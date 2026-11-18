@@ -15,8 +15,16 @@ const assets = require('./src/assets');
 const PORT = Number(process.env.PORT ?? 8080);
 const INTERNAL_SECRET = process.env.HAMSTER_INTERNAL_SECRET ?? 'dev-internal-secret';
 const APPROVAL_TTL_SECONDS = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
+const CORS_ORIGIN = process.env.HAMSTER_CORS_ORIGIN ?? 'http://localhost:3000';
 
 const app = express();
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-hamster-internal-secret');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  return next();
+});
 app.use(express.json({ limit: '1mb' }));
 
 // ------------------------------------------------------------------ helpers
@@ -65,16 +73,14 @@ async function taskDetail(taskId) {
     query('SELECT control_seq, type, payload, status, created_at, applied_at FROM task_controls WHERE task_id = $1 ORDER BY control_seq ASC', [taskId]),
     query('SELECT id, action, params, status, expires_at, decided_at, decision_note, consumed_at FROM approvals WHERE task_id = $1 ORDER BY requested_at ASC', [taskId]),
   ]);
-  const lastEventAt = evts.rows.at(-1)?.created_at ?? null;
-  const nonTerminal = !['succeeded', 'failed', 'cancelled'].includes(t.status);
-  const needsReview =
-    nonTerminal && lastEventAt !== null && Date.now() - new Date(lastEventAt).getTime() > 15 * 60 * 1000;
+  const failureEvent = [...evts.rows].reverse().find((e) => e.kind === 'failure') ?? null;
   return {
     ...taskJson(t),
     events: evts.rows,
     controls: ctrls.rows,
     approvals: apprs.rows,
-    needsReview,
+    // Human-readable failure reason for the Task card (design-table status: Failed).
+    failureReason: failureEvent?.message ?? null,
   };
 }
 
@@ -425,7 +431,28 @@ app.get('/api/assets/:id', asyncRoute(async (req, res) => {
   if (asset.revoked_at) {
     return res.status(403).json({ error: 'asset_revoked', detail: 'Access to this asset was revoked. The cached snapshot is not served.' });
   }
-  res.json({ assetId: asset.id, taskId: asset.task_id, conversationId: asset.conversation_id, title: asset.title, source: asset.source, layoutVersion: asset.layout_version, freshness: asset.freshness, lastSuccessAt: asset.last_success_at, lastError: asset.freshness === 'refresh_failed' ? asset.last_error : null, publishedAt: asset.published_at, openui: asset.openui_document, bindings: asset.bindings });
+  // Prefer the latest snapshot when present; otherwise the creation-time default.
+  // Refresh mutates snapshot rows + freshness only — never the openui_document.
+  const snap = await query(
+    `SELECT data FROM asset_snapshots WHERE asset_id = $1 ORDER BY id DESC LIMIT 1`,
+    [asset.id]
+  );
+  const data = snap.rows[0]?.data ?? asset.default_data;
+  res.json({
+    assetId: asset.id,
+    taskId: asset.task_id,
+    conversationId: asset.conversation_id,
+    title: asset.title,
+    source: asset.source,
+    layoutVersion: asset.layout_version,
+    freshness: asset.freshness,
+    lastSuccessAt: asset.last_success_at,
+    lastError: asset.freshness === 'refresh_failed' ? asset.last_error : null,
+    publishedAt: asset.published_at,
+    openui: asset.openui_document,
+    bindings: asset.bindings,
+    data,
+  });
 }));
 
 // toolProvider target: fetch one named query's fresh data. Also refreshes the
@@ -620,11 +647,21 @@ app.post('/internal/events', requireInternal, asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'task_cancelled' });
   }
   const ev = await events.appendTaskEvent(taskId, { kind, message, step, total });
-  await query(
-    `UPDATE tasks SET status = 'running', updated_at = now()
-      WHERE id = $1 AND status IN ('queued', 'waiting_for_approval')`,
-    [taskId]
-  );
+  if (kind === 'failure') {
+    // Design-table terminal status is Failed — never leave a still-Running card
+    // beside a "halted" chat line for this task.
+    await query(
+      `UPDATE tasks SET status = 'failed', updated_at = now()
+        WHERE id = $1 AND status NOT IN ('cancelled')`,
+      [taskId]
+    );
+  } else {
+    await query(
+      `UPDATE tasks SET status = 'running', updated_at = now()
+        WHERE id = $1 AND status IN ('queued', 'waiting_for_approval')`,
+      [taskId]
+    );
+  }
   res.status(201).json({ seq: ev?.seq ?? null });
 }));
 

@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package.json ./
+COPY package.json package-lock.json ./
 RUN npm install --no-audit --no-fund
 
 COPY agent ./agent
+COPY lib ./lib
+COPY tsconfig.json ./
 
 # Build the eve server. No model provider key is required for the scripted
 # fixture model; HAMSTER_MODEL_ID switches to a real provider at runtime.

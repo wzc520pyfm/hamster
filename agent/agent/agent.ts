@@ -62,7 +62,9 @@ function scriptedRespond(request: ScriptedRequest) {
 
   const text = lastUserMessage ?? "";
 
-  // Control receipts: acknowledge a steer exactly once per controlSeq.
+  // Control receipts: acknowledge a steer exactly once per controlSeq, then
+  // continue the worker loop when this is a worker session (steer must not
+  // terminate the independent task).
   const steer = text.match(/CONTROL-STEER taskId=\S+ controlSeq=(\d+)/);
   if (steer) {
     const controlSeq = Number(steer[1]);
@@ -74,7 +76,10 @@ function scriptedRespond(request: ScriptedRequest) {
     if (!already) {
       return { toolCalls: [{ name: "acknowledge_control", input: { taskId, controlSeq } }] };
     }
-    return { text: `Steer #${controlSeq} applied for task ${taskId}.` };
+    if (!isWorker) {
+      return { text: `Steer #${controlSeq} applied for task ${taskId}.` };
+    }
+    // Fall through to resume worker checkpoints after the receipt is Applied.
   }
 
   if (/CONTROL-CANCEL/.test(text)) {
@@ -97,13 +102,37 @@ function scriptedRespond(request: ScriptedRequest) {
   const taskId = taskMatch?.[1] ?? "";
   const titleMatch = userMessages
     .find((m) => m.startsWith("[hamster-worker"))
-    ?.match(/title=([^|]+)/);
-  const title = titleMatch?.[1]?.trim() ?? "Weekly metrics dashboard";
+    ?.match(/title=([^\]]+)/);
+  const title = (titleMatch?.[1] ?? "Weekly metrics dashboard").trim();
 
   const errored = toolResults.find((r) => r.isError);
   if (errored) {
+    const failureReason =
+      errored.name === "publish_dashboard"
+        ? `Publishing the dashboard for “${title}” was not approved or was denied, so it did not run.`
+        : `“${title}” failed while running ${errored.name.replaceAll("_", " ")}.`;
+    const erroredIndex = toolResults.indexOf(errored);
+    const failureRecorded = toolResults.some(
+      (r, idx) =>
+        idx > erroredIndex && r.name === "record_task_event" && !r.isError,
+    );
+    if (!failureRecorded) {
+      return {
+        toolCalls: [
+          {
+            name: "record_task_event",
+            input: {
+              taskId,
+              kind: "failure",
+              message: failureReason,
+            },
+          },
+        ],
+      };
+    }
+    // Name the task in chat so a Failed card is never confused with a still-Running sibling.
     return {
-      text: `Task halted: tool ${errored.name} reported an error. See the task timeline for details.`,
+      text: `Failed: “${title}” (${taskId}) — ${failureReason}`,
     };
   }
 

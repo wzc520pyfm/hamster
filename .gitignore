@@ -1,8 +1,14 @@
 node_modules/
 .eve/
 .output/
+dist/
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+.DS_Store
+npm-debug.log*
+client/dist/
+api/node_modules/
+agent/node_modules/

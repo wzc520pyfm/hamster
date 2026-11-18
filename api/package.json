@@ -8,8 +8,10 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "@openuidev/lang-core": "^1.1.1",
     "express": "^4.21.2",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "zod": "^4.6.7"
   },
   "engines": {
     "node": ">=20"

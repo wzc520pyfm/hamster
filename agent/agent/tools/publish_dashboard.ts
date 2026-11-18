@@ -16,7 +16,10 @@ export default defineTool({
   // unexpired ticket bound to these exact parameters.
   approval: always(),
   async execute(input) {
+    // Params must match the approval ticket bound to this exact call input
+    // (including taskId), or the control plane returns no_valid_ticket.
     const decision = await policyCheck(input.taskId, "publish_dashboard", {
+      taskId: input.taskId,
       assetId: input.assetId,
       channel: input.channel,
     });

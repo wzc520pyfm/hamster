@@ -79,8 +79,9 @@ export function ConversationPage({
   }
 
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col gap-3">
-      <header className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
+    // Narrow shell has a sticky top bar; keep the composer in the first viewport.
+    <div className="flex h-[calc(100dvh-5.75rem)] min-h-0 flex-col gap-3 md:h-[calc(100vh-2rem)]">
+      <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
         <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
           {t.mainConversation}
         </h1>
@@ -148,20 +149,28 @@ export function ConversationPage({
       ) : null}
 
       <form
-        className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
+        className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
         onSubmit={(e) => {
           e.preventDefault()
           void send(text)
         }}
       >
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            className="h-10 min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-white px-3 outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
+          <textarea
+            className="min-h-[4.5rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
+            rows={3}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t.composerPlaceholder}
             aria-label={t.composerPlaceholder}
             disabled={!conversationId || sending}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                void send(text)
+              }
+            }}
           />
           <Button type="submit" disabled={!conversationId || sending || !text.trim()}>
             {t.send}

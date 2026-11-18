@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useId, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLocale } from '@/i18n/LocaleContext'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +11,23 @@ export function Shell({
   conversationTitle: string
 }) {
   const { locale, t, setLocale } = useLocale()
+  const location = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const panelId = useId()
+
+  // Close the narrow drawer after navigation so the main column stays full-width.
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -19,76 +37,159 @@ export function Shell({
         : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]',
     )
 
-  return (
-    <div className="mx-auto flex min-h-screen max-w-6xl gap-0 md:gap-4 md:p-4">
-      <aside
-        className="sticky top-0 flex h-screen w-[13.5rem] shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-4 backdrop-blur-md md:h-[calc(100vh-2rem)] md:rounded-xl md:border"
-        style={{ animation: 'shell-in 420ms ease-out' }}
+  const brandBlock = (
+    <div className="mb-6 px-1">
+      <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+        {t.brand}
+      </div>
+      <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{t.preview}</div>
+    </div>
+  )
+
+  const links = (
+    <nav className="flex flex-col gap-1">
+      <NavLink to="/" end className={linkClass} onClick={() => setMenuOpen(false)}>
+        <div className="font-medium">{t.conversation}</div>
+        <div className="truncate text-xs opacity-80">{conversationTitle || t.mainConversation}</div>
+      </NavLink>
+      <NavLink to="/assets" className={linkClass} onClick={() => setMenuOpen(false)}>
+        {t.dashboards}
+      </NavLink>
+      <NavLink to="/approvals" className={linkClass} onClick={() => setMenuOpen(false)}>
+        <span className="inline-flex w-full items-center justify-between gap-2">
+          <span>{t.approvals}</span>
+          {pendingApprovals > 0 ? (
+            <span className="rounded-md bg-[var(--color-muted)] px-1.5 py-0.5 text-xs tabular-nums">
+              {pendingApprovals}
+            </span>
+          ) : null}
+        </span>
+      </NavLink>
+    </nav>
+  )
+
+  const localeToggle = (
+    <div
+      className="mt-auto flex items-center gap-1 border-t border-[var(--color-border)] pt-3"
+      role="group"
+      aria-label="Language"
+    >
+      <button
+        type="button"
+        data-testid="locale-en"
+        className={cn(
+          'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+          locale === 'en'
+            ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+        )}
+        aria-pressed={locale === 'en'}
+        onClick={() => setLocale('en')}
       >
-        <div className="mb-6 px-1">
-          <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+        EN
+      </button>
+      <button
+        type="button"
+        data-testid="locale-zh"
+        className={cn(
+          'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+          locale === 'zh'
+            ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+        )}
+        aria-pressed={locale === 'zh'}
+        onClick={() => setLocale('zh')}
+      >
+        中文
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-0 md:flex-row md:gap-4 md:p-4">
+      {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
+        <div className="min-w-0">
+          <div className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight">
             {t.brand}
           </div>
-          <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{t.preview}</div>
+          <div className="text-[11px] text-[var(--color-muted-foreground)]">{t.preview}</div>
         </div>
-
-        <nav className="flex flex-col gap-1">
-          <NavLink to="/" end className={linkClass}>
-            <div className="font-medium">{t.conversation}</div>
-            <div className="truncate text-xs opacity-80">{conversationTitle || t.mainConversation}</div>
-          </NavLink>
-          <NavLink to="/assets" className={linkClass}>
-            {t.dashboards}
-          </NavLink>
-          <NavLink to="/approvals" className={linkClass}>
-            <span className="inline-flex w-full items-center justify-between gap-2">
-              <span>{t.approvals}</span>
-              {pendingApprovals > 0 ? (
-                <span className="rounded-md bg-[var(--color-muted)] px-1.5 py-0.5 text-xs tabular-nums">
-                  {pendingApprovals}
-                </span>
-              ) : null}
-            </span>
-          </NavLink>
-        </nav>
-
-        <div
-          className="mt-auto flex items-center gap-1 border-t border-[var(--color-border)] pt-3"
-          role="group"
-          aria-label="Language"
-        >
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex items-center gap-0.5" role="group" aria-label="Language">
+            <button
+              type="button"
+              data-testid="locale-en"
+              className={cn(
+                'h-8 rounded-md px-2 text-xs font-medium transition-colors',
+                locale === 'en'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+                  : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+              )}
+              aria-pressed={locale === 'en'}
+              onClick={() => setLocale('en')}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              data-testid="locale-zh"
+              className={cn(
+                'h-8 rounded-md px-2 text-xs font-medium transition-colors',
+                locale === 'zh'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+                  : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+              )}
+              aria-pressed={locale === 'zh'}
+              onClick={() => setLocale('zh')}
+            >
+              中文
+            </button>
+          </div>
           <button
             type="button"
-            data-testid="locale-en"
-            className={cn(
-              'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
-              locale === 'en'
-                ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-                : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
-            )}
-            aria-pressed={locale === 'en'}
-            onClick={() => setLocale('en')}
+            data-testid="shell-menu-toggle"
+            className="inline-flex h-9 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium"
+            aria-expanded={menuOpen}
+            aria-controls={panelId}
+            onClick={() => setMenuOpen((open) => !open)}
           >
-            EN
-          </button>
-          <button
-            type="button"
-            data-testid="locale-zh"
-            className={cn(
-              'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
-              locale === 'zh'
-                ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-                : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
-            )}
-            aria-pressed={locale === 'zh'}
-            onClick={() => setLocale('zh')}
-          >
-            中文
+            {menuOpen ? t.closeMenu : t.openMenu}
           </button>
         </div>
+      </header>
+
+      {/* Desktop sidebar (unchanged composition at md+). */}
+      <aside
+        className="sticky top-0 hidden h-[calc(100vh-2rem)] w-[13.5rem] shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-4 backdrop-blur-md md:flex"
+        style={{ animation: 'shell-in 420ms ease-out' }}
+      >
+        {brandBlock}
+        {links}
+        {localeToggle}
       </aside>
 
-      <main className="min-w-0 flex-1 px-3 py-4 md:px-0 md:py-0">
+      {/* Narrow drawer overlay — nav only; locale stays on the top bar. */}
+      {menuOpen ? (
+        <div className="fixed inset-0 z-40 md:hidden" role="presentation">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[rgba(26,35,48,0.35)]"
+            aria-label={t.closeMenu}
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside
+            id={panelId}
+            className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 shadow-[4px_0_24px_rgba(26,35,48,0.12)]"
+            style={{ animation: 'shell-in 280ms ease-out' }}
+          >
+            {brandBlock}
+            {links}
+          </aside>
+        </div>
+      ) : null}
+
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 md:px-0 md:py-0">
         <Outlet />
       </main>
 

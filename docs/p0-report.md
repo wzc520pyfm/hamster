@@ -54,7 +54,7 @@ Now asserts (among retained Line A / policy checks):
 | Approvals | Observed | Cards with exact `Expired — not approved, so it did not run` and `Invalidated — approve again` (no live pending card in that dataset) |
 | EN \| 中文 | **Pass (Playwright)** | `scripts/ui-smoke-locale.mjs` — nav `对话` / `Dashboard 库` / `待审批`, header `主对话`, then back to EN. Earlier computer-use click coordinates falsely reported fail; deterministic Playwright proves the toggle. |
 
-Screenshots (browser smoke): `docs/evidence/ui-smoke/` (see `NOTES.md`). Coverage expansion adds live **Needs approval** + Deny/Approve, task statuses Queued/Running/Waiting for approval/Succeeded/Cancelled (Failed kept from prior), steer receipts Received/Pending apply/Applied, dashboard **Refresh failed — still showing last success** + Retry, ZH copies for key badges, and narrow viewports. **Stale** freshness remains unverified (no product path sets it). **Not a design-gate pass.**
+Screenshots (browser smoke): `docs/evidence/ui-smoke/` (see `NOTES.md`). Coverage expansion plus narrow-shell must-fix recaptures (`*-shellfix.webp`): drawer nav below `md`, non-truncating freshness + visible Retry/重试 at 390×844, full composer placeholders. Prior `2f65210` truncated narrow-dashboard shot kept as failure evidence. **Stale** freshness remains unverified (no product path sets it). **Not a design-gate pass.**
 
 This is **not** a full product E2E suite.
 

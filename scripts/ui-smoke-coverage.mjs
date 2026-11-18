@@ -14,8 +14,9 @@
  *   --width N
  *   --height N
  *   --out FILE          absolute or relative to docs/evidence/ui-smoke/
- *   --wait-text TEXT    wait for visible text before shot
- *   --scroll-text TEXT  scroll element containing text into view
+ *   --wait-text TEXT         wait for visible text before shot
+ *   --wait-placeholder TEXT  wait for an input/textarea with this placeholder
+ *   --scroll-text TEXT       scroll element containing text into view
  */
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -43,6 +44,7 @@ async function shotOnce(opts) {
     height = 900,
     out,
     waitText = null,
+    waitPlaceholder = null,
     scrollText = null,
     fullPage = false,
   } = opts
@@ -55,21 +57,34 @@ async function shotOnce(opts) {
     viewport: { width: Number(width), height: Number(height) },
   })
   await page.goto(CLIENT_BASE + urlPath, { waitUntil: 'networkidle' })
+  // Narrow shell keeps locale on the top bar; desktop keeps it in the aside.
+  // Both stay in the DOM, so click only the visible control.
+  const clickLocale = async (id) => {
+    const visible = page.getByTestId(id).locator('visible=true')
+    if ((await visible.count()) > 0) {
+      await visible.first().click()
+      return true
+    }
+    return false
+  }
   if (locale === 'zh') {
-    await page.getByTestId('locale-zh').click()
+    await clickLocale('locale-zh')
     await page.waitForTimeout(400)
   } else {
-    const en = page.getByTestId('locale-en')
-    if (await en.count()) {
-      await en.click().catch(() => undefined)
-      await page.waitForTimeout(200)
-    }
+    await clickLocale('locale-en')
+    await page.waitForTimeout(200)
   }
   if (waitText) {
     // Prefer exact match so titles like "Succeeded capture…" do not satisfy a
     // status wait for the word "Succeeded".
     const exact = process.argv.includes('--wait-exact')
     await page.getByText(waitText, { exact }).first().waitFor({
+      state: 'visible',
+      timeout: 20000,
+    })
+  }
+  if (waitPlaceholder) {
+    await page.locator(`textarea[placeholder="${waitPlaceholder}"], input[placeholder="${waitPlaceholder}"]`).first().waitFor({
       state: 'visible',
       timeout: 20000,
     })
@@ -101,6 +116,7 @@ if (cmd === 'shot') {
     height: arg('--height', '900'),
     out: arg('--out', name ? `${name}.png` : null),
     waitText: arg('--wait-text', null),
+    waitPlaceholder: arg('--wait-placeholder', null),
     scrollText: arg('--scroll-text', null),
     fullPage: process.argv.includes('--full-page'),
   })

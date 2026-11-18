@@ -147,8 +147,8 @@ export function DashboardView({
 
   return (
     <div className="flex h-[calc(100vh-2rem)] flex-col gap-3">
-      <header className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 p-4 backdrop-blur">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 p-4 backdrop-blur">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="mb-2">
               <Button asChild size="sm" variant="ghost">
@@ -168,18 +168,25 @@ export function DashboardView({
               <span>layout v{asset.layoutVersion}</span>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
+          {/* Full-width on narrow so freshness copy + Retry stay in the first viewport. */}
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:max-w-[min(100%,22rem)] sm:items-end">
             <Badge
               tone={
                 freshness === 'refresh_failed' ? 'danger' : freshness === 'stale' ? 'warn' : 'info'
               }
+              className="max-w-full whitespace-normal text-left leading-snug sm:text-right"
             >
               {freshnessLabel(freshness, lastSuccessAt, locale, localeTag)}
             </Badge>
-            <div className="text-xs text-[var(--color-muted-foreground)]">
+            <div className="text-xs text-[var(--color-muted-foreground)] whitespace-normal">
               {formatTime(lastSuccessAt, localeTag)}
             </div>
-            <Button size="sm" onClick={() => void refresh()} disabled={refreshing}>
+            <Button
+              size="sm"
+              className="w-fit"
+              onClick={() => void refresh()}
+              disabled={refreshing}
+            >
               {freshness === 'refresh_failed' ? t.retry : t.refresh}
             </Button>
           </div>

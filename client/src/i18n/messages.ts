@@ -78,6 +78,8 @@ const copy = {
     loading: 'Loading…',
     error: 'Something went wrong',
     failureReason: 'Failure reason',
+    openMenu: 'Menu',
+    closeMenu: 'Close menu',
   },
   zh: {
     brand: 'Hamster',
@@ -115,6 +117,8 @@ const copy = {
     loading: '加载中…',
     error: '出错了',
     failureReason: '失败原因',
+    openMenu: '菜单',
+    closeMenu: '关闭菜单',
   },
 } as const
 

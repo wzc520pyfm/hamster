@@ -1,48 +1,46 @@
-# UI smoke screenshots — coverage expansion
+# UI smoke screenshots — narrow shell must-fix recapture
 
-**Not a design-gate pass.** Eve is not frozen. Repo stays private.
+**Not a design-gate pass.** Eve is not frozen. Repo stays private. No merge.
 
-Kept from `e4d4b73` (must-fix set): `conversation.webp`, `approvals.webp`, `dashboard.webp`.
+Kept prior evidence:
 
-New files below were captured on the fixture / `mockModel` / local-equivalent path after that commit. Capture helpers: `scripts/capture-ui-smoke-coverage.sh`, `scripts/ui-smoke-coverage.mjs` (Playwright via `http://localhost:3000` to match CORS).
+- From `e4d4b73` (copy must-fixes): `conversation.webp`, `approvals.webp`, `dashboard.webp`.
+- From `2f65210` (coverage expansion): desktop/task/control shots, plus the **failure-documenting** narrow set `narrow-dashboard-refresh-failed-retry.webp` (truncated freshness / squeezed column). Those files are intentionally retained and were **not** overwritten.
 
-## Captured (exact design-table copy)
+Product fixes in this pass (narrow shell only; desktop aside unchanged at `md+`):
+
+1. Freshness badges may wrap; words are not clipped or ellipsized. Dashboard header keeps full freshness copy, full timestamp, and **Retry** / **重试** in the 390×844 viewport.
+2. Below `md`, the left nav collapses to a top-bar **Menu** / **菜单** drawer so the main column uses the full width. Composer uses a wrapping textarea so the full design-table placeholder stays visible.
+
+Capture helpers: `scripts/capture-ui-smoke-shellfix.sh`, `scripts/ui-smoke-coverage.mjs` (Playwright via `http://localhost:3000`).
+
+## Captured this pass (new or repaired filenames)
 
 | File | State |
 | --- | --- |
-| `approval-pending-needs-approval.webp` | Live pending card: **Needs approval** + **Deny** / **Approve this action** |
-| `zh-approval-pending-needs-approval.webp` | Same: **需要批准** |
-| `narrow-approval-pending-needs-approval.webp` | Same pending approval, 390×844 |
-| `task-queued.webp` | Task card **Queued** (observed while `eve.createSession` hung under SIGSTOP) |
-| `task-running.webp` | Task card **Running** |
-| `task-waiting-for-approval.webp` | Task card **Waiting for approval** |
-| `zh-task-waiting-for-approval.webp` | **等待审批** |
-| `task-succeeded.webp` | Task card **Succeeded** (after honest approve → consume publish ticket) |
-| `zh-task-succeeded.webp` | **已成功** |
-| `task-cancelled.webp` | Task card **Cancelled** |
-| `zh-task-cancelled.webp` | **已取消** |
-| `zh-task-failed.webp` | **已失败** (Failed already in `conversation.webp`) |
-| `control-received.webp` | Steer receipt **Received** (eve down → deliver failed; that task only) |
-| `zh-control-received.webp` | **已收到** |
-| `control-pending-apply.webp` | Steer receipt **Pending apply** (delivered; acknowledge blocked by mismatched internal secret) |
-| `zh-control-pending-apply.webp` | **待应用** |
-| `control-applied.webp` | Steer/cancel receipt **Applied** |
-| `zh-control-applied.webp` | **已应用** |
-| `dashboard-refresh-failed-retry.webp` | **Refresh failed — still showing last success** + **Retry**; layout retained |
-| `zh-dashboard-refresh-failed-retry.webp` | **刷新失败，仍保留上次成功结果** + **重试** |
-| `narrow-dashboard-refresh-failed-retry.webp` | Same freshness/Retry, narrow viewport |
-| `narrow-conversation.webp` | Narrow conversation (Cancelled visible) |
+| `narrow-dashboard-refresh-failed-retry-shellfix.webp` | EN 390×844: full **Refresh failed — still showing last success**, full timestamp, visible **Retry**, last-success layout retained; Menu drawer shell |
+| `zh-narrow-dashboard-refresh-failed-retry-shellfix.webp` | ZH 390×844: full **刷新失败，仍保留上次成功结果**, full timestamp, visible **重试**, last-success layout retained |
+| `narrow-conversation-shellfix.webp` | EN 390×844 conversation; full composer placeholder **Message Hamster… Use “start task: …” to dispatch.** |
+| `zh-narrow-conversation-shellfix.webp` | ZH 390×844; full **给 Hamster 发消息… 用 “start task: …” 派发任务。** |
+| `narrow-approval-pending-shellfix.webp` | EN 390×844 pending: **Needs approval** |
+| `zh-narrow-approval-pending-shellfix.webp` | ZH 390×844 pending: **需要批准** |
+| `zh-task-cancelled.webp` | **Repaired** — complete **已取消** badge + title (prior crop was defective) |
+| `zh-task-failed.webp` | **Repaired** — honest **已失败** (prior file was a byte-identical duplicate of `zh-task-succeeded.webp`) |
+| `approval-approved-this-action-only.webp` | Optional: **Approved for this action only** |
+| `zh-approval-approved-this-action-only.webp` | Optional: **仅批准此次动作** |
+| `zh-approval-expired.webp` | Optional: **已过期，未获批准，动作未执行** |
+| `zh-approval-denied.webp` | Optional: **已拒绝** |
+| `zh-approval-invalidated.webp` | Optional: **已失效，请重新审批** |
 
 ## Still unverified
 
 | State | Why |
 | --- | --- |
-| Dashboard freshness **Stale — still showing last success** / ZH **仍显示上次成功结果** | Schema + UI support `freshness=stale`, but no control-plane or client path sets it on the fixture / local-equivalent path. Not faked. |
-| ZH **Queued** / **Running** | Ephemeral windows; EN captured; ZH not re-held for those flashes in this pass. |
-| Pending approval ZH narrow | EN narrow captured; ZH narrow skipped as redundant once ZH desktop pending was verified. |
+| Dashboard freshness **Stale — still showing last success** / ZH **仍显示上次成功结果** | Schema + UI support `freshness=stale`, but no product path sets it. Not faked. |
+| ZH **Queued** / **Running** | Ephemeral windows; not re-held in this pass. Leave unverified. |
 
-## Contract note (minimal code change for Succeeded)
+## Notes
 
-Honest **Succeeded** required `publish_dashboard` policy params to match the approval ticket produced from `call.requested` input (including `taskId`). Without that, approve left an unconsumed ticket and the worker got `no_valid_ticket` → Failed. Fix: `agent/agent/tools/publish_dashboard.ts` passes the full call input into `policyCheck`. No status-copy changes. No Hermes. No merge.
-
-Do **not** treat this folder as a design-gate pass.
+- `narrow-dashboard-refresh-failed-retry.webp` from `2f65210` remains as the pre-fix failure record; use `*-shellfix.webp` for the corrected narrow behavior.
+- No design-table status words were synonym-rewritten. No Line A/B, approval, or lease contract changes. No Hermes. No eve freeze claim.
+- Do **not** treat this folder or CI/CodeRabbit as a design-gate pass.

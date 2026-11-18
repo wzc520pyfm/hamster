@@ -2,6 +2,8 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
+  // Default nowrap for short lifecycle/control badges. Long freshness copy
+  // overrides with whitespace-normal so words are never clipped or ellipsized.
   'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap',
   {
     variants: {

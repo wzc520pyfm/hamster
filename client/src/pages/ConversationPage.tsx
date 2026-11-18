@@ -216,7 +216,9 @@ function renderTimeline(
         <div className="mb-1 text-[11px] uppercase tracking-wide text-[var(--color-muted-foreground)]">
           {message.role}
         </div>
-        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        <div className="whitespace-pre-wrap break-words">
+          {displayMessageContent(message, taskById)}
+        </div>
       </div>,
     )
   }
@@ -237,4 +239,19 @@ function renderTimeline(
   }
 
   return nodes
+}
+
+/** Never show a bare “Task halted” line that can be misread against a still-Running card. */
+function displayMessageContent(
+  message: TimelineMessage,
+  taskById: Map<string, Timeline['tasks'][number]>,
+) {
+  const content = message.content
+  if (!/^Task halted:/i.test(content)) return content
+  const taskId = typeof message.meta?.taskId === 'string' ? message.meta.taskId : null
+  const task = taskId ? taskById.get(taskId) : null
+  if (task) {
+    return `Failed: “${task.title}” (${task.taskId}) — see that task’s card for the failure reason.`
+  }
+  return content.replace(/^Task halted:/i, 'Failed:')
 }

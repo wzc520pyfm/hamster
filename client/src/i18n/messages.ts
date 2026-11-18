@@ -77,7 +77,7 @@ const copy = {
     layoutNote: 'Layout stays mounted. Refresh re-fetches saved bindings only.',
     loading: 'Loading…',
     error: 'Something went wrong',
-    needsReview: 'Needs review after process gap',
+    failureReason: 'Failure reason',
   },
   zh: {
     brand: 'Hamster',
@@ -114,7 +114,7 @@ const copy = {
     layoutNote: '布局保持挂载。刷新只按已保存绑定取数。',
     loading: '加载中…',
     error: '出错了',
-    needsReview: '进程中断后需复核',
+    failureReason: '失败原因',
   },
 } as const
 
@@ -152,4 +152,33 @@ export function freshnessLabel(
   if (freshness === 'refresh_failed') return FRESHNESS.refreshFailed[locale]
   if (freshness === 'stale') return FRESHNESS.stale[locale]
   return FRESHNESS.lastSucceeded[locale](time)
+}
+
+/** Plain-language approval titles — never show raw tool ids as the card title. */
+export function approvalActionLabel(
+  action: string,
+  params: Record<string, unknown> | null | undefined,
+  locale: Locale,
+): string {
+  const channel =
+    typeof params?.channel === 'string' && params.channel.trim() ? params.channel.trim() : null
+  switch (action) {
+    case 'publish_dashboard':
+      return locale === 'zh'
+        ? channel
+          ? `将此 Dashboard 发布到${channel}`
+          : '发布此 Dashboard'
+        : channel
+          ? `Publish this dashboard to ${channel}`
+          : 'Publish this dashboard'
+    case 'save_dashboard_page':
+      return locale === 'zh' ? '保存 Dashboard 页面' : 'Save the dashboard page'
+    case 'unknown_action':
+    case '':
+    case undefined:
+      return locale === 'zh' ? '未知动作（需要批准）' : 'An unknown action (needs approval)'
+    default:
+      // Unknown tool id: say so in plain words, do not echo the identifier as the title.
+      return locale === 'zh' ? '未知动作（需要批准）' : 'An unknown action (needs approval)'
+  }
 }

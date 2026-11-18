@@ -10,6 +10,43 @@ const { paramsHash } = require('./policy');
 
 const EXPIRY_NOTE = 'Expired — not approved, so it did not run';
 
+// Same-session tool approvals omit origin.call; the tool name/input live on the
+// preceding call.requested fact keyed by subject.callId. Subagent relays still
+// carry origin.call. Cache both so tickets get the real action for policy match
+// and so the React client can map to plain-language titles (never show raw ids).
+const callBySessionAndId = new Map(); // `${sessionId}:${callId}` -> { name, input }
+
+function callCacheKey(sessionId, callId) {
+  return `${sessionId}:${callId}`;
+}
+
+function rememberCallRequested(sessionId, fact) {
+  const data = fact.data ?? {};
+  const callId = data.callId;
+  const name = data.capability?.name;
+  if (!callId || !name) return;
+  const input =
+    data.input && typeof data.input === 'object' && !Array.isArray(data.input) ? data.input : {};
+  callBySessionAndId.set(callCacheKey(sessionId, callId), { name: String(name), input });
+}
+
+function resolveApprovalCall(sessionId, data) {
+  const originCall = data.origin?.call ?? null;
+  if (originCall?.name && String(originCall.name).trim()) {
+    const input =
+      originCall.input && typeof originCall.input === 'object' && !Array.isArray(originCall.input)
+        ? originCall.input
+        : {};
+    return { name: String(originCall.name).trim(), input };
+  }
+  const callId = data.subject?.callId;
+  if (callId) {
+    const cached = callBySessionAndId.get(callCacheKey(sessionId, callId));
+    if (cached?.name) return cached;
+  }
+  return { name: 'unknown_action', input: {} };
+}
+
 async function findTaskBySession(sessionId) {
   const { rows } = await query('SELECT * FROM tasks WHERE eve_session_id = $1', [sessionId]);
   return rows[0] ?? null;
@@ -21,8 +58,8 @@ async function findConversationBySession(sessionId) {
 }
 
 // Upsert a ticket for a pending eve approval. Params come from the call site the
-// worker attempted (origin.call.input), so authorization stays bound to exactly
-// what was asked, never to a later natural-language echo of it.
+// worker attempted (origin.call.input or call.requested.input), so authorization
+// stays bound to exactly what was asked, never to a later natural-language echo.
 async function handleApprovalOpened(fact, sessionId) {
   const data = fact.data ?? {};
   if (data.request?.kind !== 'approval') return;
@@ -31,9 +68,10 @@ async function handleApprovalOpened(fact, sessionId) {
     console.log('[events] approval opened on non-task session; not bound to a ticket', sessionId);
     return;
   }
-  const origin = data.origin?.call ?? null;
-  const action = origin?.name ?? 'unknown_action';
-  const params = origin?.input ?? {};
+  const resolved = resolveApprovalCall(sessionId, data);
+  // Machine id for policy matching; React maps to plain-language card titles.
+  const action = resolved.name || 'unknown_action';
+  const params = resolved.input ?? {};
   const hash = paramsHash(params);
   const approvalId = `appr_${data.interactionId}`;
   const ttlSeconds = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
@@ -185,6 +223,9 @@ async function audit(action, detail, actor = 'system') {
 
 async function handleFact(key, sessionId, fact) {
   switch (fact?.type) {
+    case 'call.requested':
+      rememberCallRequested(sessionId, fact);
+      return undefined;
     case 'interaction.opened':
       return handleApprovalOpened(fact, sessionId);
     case 'interaction.settled':

@@ -24,6 +24,10 @@ export function TaskCard({
   const [busy, setBusy] = useState(false)
   const terminal = ['succeeded', 'failed', 'cancelled'].includes(task.status)
   const latestControl = task.controls.at(-1)
+  const failureReason =
+    task.failureReason ||
+    [...task.events].reverse().find((e) => e.kind === 'failure')?.message ||
+    null
 
   return (
     <article
@@ -44,11 +48,20 @@ export function TaskCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           <TaskStatusLabel status={task.status} locale={locale} />
-          {task.needsReview ? (
-            <span className="text-xs text-[var(--color-muted-foreground)]">{t.needsReview}</span>
-          ) : null}
         </div>
       </header>
+
+      {task.status === 'failed' && failureReason ? (
+        <div className="mt-3 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-2.5 py-2 text-sm text-[var(--color-destructive)]">
+          <div className="text-xs font-medium text-[var(--color-muted-foreground)]">
+            {t.failureReason}
+          </div>
+          <div className="mt-0.5">
+            <span className="font-medium">{task.title}</span>
+            <span> — {failureReason}</span>
+          </div>
+        </div>
+      ) : null}
 
       {task.events.length > 0 ? (
         <div className="mt-3">
@@ -64,6 +77,7 @@ export function TaskCard({
                 <span className="font-mono text-[11px] text-[var(--color-muted-foreground)]">
                   #{ev.seq}
                   {ev.step != null && ev.total != null ? ` · ${ev.step}/${ev.total}` : ''}
+                  {ev.kind === 'failure' ? ' · failure' : ''}
                 </span>
                 <div>{ev.message}</div>
               </li>

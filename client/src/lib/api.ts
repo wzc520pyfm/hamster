@@ -91,7 +91,7 @@ export interface TaskDetail {
   events: TaskEvent[]
   controls: TaskControl[]
   approvals: Approval[]
-  needsReview?: boolean
+  failureReason?: string | null
 }
 
 export interface TimelineMessage {

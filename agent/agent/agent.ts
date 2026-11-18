@@ -107,8 +107,32 @@ function scriptedRespond(request: ScriptedRequest) {
 
   const errored = toolResults.find((r) => r.isError);
   if (errored) {
+    const failureReason =
+      errored.name === "publish_dashboard"
+        ? `Publishing the dashboard for “${title}” was not approved or was denied, so it did not run.`
+        : `“${title}” failed while running ${errored.name.replaceAll("_", " ")}.`;
+    const erroredIndex = toolResults.indexOf(errored);
+    const failureRecorded = toolResults.some(
+      (r, idx) =>
+        idx > erroredIndex && r.name === "record_task_event" && !r.isError,
+    );
+    if (!failureRecorded) {
+      return {
+        toolCalls: [
+          {
+            name: "record_task_event",
+            input: {
+              taskId,
+              kind: "failure",
+              message: failureReason,
+            },
+          },
+        ],
+      };
+    }
+    // Name the task in chat so a Failed card is never confused with a still-Running sibling.
     return {
-      text: `Task halted: tool ${errored.name} reported an error. See the task timeline for details.`,
+      text: `Failed: “${title}” (${taskId}) — ${failureReason}`,
     };
   }
 

@@ -73,16 +73,14 @@ async function taskDetail(taskId) {
     query('SELECT control_seq, type, payload, status, created_at, applied_at FROM task_controls WHERE task_id = $1 ORDER BY control_seq ASC', [taskId]),
     query('SELECT id, action, params, status, expires_at, decided_at, decision_note, consumed_at FROM approvals WHERE task_id = $1 ORDER BY requested_at ASC', [taskId]),
   ]);
-  const lastEventAt = evts.rows.at(-1)?.created_at ?? null;
-  const nonTerminal = !['succeeded', 'failed', 'cancelled'].includes(t.status);
-  const needsReview =
-    nonTerminal && lastEventAt !== null && Date.now() - new Date(lastEventAt).getTime() > 15 * 60 * 1000;
+  const failureEvent = [...evts.rows].reverse().find((e) => e.kind === 'failure') ?? null;
   return {
     ...taskJson(t),
     events: evts.rows,
     controls: ctrls.rows,
     approvals: apprs.rows,
-    needsReview,
+    // Human-readable failure reason for the Task card (design-table status: Failed).
+    failureReason: failureEvent?.message ?? null,
   };
 }
 
@@ -649,11 +647,21 @@ app.post('/internal/events', requireInternal, asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'task_cancelled' });
   }
   const ev = await events.appendTaskEvent(taskId, { kind, message, step, total });
-  await query(
-    `UPDATE tasks SET status = 'running', updated_at = now()
-      WHERE id = $1 AND status IN ('queued', 'waiting_for_approval')`,
-    [taskId]
-  );
+  if (kind === 'failure') {
+    // Design-table terminal status is Failed — never leave a still-Running card
+    // beside a "halted" chat line for this task.
+    await query(
+      `UPDATE tasks SET status = 'failed', updated_at = now()
+        WHERE id = $1 AND status NOT IN ('cancelled')`,
+      [taskId]
+    );
+  } else {
+    await query(
+      `UPDATE tasks SET status = 'running', updated_at = now()
+        WHERE id = $1 AND status IN ('queued', 'waiting_for_approval')`,
+      [taskId]
+    );
+  }
   res.status(201).json({ seq: ev?.seq ?? null });
 }));
 

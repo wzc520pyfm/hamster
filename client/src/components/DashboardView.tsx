@@ -1,16 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Renderer, type OpenUIError } from '@openuidev/react-lang'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { freshnessLabel, getCopy, type Locale } from '@/i18n/messages'
 import { api, type AssetDetail, type Freshness } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
+import { hamsterOpenUiLibrary, RefreshTokenContext } from '@/openui/library'
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
 
 /**
  * Persistent dashboard surface (Line B).
  * - Same route for library open and in-chat open: /assets/:assetId
- * - Refresh re-fetches saved bindings into stable slots; layout stays mounted.
- * - On failure, last successful snapshot remains visible with exact status copy.
+ * - Renders the persisted OpenUI React Lang 1.0 document via @openuidev/react-lang
+ * - Refresh bumps $rev only (rebinds Query data); does not regenerate or remount layout
+ * - On failure, last successful / default snapshot stays visible with exact status copy
  */
 export function DashboardView({
   assetId,
@@ -22,20 +27,20 @@ export function DashboardView({
   const t = getCopy(locale)
   const localeTag = locale === 'zh' ? 'zh-CN' : 'en-US'
   const [asset, setAsset] = useState<AssetDetail | null>(null)
-  const [data, setData] = useState<AssetDetail['data'] | null>(null)
   const [freshness, setFreshness] = useState<Freshness>('fresh')
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  // Keep the page shell mounted across refreshes; only swap slot data.
+  const [refreshToken, setRefreshToken] = useState(0)
+  const openuiRef = useRef<string | null>(null)
   const mountedOnce = useRef(false)
 
-  async function load() {
+  async function loadMeta() {
     setError(null)
     const detail = await api.getAsset(assetId)
     setAsset(detail)
-    setData(detail.data)
+    openuiRef.current = detail.openui
     setFreshness(detail.freshness)
     setLastSuccessAt(detail.lastSuccessAt)
     setLoading(false)
@@ -46,7 +51,7 @@ export function DashboardView({
     let cancelled = false
     ;(async () => {
       try {
-        await load()
+        await loadMeta()
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err))
@@ -60,21 +65,59 @@ export function DashboardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assetId])
 
+  const toolProvider = useMemo(
+    () => ({
+      metrics_weekly: async (args: Record<string, unknown>) => {
+        void args
+        const res = await fetch(
+          `${API_BASE}/api/assets/${encodeURIComponent(assetId)}/query/metrics_weekly`,
+        )
+        if (!res.ok) {
+          const body = await res.text()
+          let message = `HTTP ${res.status}`
+          try {
+            message = (JSON.parse(body) as { error?: string }).error ?? message
+          } catch {
+            // keep status text
+          }
+          throw new Error(message)
+        }
+        return res.json()
+      },
+    }),
+    [assetId],
+  )
+
+  const onOpenUiError = useCallback((errors: OpenUIError[]) => {
+    const hard = errors.filter((e) => e.severity !== 'warning')
+    if (hard.length === 0) return
+    const queryFail = hard.find((e) => e.source === 'query' || e.code?.startsWith('tool-'))
+    if (queryFail) {
+      setFreshness('refresh_failed')
+      setError(queryFail.message)
+    }
+  }, [])
+
   async function refresh() {
     if (!asset) return
     setRefreshing(true)
     setError(null)
+    const openuiBefore = openuiRef.current
     try {
+      // Product freshness bookkeeping (does not rewrite openui_document).
       const result = await api.refreshAsset(assetId)
-      // Re-fetch the same asset document; do not remount or regenerate layout.
       const detail = await api.getAsset(assetId)
+      if (openuiBefore && detail.openui !== openuiBefore) {
+        throw new Error('refresh mutated openui document — refused')
+      }
       setAsset(detail)
+      openuiRef.current = detail.openui
+      // Bump $rev inside the mounted Renderer so Query rebinds data in place.
+      setRefreshToken((n) => n + 1)
       if (result.ok) {
-        setData(detail.data)
         setFreshness('fresh')
         setLastSuccessAt(detail.lastSuccessAt)
       } else {
-        // Keep previous data in the original slots.
         setFreshness('refresh_failed')
         setError(result.error ?? 'refresh failed')
       }
@@ -90,7 +133,7 @@ export function DashboardView({
     return <div className="p-4 text-sm text-[var(--color-muted-foreground)]">{t.loading}</div>
   }
 
-  if (!asset || !data) {
+  if (!asset || !asset.openui) {
     return (
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
         <p className="text-sm">{t.error}</p>
@@ -147,57 +190,20 @@ export function DashboardView({
         ) : null}
       </header>
 
-      {/* Stable slots — never unmounted on refresh */}
+      {/* Stable OpenUI Renderer — never keyed by refreshToken (would remount layout). */}
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-        <section data-slot="head" className="mb-4">
-          <h2 className="text-lg font-semibold">Weekly metrics</h2>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Asset {asset.assetId} · source: {asset.source} · refresh re-fetches this query only
-          </p>
-        </section>
-
-        <section data-slot="kpis" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {data.kpis.map((kpi) => (
-            <div
-              key={kpi.label}
-              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-3"
-            >
-              <div className="text-xs text-[var(--color-muted-foreground)]">{kpi.label}</div>
-              <div className="mt-1 text-xl font-semibold tabular-nums">{kpi.value}</div>
-              <div className="mt-1 text-xs text-[var(--color-muted-foreground)]">{kpi.delta}</div>
-            </div>
-          ))}
-        </section>
-
-        <section data-slot="grid" className="overflow-x-auto">
-          <table className="w-full min-w-[36rem] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-border)] text-left text-[var(--color-muted-foreground)]">
-                <th className="px-2 py-2 font-medium">Week</th>
-                <th className="px-2 py-2 font-medium">Sessions</th>
-                <th className="px-2 py-2 font-medium">Signups</th>
-                <th className="px-2 py-2 font-medium">Conversion</th>
-                <th className="px-2 py-2 font-medium">Exceptions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row) => (
-                <tr key={row.week} className="border-b border-[var(--color-border)]/70">
-                  <td className="px-2 py-2 font-mono text-xs">{row.week}</td>
-                  <td className="px-2 py-2 tabular-nums">{row.sessions}</td>
-                  <td className="px-2 py-2 tabular-nums">{row.signups}</td>
-                  <td className="px-2 py-2 tabular-nums">{row.conversion}</td>
-                  <td className="px-2 py-2 tabular-nums">{row.exceptions}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <section data-slot="note" className="mt-4 text-xs text-[var(--color-muted-foreground)]">
-          Hamster asset {asset.assetId} — layout v{asset.layoutVersion}. Refresh replaces data in
-          place; it never regenerates this page.
-        </section>
+        <RefreshTokenContext.Provider value={refreshToken}>
+          <Renderer
+            response={asset.openui}
+            library={hamsterOpenUiLibrary}
+            isStreaming={false}
+            toolProvider={toolProvider}
+            onError={onOpenUiError}
+            queryLoader={
+              <span className="text-xs text-[var(--color-muted-foreground)]">{t.loading}</span>
+            }
+          />
+        </RefreshTokenContext.Provider>
       </div>
     </div>
   )

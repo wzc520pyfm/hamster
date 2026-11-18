@@ -1,31 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { getCopy, type Locale } from '@/i18n/messages'
+import { useLocale } from '@/i18n/LocaleContext'
 import { cn } from '@/lib/utils'
 
-const LOCALE_KEY = 'hamster.locale'
-
-export function readStoredLocale(): Locale {
-  const value = localStorage.getItem(LOCALE_KEY)
-  return value === 'zh' ? 'zh' : 'en'
-}
-
-export function storeLocale(locale: Locale) {
-  localStorage.setItem(LOCALE_KEY, locale)
-}
-
 export function Shell({
-  locale,
-  onLocaleChange,
   pendingApprovals,
   conversationTitle,
 }: {
-  locale: Locale
-  onLocaleChange: (locale: Locale) => void
   pendingApprovals: number
   conversationTitle: string
 }) {
-  const t = getCopy(locale)
+  const { locale, t, setLocale } = useLocale()
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -68,25 +52,39 @@ export function Shell({
           </NavLink>
         </nav>
 
-        <div className="mt-auto flex items-center gap-1 border-t border-[var(--color-border)] pt-3">
-          <Button
+        <div
+          className="mt-auto flex items-center gap-1 border-t border-[var(--color-border)] pt-3"
+          role="group"
+          aria-label="Language"
+        >
+          <button
             type="button"
-            size="sm"
-            variant={locale === 'en' ? 'secondary' : 'ghost'}
-            onClick={() => onLocaleChange('en')}
+            data-testid="locale-en"
+            className={cn(
+              'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+              locale === 'en'
+                ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+                : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+            )}
             aria-pressed={locale === 'en'}
+            onClick={() => setLocale('en')}
           >
             EN
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            size="sm"
-            variant={locale === 'zh' ? 'secondary' : 'ghost'}
-            onClick={() => onLocaleChange('zh')}
+            data-testid="locale-zh"
+            className={cn(
+              'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
+              locale === 'zh'
+                ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
+                : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+            )}
             aria-pressed={locale === 'zh'}
+            onClick={() => setLocale('zh')}
           >
             中文
-          </Button>
+          </button>
         </div>
       </aside>
 

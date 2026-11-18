@@ -1,26 +1,28 @@
 'use strict';
 
 // Asset (persistent dashboard) helpers: create the OpenUI React Lang 1.0 document,
-// read bindings, refresh data in place. Refresh NEVER re-generates the layout and
-// NEVER calls a model. On failure the last success stays visible.
+// server-validate, persist. Refresh NEVER re-generates the layout and NEVER calls
+// a model. On failure the last success stays visible.
 
 const crypto = require('crypto');
 const { query } = require('./db');
 const { runNamedQuery } = require('./namedQueries');
+const { toOpenUiLiteral, validateOpenuiDocument } = require('./openuiValidate');
 
 function buildDashboardDocument(assetId, source, snapshot) {
   // OpenUI React Lang 1.0 program. Only registered components, stable ids,
   // versioned layout (v1). $rev drives query refetch on refresh; same document,
   // same slots — data is swapped in place. The first snapshot is embedded as
   // the query default so refresh failure keeps the last success visible.
-  const payload = JSON.stringify(snapshot ?? { kpis: [], rows: [] });
+  const payload = toOpenUiLiteral(snapshot ?? { kpis: [], rows: [] });
   return `$rev = 0
 metrics = Query("${source}", { rev: $rev }, ${payload})
-root = Stack([head, kpis, grid, note])
+sync = RevSync()
 head = CardHeader("Weekly metrics", "Asset ${assetId} · source: ${source} · refresh re-fetches this query only")
 kpis = KpiGrid(metrics.kpis)
 grid = MetricsTable(metrics.rows)
 note = Note("Hamster asset ${assetId} — layout v1. Refresh replaces data in place; it never regenerates this page.")
+root = Stack([sync, head, kpis, grid, note])
 `;
 }
 
@@ -34,6 +36,11 @@ async function createAsset({ taskId, conversationId, title, bindings, defaultDat
 
   const assetId = `asset_${crypto.randomUUID()}`;
   const document = buildDocument(assetId, defaultData);
+  const validation = validateOpenuiDocument(document);
+  if (!validation.ok) {
+    throw new Error(`openui_validation_failed: ${validation.errors.join('; ')}`);
+  }
+
   const { rows } = await query(
     `INSERT INTO assets (id, task_id, conversation_id, title, source, openui_document,
                          layout_version, bindings, default_data, freshness, last_success_at)
@@ -47,7 +54,7 @@ async function createAsset({ taskId, conversationId, title, bindings, defaultDat
       document,
       JSON.stringify(bindings),
       JSON.stringify(defaultData ?? {}),
-    ]
+    ],
   );
   return rows[0];
 }
@@ -58,18 +65,20 @@ async function refreshAsset(assetId) {
   if (!asset) return { ok: false, error: 'asset_not_found' };
   if (asset.revoked_at) return { ok: false, error: 'asset_revoked' };
 
+  // Refresh must not rewrite openui_document or layout_version.
   try {
     const data = await runNamedQuery(require('./db').pool, 'metrics_weekly');
     await query('BEGIN');
     try {
-      await query(
-        `INSERT INTO asset_snapshots (asset_id, query_name, data) VALUES ($1, $2, $3)`,
-        [assetId, 'metrics_weekly', JSON.stringify(data)]
-      );
+      await query(`INSERT INTO asset_snapshots (asset_id, query_name, data) VALUES ($1, $2, $3)`, [
+        assetId,
+        'metrics_weekly',
+        JSON.stringify(data),
+      ]);
       await query(
         `UPDATE assets SET freshness = 'fresh', last_success_at = now(), last_error = NULL, updated_at = now()
           WHERE id = $1`,
-        [assetId]
+        [assetId],
       );
       await query('COMMIT');
     } catch (err) {
@@ -80,7 +89,7 @@ async function refreshAsset(assetId) {
   } catch (err) {
     await query(
       `UPDATE assets SET freshness = 'refresh_failed', last_error = $2, updated_at = now() WHERE id = $1`,
-      [assetId, String(err.message ?? err)]
+      [assetId, String(err.message ?? err)],
     );
     return { ok: false, error: String(err.message ?? err), assetId };
   }

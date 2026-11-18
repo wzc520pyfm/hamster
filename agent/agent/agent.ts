@@ -62,7 +62,9 @@ function scriptedRespond(request: ScriptedRequest) {
 
   const text = lastUserMessage ?? "";
 
-  // Control receipts: acknowledge a steer exactly once per controlSeq.
+  // Control receipts: acknowledge a steer exactly once per controlSeq, then
+  // continue the worker loop when this is a worker session (steer must not
+  // terminate the independent task).
   const steer = text.match(/CONTROL-STEER taskId=\S+ controlSeq=(\d+)/);
   if (steer) {
     const controlSeq = Number(steer[1]);
@@ -74,7 +76,10 @@ function scriptedRespond(request: ScriptedRequest) {
     if (!already) {
       return { toolCalls: [{ name: "acknowledge_control", input: { taskId, controlSeq } }] };
     }
-    return { text: `Steer #${controlSeq} applied for task ${taskId}.` };
+    if (!isWorker) {
+      return { text: `Steer #${controlSeq} applied for task ${taskId}.` };
+    }
+    // Fall through to resume worker checkpoints after the receipt is Applied.
   }
 
   if (/CONTROL-CANCEL/.test(text)) {
@@ -97,8 +102,8 @@ function scriptedRespond(request: ScriptedRequest) {
   const taskId = taskMatch?.[1] ?? "";
   const titleMatch = userMessages
     .find((m) => m.startsWith("[hamster-worker"))
-    ?.match(/title=([^|]+)/);
-  const title = titleMatch?.[1]?.trim() ?? "Weekly metrics dashboard";
+    ?.match(/title=([^\]]+)/);
+  const title = (titleMatch?.[1] ?? "Weekly metrics dashboard").trim();
 
   const errored = toolResults.find((r) => r.isError);
   if (errored) {

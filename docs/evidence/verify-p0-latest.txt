@@ -1,0 +1,26 @@
+=== Hamster P0 verification @ 2026-11-18T17:22:46Z ===
+API_BASE=http://127.0.0.1:8080
+PASS: control plane /api/health responds
+PASS: conversationId allocated: conv_0964f2f0-1d51-4d89-84e0-7c68ae4192c4
+PASS: task created taskId=task_458a637a-5986-4ad7-8c2f-39019e0a2e40 status=running
+PASS: runtimeSessionId distinct from taskId: wrun_01M7QTXDGAB4P0VHE15EQM7P0Z
+PASS: conversationId / taskId / runtimeSessionId are separate values
+PASS: ordinary follow-up did not cancel task (status=running)
+PASS: progress answered from control-plane persisted state (not model estimate)
+poll#1 events=0 asset= approvals=0 steer_applied=False status=running
+poll#2 events=2 asset= approvals=0 steer_applied=False status=running
+PASS: steer receipt is pending_apply (not Applied / not queued-successfully-as-applied)
+poll#3 events=3 asset=asset_9e3ff362-04cb-4e07-bf32-7f2ef934c399 approvals=1 steer_applied=True status=waiting_for_approval
+PASS: task has 3 persisted events (progress source)
+PASS: steer control status machine visible as applied
+PASS: assetId created: asset_9e3ff362-04cb-4e07-bf32-7f2ef934c399 (distinct from task/conversation)
+PASS: refresh kept identical openui document and layoutVersion=1
+NOTE: refresh-failure UI path exercised in client unit of DashboardView; API sets freshness=refresh_failed on named-query errors
+PASS: pending approval ticket exists: appr_hBQhoRZeBj6ShxhY
+PASS: policy denies publish without matching approved ticket (omit-approval fail-closed)
+PASS: cancel set task1 to cancelled
+PASS: cancel did not harm sibling task2 (status=running)
+PASS: cancel path ran; invalidated unused approvals count=1
+PASS: exact expiry copy present in control plane
+PASS: no obvious real secret material committed
+=== summary: PASS=19 FAIL=0 NOTE=1 ===

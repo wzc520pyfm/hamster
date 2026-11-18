@@ -54,9 +54,9 @@ Now asserts (among retained Line A / policy checks):
 | Approvals | Observed | Cards with exact `Expired — not approved, so it did not run` and `Invalidated — approve again` (no live pending card in that dataset) |
 | EN \| 中文 | **Pass (Playwright)** | `scripts/ui-smoke-locale.mjs` — nav `对话` / `Dashboard 库` / `待审批`, header `主对话`, then back to EN. Earlier computer-use click coordinates falsely reported fail; deterministic Playwright proves the toggle. |
 
-Screenshots (browser smoke): `docs/evidence/ui-smoke/` (see `NOTES.md` for the must-fix recapture). Recapture shows **Failed** (not “halted”) on the Task card with a titled failure reason, no “Needs review after process gap” badge, and plain-language approval titles. **Not a design-gate pass.**
+Screenshots (browser smoke): `docs/evidence/ui-smoke/` (see `NOTES.md`). Coverage expansion adds live **Needs approval** + Deny/Approve, task statuses Queued/Running/Waiting for approval/Succeeded/Cancelled (Failed kept from prior), steer receipts Received/Pending apply/Applied, dashboard **Refresh failed — still showing last success** + Retry, ZH copies for key badges, and narrow viewports. **Stale** freshness remains unverified (no product path sets it). **Not a design-gate pass.**
 
-This is **not** a full product E2E suite (no pending Approve/Deny click-path in the smoke dataset).
+This is **not** a full product E2E suite.
 
 ---
 

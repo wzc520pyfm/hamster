@@ -1,0 +1,22 @@
+{
+  "name": "hamster-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hamster P0 eve worker/chat agent. Runs fully self-hosted next to the control plane. No Vercel project, no hosted eve service.",
+  "scripts": {
+    "build": "eve build",
+    "start": "eve start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "eve": "1.0.2",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

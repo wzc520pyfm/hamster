@@ -86,29 +86,34 @@ Same web client, new container. The Electron window only adds window, install, s
 background-reachability behaviour; the product UI, status words, and IDs are unchanged.
 
 ```bash
-# 1. Control plane (self-hosted, fixture path)
-sudo docker compose up --build -d        # client published at http://localhost:3000
+# 1. Control plane (self-hosted, fixture path) — client image proxies /api same-origin
+sudo docker compose up --build -d        # http://<host>:3000 (LAN IP OK for phones)
 
-# 2. Client (serves the origin the Electron window will load)
-cd client && npm install && npm run build && npm run preview -- --port 3000
+# 2. Or local production client (empty Vite API bake + reverse proxy)
+cd client && npm install && VITE_API_BASE_URL= npm run build
+API_UPSTREAM=http://127.0.0.1:8080 npm run start:prod
 
 # 3. Electron
-cd electron && npm install && npx electron .
+cd electron && npm install
+HAMSTER_CONTROL_ORIGIN=http://127.0.0.1:3000 npx electron .
 ```
 
 - Default window is about 1200×800 with the sidebar visible side-by-side (`minWidth: 480` so the
   window can shrink below the existing `md` / 768 breakpoint); the shell then reuses the Menu drawer.
 - Minimal native menu: Hamster / Edit / View / Window. Product navigation stays in the app shell.
-- If the window is not loaded same-origin with the control plane, a quiet connect gate (address +
-  Connect) shows alone and remembers only a last health-tested successful address.
+- Quiet ConnectGate (title `Connect to Hamster` / `连接 Hamster`) validates a Hamster client+API
+  origin before trust/navigate; last in-app route restores across close/reopen on trusted origins.
 
 ## Installable PWA from the self-hosted origin (P1 slice)
 
-The web client is installable as a standalone PWA (not store-listed) from a self-hosted origin:
+The web client is installable as a standalone PWA (not store-listed) from a self-hosted origin.
+Production serving uses `client/server.mjs` so `/api` is same-origin (phones must not hit
+`localhost:8080` on the device).
 
 ```bash
-cd client && npm install && npm run build && npm run preview -- --port 3000
-# open http://localhost:3000 in a supporting browser and install (quiet, dismissible)
+cd client && npm install && VITE_API_BASE_URL= npm run build
+API_UPSTREAM=http://127.0.0.1:8080 npm run start:prod
+# open http://<LAN-IP>:3000 on a phone and install (quiet, dismissible, in-flow)
 ```
 
 After install, opening from the home screen enters the same main conversation (standalone, no promo

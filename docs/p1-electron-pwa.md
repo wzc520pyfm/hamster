@@ -5,177 +5,107 @@
 
 Provisional-name **private** exploration. Not a product launch. **Eve is not frozen.** This slice is
 not an eve-freeze claim and not a live-model verification. It also is **not** a completed design-gate
-pass; the operator (wzc520pyfm) decides any gate outcome after review. **Seven must-fixes landed in
-code does not mean the product is accepted.**
+pass; the operator (wzc520pyfm) decides any gate outcome after review. **Code + docs fixes do not mean
+the product is accepted.**
 
-This note covers only the two new surfaces of the slice: the **Electron main-computer window** and the
-**installable standalone PWA**. Status words, button labels, and connection copy come from the design
-table verbatim (see `/workspace/hamster-electron-pwa-direction-2026-11-19.md` and
-`/workspace/hamster-p0-client-direction-2026-11-19.md`). No synonyms were used.
-
-Same product UI and the same `conversationId` / `taskId` / `runtimeSessionId` / `assetId` across Web,
-Electron, and PWA. In-app approval cards remain the only approval channel; without a reachable card
-the action **fail-closed** (no silent Full Access). Notifications and badges only return the operator
-to that card.
+Same product UI and the same `conversationId` / `taskId` / `runtimeSessionId` / `assetId` / approval
+IDs across Web, Electron, and PWA. In-app approval cards remain the only approval channel; without a
+reachable card the action **fail-closed**. Notifications and badges only return the operator to that
+card. Close / quit / reload / background never Cancel or auto-approve.
 
 ---
 
-## 1. What was built in this slice (must-change items 1–7 + minimum demo screens)
+## 1. Must-change items 1–7 (state on this branch)
 
-| # | Must-change item | State on this branch |
+| # | Item | State |
 | --- | --- | --- |
-| 1 | Two surfaces reuse the existing product UI and status words | Done in code: same React client, same `messages.ts` design-table copy. Electron/PWA add only window/install/safe-area/background concerns. |
-| 2 | Electron default window ~1200×800, sidebar side-by-side; below `md`/768 reuse shell Menu drawer; status words not truncated, Retry visible; window buttons don't cover brand/lang/Menu; minimal app menu only | Done in `electron/main.js` (default 1200×800, **`minWidth: 480`** so the window can shrink below `md`/768) + `Shell.tsx` (narrow top bar + drawer, badge on Menu toggle). Minimal menu: Hamster / Edit / View / Window. |
-| 3 | Close / quit / reload / PWA background must not become Cancel or auto-approve; reopen same IDs; window reload = reattach route, not Regenerate | Done in `electron/main.js` (`will-quit`, `window-all-closed`) + `App.tsx` routing (`Navigate to="/"` re-mounts current route only). Live reopen-same-IDs on a real window **not** executed. |
-| 4 | Pending approval visible when narrow/PWA Menu closed; same ticket when opened; Electron background → notification (if allowed) + dock/taskbar badge back to same ticket; no permission → badge + shell entry, fail closed | Done in `Shell.tsx` (badge on Menu toggle, menu closed), `electron/main.js` (activity IPC → notify + `app.dock.setBadge` + `app.setBadgeCount`, notification click → focus approvals). Real notification/dock hardware path **not** executed. |
-| 5 | Disconnect uses `Can't reach this Hamster` / `无法连接` + Retry; Dashboard keeps last good layout (main line B); only refresh-failed adds Refresh failed + Retry | Done in `App.tsx`, `ConversationPage.tsx`, `DashboardView.tsx`, `ApprovalsPage.tsx` via `isNetworkError` (fetch-level TypeError) → `t.connect` + `t.retry`. Disconnect screen does **not** show the control-plane address label. |
-| 6 | PWA installable standalone from self-hosted origin; safe area; keyboard; long Chinese copy wraps; Retry on first screen; cache never exposes restricted data after revocation; standalone Back to conversation reachable | Done via `client/public/manifest.webmanifest` (`display: standalone`, `start_url: "/"`, icons `type: image/png`), `client/public/sw.js` (shell cache only, never `/api` / `/internal`), `client/index.css` safe-area + `ConversationPage.tsx` visualViewport handling, `InstallPrompt.tsx` (quiet, dismissible, never blocks), i18n long-copy. Physical-device install **not** executed. |
-| 7 | Icons only temporary typographic marks, placeholder labeled, no paused logo | Done: `client/public/icons/icon-192.png`, `icon-512.png`, `electron/build/icon.png` (generated typographic marks, labeled placeholder in docs). Manifest icon types are `image/png`. |
+| 1 | Same UI + status words | Same React client / `messages.ts` design-table copy |
+| 2 | Electron ~1200×800, `minWidth: 480`, Menu drawer below `md` | `electron/main.js` + `Shell.tsx` |
+| 3 | Close/quit/reload/background ≠ Cancel/approve; restore route/IDs | Session restore in Electron (`sessionStore.cjs`); control plane owns tasks |
+| 4 | Pending badge + background return; fail closed | Menu badge + `setBadgeCount`; focus clears badge but **keeps count**; blur restores badge |
+| 5 | Disconnect `Can't reach this Hamster` / `无法连接` + Retry | Disconnect screen only; ConnectGate uses separate `connectGateTitle` |
+| 6 | PWA standalone from self-hosted origin | Manifest + SW; production client proxies `/api` same-origin; install affordance **in-flow** (not fixed overlay) |
+| 7 | Placeholder icons | Typographic marks; manifest `image/png` |
 
-### Must-fixes landed after the first operator stretch (code commits)
+### Reviewer follow-up fixes (after docs handoff `f7c9ea0`)
 
-1. `preload` (not `preloadPath`); `sandbox: true`; `contextIsolation: true`; `nodeIntegration: false` — `90db226`.
-2. Window shows on BrowserWindow `ready-to-show`; container/`controlBaseUrl` via `electron/preload.js` → `window.hamster` (no `executeJavaScript` injection for identity) — `90db226` + `fbab807`.
-3. `minWidth: 480` (was `820`) so the shell can use the existing `md`/768 Menu drawer — `90db226`.
-4. Disconnect copy exact: `Can't reach this Hamster` / `无法连接` + `Retry` / `重试` only on that screen — `fbab807`.
-5. ConnectGate: persists only a last **health-tested** successful URL (`/api/health`); when showing, renders alone (no disconnect / routes underneath); empty-field validation uses `t.error`, not disconnect copy — `fbab807`.
-6. Manifest icon MIME `image/png`; `scripts/capture-p1.mjs` `install.ok` tightened (see §4) — `fbab807`.
-7. Taskbar/dock badge: `app.setBadgeCount` in addition to `app.dock.setBadge` — `90db226`.
+Independently confirmed, then fixed:
 
-Minimum demonstrable screens (fixture-path PNGs under `docs/evidence/p1-electron-pwa/`):
-
-- Desktop-width conversation with pending approval + composer (`p1-desktop-conversation.png`).
-- Narrow (390px) conversation, pending badge on closed Menu (`p1-narrow-menu-closed-badge.png`, `p1-narrow-conversation.png`).
-- Chinese narrow conversation: `需要批准` + buttons `拒绝` / `批准此次动作` fully visible (`p1-zh-narrow-conversation.png`).
-- Disconnect EN (`Can't reach this Hamster` + Retry) / ZH (`无法连接` + Retry) via real network abort (`p1-disconnect-en.png`, `p1-disconnect-zh.png`).
-
-**Screenshot provenance:** these PNGs were produced during the earlier free-CLI / OpenCode host run
-(recaptured on disconnect-copy fix in `fbab807`). They are **inherited evidence**, not re-captured in
-the Cursor Auto docs handoff. Honest labels stay: fixture / mocked API for happy-path frames; real
-network abort for disconnect frames. No Electron window visual exists.
+1. **ConnectGate title** — `connectGateTitle`: EN `Connect to Hamster` / ZH `连接 Hamster` (not disconnect copy).
+2. **Same-origin API** — production build bakes empty `VITE_API_BASE_URL`; `client/server.mjs` reverse-proxies `/api` (+ `/internal`) to `API_UPSTREAM`. Phones on `http://LAN:3000` call `http://LAN:3000/api/...`, not `localhost:8080`. `api.ts` / `DashboardView` resolve API base at runtime via `resolveApiBase` (relative when page === control origin).
+3. **ConnectGate validation** — requires Hamster **client+API** on the same origin: `/api/health` JSON `{status:'ok'}` with `redirect: 'manual'`, plus `manifest.webmanifest` (`display: standalone`, `start_url: '/'`, name Hamster). Rejects credentials in URL, non-http(s) schemes, arbitrary 200 sites, API-only origins, and health/manifest redirects. Private LAN http(s) allowed.
+4. **Electron trust** — `will-navigate` / `will-redirect` / `setWindowOpenHandler` allowlist trusted origins; IPC sender frame URL checked; preload bridge only on windows we create; ConnectGate uses `requestConnect` so main re-validates before trust+navigate. No unsafe renderer identity for Electron privilege (`isElectronContainer` uses preload bridge only).
+5. **Route restore** — last trusted in-app path (`/`, `/assets`, `/assets/:id`, `/approvals`) persisted in userData session; startup `loadURL` restores it. Renderer also `reportRoute`s. No task/asset fork: IDs remain control-plane IDs.
+6. **Install prompt** — in-flow under main column (not `fixed` overlay covering composer/approvals).
 
 ---
 
 ## 2. How to start Electron
 
-Prerequisites on the host:
-
-- Node 24+.
-- Control plane reachable (self-hosted origin), e.g. `sudo docker compose up --build -d`
-  (client published on `http://localhost:3000`, API on `http://localhost:8080`).
-  Or the local equivalent: eve agent + api + client preview.
-- A display server (X11/Wayland). Headless hosts often use `xvfb-run -a npx electron .` — see §5 for
-  honest Xvfb screenshot failure on this slice; do not treat Xvfb launch as a visual acceptance.
-
-Steps:
-
 ```bash
-git clone ... # or use this checkout
-cd client && npm install && npm run build && npm run preview -- --port 3000   # serves :3000
-cd ../electron && npm install && npx electron .
+# Preferred: Compose (client image runs server.mjs with API_UPSTREAM=http://api:8080)
+sudo docker compose up --build -d
+# Client origin: http://<host>:3000  (LAN IP works for phones)
+
+# Or local production-like client (after API is up on :8080)
+cd client && npm install && VITE_API_BASE_URL= npm run build
+API_UPSTREAM=http://127.0.0.1:8080 npm run start:prod   # 0.0.0.0:3000 + /api proxy
+
+cd ../electron && npm install
+HAMSTER_CONTROL_ORIGIN=http://127.0.0.1:3000 npx electron .
 ```
 
-- `electron/main.js` defaults: `HAMSTER_CONTROL_ORIGIN` (default `http://localhost:3000`),
-  `HAMSTER_CONTROL_BASE_URL` (default same). Window default `1200×800`, **`minWidth: 480`**
-  (code inspection of `BrowserWindow`; sufficient to shrink below `md`/768). Do not document a
-  product-verified minHeight claim beyond what the BrowserWindow options literally set in code.
-- Minimal native menu: Hamster / Edit / View / Window; product navigation stays in the app shell.
-- Preload bridge: `window.hamster` (container + controlBaseUrl) from `electron/preload.js`; container
-  identity must not come from `executeJavaScript` injection. Window shows on `ready-to-show`;
-  `sandbox: true` with `contextBridge` surface.
-- If the Electron window is not loaded same-origin with the control plane, the quiet ConnectGate
-  (address + Connect) shows via `shouldShowConnectGate()` and renders alone. It remembers only a
-  health-checked successful address (`localStorage` key `hamster.controlBase` after `/api/health`
-  succeeds). PWA never needs this gate.
+- Default window 1200×800, **`minWidth: 480`**. Minimal menu: Hamster / Edit / View / Window.
+- ConnectGate title is `connectGateTitle`; remembers only a validated Hamster client+API origin.
+- Reopen restores the last validated in-app route on a trusted origin (not always `/`).
+
+Dev-only alternative: `npm run preview` still proxies `/api` via Vite. Prefer `start:prod` / Compose for production-build evidence.
 
 ---
 
 ## 3. How to install the PWA from the self-hosted origin
 
-1. Serve the client from the self-hosted origin (Compose publishes the client on `:3000`; or
-   `cd client && npm run build && npm run preview -- --port 3000`).
-2. Open `http://<self-hosted-origin>/` in a supporting browser (Chrome/Edge/Android; iOS Safari uses
-   “Add to Home Screen”).
-3. Install: quiet, dismissible install affordance (`beforeinstallprompt` + `appinstalled`) that never
-   blocks work; after install, opening from the home screen goes straight into the same main
-   conversation (standalone, not a promo page). Same IDs as the desktop/Web client.
-4. Safe area: `viewport-fit=cover` + `env(safe-area-inset-*)` handled (`.safe-area-top` / `.safe-area-bottom`);
-   standalone Back to conversation (`/`) always reachable and clear of the safe area.
-5. Keyboard: visual-viewport shrink keeps composer + approval buttons usable when the virtual keyboard rises.
+1. Serve the **production** client with `/api` proxy (Compose or `npm run start:prod`).
+2. On a phone, open `http://<LAN-or-host>:3000/` (not a desktop-only localhost bake).
+3. Install via the quiet, dismissible in-flow affordance; home-screen open enters the same main conversation (standalone).
+4. Same IDs as desktop/Web; approvals fail closed without a reachable card.
 
-Physical home-screen install on a real phone was **not** performed on this host.
+Physical-device install was **not** performed on this host.
 
 ---
 
-## 4. Evidence — inherited vs this docs handoff
+## 4. Evidence
 
-### Inherited (earlier free-CLI / OpenCode host; not re-owned by Cursor Auto unless re-run)
+### Inherited (free-CLI / earlier OpenCode host — not re-owned)
 
-- Client: `npm run build` (`tsc -b && vite build`) **PASS** on that host; `oxlint` clean (scoped check).
-- Capture: `node scripts/capture-p1.mjs` (Playwright headless Chromium against the built client; API
-  routes mocked for happy-path shots, real network abort for disconnect shots). **PASS** (exit 0).
-  - Shots: `docs/evidence/p1-electron-pwa/*.png` (preserved; honest fixture provenance).
-  - **`install.ok === true` only when all of the following hold** (see `scripts/capture-p1.mjs`):
-    - manifest `display === 'standalone'`
-    - manifest `start_url === '/'`
-    - each icon URL returns **HTTP 200** and its manifest `type` is **`image/png`**
-    - service worker for `/sw.js` is **registered**
-  - Disconnect: real network abort → design-table copy (`Can't reach this Hamster` / `无法连接`) with Retry
-    visible on first screen.
-- Electron: earlier host reported `npx electron --version` → `36.9.5` and a launch smoke attempt under
-  Xvfb. That is **not** a successful Electron visual.
+- Fixture PNGs in `docs/evidence/p1-electron-pwa/` (Playwright mocks + real abort disconnect).
+- Earlier `install.ok` capture under tightened rules (standalone + `/` + icon 200/`image/png` + SW registered).
 
-### This Cursor Auto docs handoff
+### This Cloud Auto fix pass
 
-- Independently re-inspected: `electron/main.js` (`preload`, `ready-to-show`, `minWidth: 480`,
-  `sandbox: true`, `app.setBadgeCount`), `ConnectGate.tsx` / `hamsterEnv.ts`,
-  `manifest.webmanifest` (`image/png`), and `scripts/capture-p1.mjs` `install.ok` conditions above.
-- Client `npm run build` re-run on this Cursor Auto VM: **PASS** (`tsc -b && vite build`).
-- **No** new fixture capture, **no** physical-device test, **no** live-model test, **no** design-gate
-  pass, **no** eve freeze.
+| Check | Result |
+| --- | --- |
+| `VITE_API_BASE_URL= npm run build` | **PASS** |
+| `node --test shared/hamsterOrigin.test.mjs electron/sessionStore.test.cjs` | **PASS** (14) |
+| `node scripts/p1-prod-proxy-verify.mjs` | **PASS** — non-localhost `http://172.30.0.2:13000/api/health` via client proxy; reject API-only + arbitrary site |
+| Electron display reopen smoke | **FAILED** (bounded): dbus address parse errors, GPU process exit, `ERR_FAILED` on loadURL; substitute = `sessionStore` unit tests |
+| Physical device / live model / design gate / eve freeze | **Not claimed** |
 
-### Electron visual attempts — FAILED (do not invent a window shot)
-
-Actual Xvfb Electron screenshot attempts on the must-fix host **failed** (dbus / GPU issues and
-load timeouts / **EXIT 124**). There is **no successful Electron visual**. Do not treat launch smoke
-or a blank/timeout Xvfb frame as product evidence. No screenshot recreation was required for this
-docs handoff.
-
-Prior fixture evidence (unchanged): `docs/evidence/compose-20261119/`, `docs/evidence/ui-smoke/`,
-`docs/evidence/verify-p0-latest.txt`, `docs/p0-report.md`.
+Regression coverage includes: valid origin, invalid 200, API-only, redirect, credentials/scheme, API base same-origin relative, route restore, navigation allowlist, IPC sender trust, badge count retained across focus/blur, ConnectGate title ≠ disconnect copy, install prompt not fixed overlay.
 
 ---
 
-## 5. Honest remaining verification / host limits (not faked)
+## 5. Remaining gaps (honest)
 
-- **No physical phone** — install-to-home-screen and on-device keyboard / safe-area behavior remain open.
-- **No successful Electron window visual** — Xvfb screenshot attempts failed (dbus/GPU, timeouts/EXIT124).
-- Real-hardware notification / dock-badge return path not executed.
-- Live reopen-after-close / reload → same IDs on a real window not executed (code-level only).
-- No live model; fixture / `mockModel` path only. No model results invented.
-- `Stale — still showing last success` / `仍显示上次成功结果` was **not** produced or claimed.
-- Chinese `排队` / `运行中` task-status labels: no new P1 evidence; not newly claimed.
-- **Design gate not passed. Product not accepted. Eve not frozen.**
+- Physical-device PWA install + keyboard/safe-area on real hardware.
+- Successful Electron **window** visual / full BrowserWindow reopen on a host without dbus/GPU failures.
+- Real notification / dock hardware behaviour.
+- Operator + DesignBot review; **product not accepted**.
 
-## 6. Remaining gaps (honest)
-
-- Physical-device install + on-device keyboard/safe-area verification.
-- Successful Electron window visual (after preload/`ready-to-show` fixes) on a host that can show one.
-- Real-hardware background-approval notification / dock-badge behavior.
-- Live reopen-same-IDs check on a real window.
-- Operator product review + DesignBot page review; design-gate decision remains with the operator.
-
-## 7. Repro commands (quick reference)
+## 6. Quick repro
 
 ```bash
-# control plane (fixture path)
-sudo docker compose up --build -d
-
-# client, then (optional) capture evidence
-cd client && npm install && npm run build && npm run preview -- --port 3000
-npx playwright install chromium   # once
-node scripts/capture-p1.mjs
-
-# electron
-cd electron && npm install && npx electron .
+cd client && VITE_API_BASE_URL= npm run build
+node ../scripts/p1-prod-proxy-verify.mjs
+node --test ../shared/hamsterOrigin.test.mjs ../electron/sessionStore.test.cjs
 ```

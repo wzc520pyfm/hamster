@@ -28,6 +28,7 @@ const {
   recordSuccessfulMount,
   senderIsTrusted,
 } = require('./sessionStore.cjs')
+const { loadFileIfAlive } = require('./windowLoadGuard.cjs')
 
 /** Explicit operator env only — bare hardcoded localhost is NOT successful config. */
 const EXPLICIT_CONTROL_ORIGIN = process.env.HAMSTER_CONTROL_ORIGIN
@@ -263,8 +264,15 @@ function showLocalGate(opts = {}) {
     session = { ...session, gateShowError: true }
   }
   persistSession()
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  void mainWindow.loadFile(GATE_HTML)
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  // Guard lifecycle race: app.close() during bad-source rescue must not throw
+  // UnhandledPromiseRejection ("Object has been destroyed"). Genuine load errors still surface.
+  void loadFileIfAlive(win, GATE_HTML).then((result) => {
+    if (result.ok || result.reason === 'window_destroyed') return
+  }).catch((err) => {
+    console.error('[hamster] showLocalGate loadFile failed:', err)
+  })
 }
 
 /**
@@ -529,4 +537,5 @@ module.exports = {
   isLocalGateUrl,
   GATE_HTML,
   BOOTSTRAP_HINT,
+  showLocalGate,
 }

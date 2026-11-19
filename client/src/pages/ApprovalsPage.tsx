@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ApprovalCard } from '@/components/ApprovalCard'
-import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
 import { api, isNetworkError, type Approval } from '@/lib/api'
 
 export function ApprovalsPage({
   locale,
   onApprovalsChanged,
+  onNetworkError,
+  connectionError = false,
 }: {
   locale: Locale
   onApprovalsChanged: () => void
+  onNetworkError?: () => void
+  /** Shell owns the single Can't reach banner; used here only to fail-close actions. */
+  connectionError?: boolean
 }) {
   const t = getCopy(locale)
   const [searchParams] = useSearchParams()
   const focusId = (searchParams.get('id') || searchParams.get('focus') || '').trim()
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [connectionError, setConnectionError] = useState(false)
   const focusedRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async () => {
@@ -25,34 +28,30 @@ export function ApprovalsPage({
     setApprovals(list)
   }, [])
 
-  const retryConnection = useCallback(async () => {
-    setConnectionError(false)
-    await refresh()
-  }, [refresh])
-
   useEffect(() => {
     let cancelled = false
-    setConnectionError(false)
     ;(async () => {
       try {
         await refresh()
+        if (!cancelled) setError(null)
       } catch (err) {
         if (!cancelled) {
-          if (isNetworkError(err)) setConnectionError(true)
+          if (isNetworkError(err)) onNetworkError?.()
           else setError(err instanceof Error ? err.message : String(err))
         }
       }
     })()
     const timer = setInterval(() => {
       void refresh().catch((err) => {
-        if (isNetworkError(err)) setConnectionError(true)
+        // Keep last-loaded tickets visible; report disconnect to shell only.
+        if (isNetworkError(err)) onNetworkError?.()
       })
     }, 3000)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [refresh])
+  }, [refresh, onNetworkError])
 
   // Deep-link: scroll/focus the exact ticket — do not leave the operator hunting the list.
   useEffect(() => {
@@ -72,16 +71,7 @@ export function ApprovalsPage({
         </h1>
       </header>
 
-      {connectionError ? (
-        <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
-          {t.connect}
-          <div className="mt-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
-              {t.retry}
-            </Button>
-          </div>
-        </div>
-      ) : error ? (
+      {error && !connectionError ? (
         <p className="text-sm text-[var(--color-destructive)]">{error}</p>
       ) : null}
 

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
 import { Shell } from '@/components/Shell'
 import { ConnectGateMount, shouldShowConnectGate } from '@/components/ConnectGate'
 import { LocaleProvider, useLocale } from '@/i18n/LocaleContext'
 import { api, isNetworkError } from '@/lib/api'
-import { getCopy } from '@/i18n/messages'
 import { ApprovalsPage } from '@/pages/ApprovalsPage'
 import { AssetPage } from '@/pages/AssetPage'
 import { AssetsLibraryPage } from '@/pages/AssetsLibraryPage'
@@ -25,7 +23,6 @@ function ElectronRouteReporter() {
 
 function AppRoutes() {
   const { locale } = useLocale()
-  const t = getCopy(locale)
   const navigate = useNavigate()
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [conversationTitle, setConversationTitle] = useState('')
@@ -33,12 +30,16 @@ function AppRoutes() {
   const [connectionError, setConnectionError] = useState(false)
   const connectGateShowing = shouldShowConnectGate()
 
+  const markNetworkError = useCallback(() => {
+    setConnectionError(true)
+  }, [])
+
   const refreshPending = useCallback(async () => {
     try {
       const list = await api.listApprovals('pending')
       setPendingApprovals(list.length)
-    } catch {
-      // Shell badge is best-effort; conversation/approvals pages show errors.
+    } catch (err) {
+      if (isNetworkError(err)) setConnectionError(true)
     }
   }, [])
 
@@ -110,23 +111,15 @@ function AppRoutes() {
   return (
     <>
       <ElectronRouteReporter />
-      {/* Temp network loss: keep Routes/UI; banner only — never replace whole shell. */}
-      {connectionError ? (
-        <div
-          className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-[#e2c4c4] bg-[#f8ecec] px-4 py-2"
-          data-testid="connection-banner"
-          role="alert"
-        >
-          <p className="text-sm text-[var(--color-destructive)]">{t.connect}</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
-            {t.retry}
-          </Button>
-        </div>
-      ) : null}
       <Routes>
         <Route
           element={
-            <Shell pendingApprovals={pendingApprovals} conversationTitle={conversationTitle} />
+            <Shell
+              pendingApprovals={pendingApprovals}
+              conversationTitle={conversationTitle}
+              connectionError={connectionError}
+              onRetryConnection={() => void retryConnection()}
+            />
           }
         >
           <Route
@@ -136,15 +129,25 @@ function AppRoutes() {
                 locale={locale}
                 conversationId={conversationId}
                 onApprovalsChanged={() => void refreshPending()}
+                onNetworkError={markNetworkError}
+                connectionError={connectionError}
               />
             }
           />
           <Route path="/assets" element={<AssetsLibraryPage locale={locale} />} />
-          <Route path="/assets/:assetId" element={<AssetPage locale={locale} />} />
+          <Route
+            path="/assets/:assetId"
+            element={<AssetPage locale={locale} onNetworkError={markNetworkError} />}
+          />
           <Route
             path="/approvals"
             element={
-              <ApprovalsPage locale={locale} onApprovalsChanged={() => void refreshPending()} />
+              <ApprovalsPage
+                locale={locale}
+                onApprovalsChanged={() => void refreshPending()}
+                onNetworkError={markNetworkError}
+                connectionError={connectionError}
+              />
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />

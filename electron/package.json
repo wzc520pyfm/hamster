@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test ./sessionStore.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs"
+    "test": "node --test ./sessionStore.test.cjs ./windowLoadGuard.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs"
   },
   "devDependencies": {
     "electron": "^36.0.0"

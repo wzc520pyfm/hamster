@@ -280,29 +280,72 @@ function readSession(userData) {
 }
 
 async function snapshot(page) {
-  return page.evaluate(() => ({
-    href: location.href,
-    origin: location.origin,
-    protocol: location.protocol,
-    pathname: location.pathname,
-    hasGate: Boolean(document.querySelector('[data-testid="connect-gate"]')),
-    title: document.querySelector('#title, [data-testid="connect-gate"] h1')?.textContent || null,
-    label: document.querySelector('#label, [data-testid="connect-gate"] label')?.textContent || null,
-    submit: document.querySelector('[data-testid="connect-gate-submit"]')?.textContent || null,
-    errorVisible: Boolean(
-      document.querySelector('[data-testid="connect-gate-error"]:not([hidden])'),
-    ),
-    errorText: document.querySelector('[data-testid="connect-gate-error"]')?.textContent || null,
-    hasBanner: Boolean(document.querySelector('[data-testid="connection-banner"]')),
-    bannerText: document.querySelector('[data-testid="connection-banner"]')?.textContent || null,
-    hasConversation: Boolean(document.querySelector('[data-testid="conversation-column"]')),
-    container: window.hamster?.container ?? null,
-    sessionOrigin:
-      typeof window.hamster?.sessionOrigin === 'function' ? window.hamster.sessionOrigin() : null,
-    controlBase:
-      typeof window.hamster?.controlBaseUrl === 'function' ? window.hamster.controlBaseUrl() : null,
-    bodySnippet: (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 280),
-  }))
+  return page.evaluate(() => {
+    const banners = [...document.querySelectorAll('[data-testid="connection-banner"]')].filter(
+      (el) => {
+        if (el.hasAttribute('hidden')) return false
+        const style = window.getComputedStyle(el)
+        if (style.display === 'none' || style.visibility === 'hidden') return false
+        const r = el.getBoundingClientRect()
+        return r.width > 0 && r.height > 0
+      },
+    )
+    const connectText = /Can't reach this Hamster|无法连接/
+    // Unique visible disconnect notices (shell banner only — pages must not duplicate).
+    const noticeEls = [...document.querySelectorAll('[role="alert"], [data-testid="connection-banner"]')].filter(
+      (el) => {
+        if (el.hasAttribute('hidden')) return false
+        const t = (el.textContent || '').trim()
+        if (!connectText.test(t)) return false
+        const r = el.getBoundingClientRect()
+        return r.width > 0 && r.height > 0
+      },
+    )
+    const localeEn = document.querySelector('[data-testid="shell-sidebar"] [data-testid="locale-en"]')
+    const localeZh = document.querySelector('[data-testid="shell-sidebar"] [data-testid="locale-zh"]')
+    const localeReachable = (el) => {
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      const vh = window.innerHeight || document.documentElement.clientHeight
+      return r.top >= 0 && r.bottom <= vh + 1 && r.height > 0
+    }
+    return {
+      href: location.href,
+      origin: location.origin,
+      protocol: location.protocol,
+      pathname: location.pathname,
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      hasGate: Boolean(document.querySelector('[data-testid="connect-gate"]')),
+      title: document.querySelector('#title, [data-testid="connect-gate"] h1')?.textContent || null,
+      label: document.querySelector('#label, [data-testid="connect-gate"] label')?.textContent || null,
+      submit: document.querySelector('[data-testid="connect-gate-submit"]')?.textContent || null,
+      errorVisible: Boolean(
+        document.querySelector('[data-testid="connect-gate-error"]:not([hidden])'),
+      ),
+      errorText: document.querySelector('[data-testid="connect-gate-error"]')?.textContent || null,
+      hasBanner: banners.length === 1,
+      connectionNoticeCount: noticeEls.length,
+      bannerText: banners[0]?.textContent || null,
+      localeEnReachable: localeReachable(localeEn),
+      localeZhReachable: localeReachable(localeZh),
+      hasConversation: Boolean(document.querySelector('[data-testid="conversation-column"]')),
+      approvalCardCount: document.querySelectorAll('[data-testid="approval-card"]').length,
+      approvalIds: [...document.querySelectorAll('[data-approval-id]')].map((el) =>
+        el.getAttribute('data-approval-id'),
+      ),
+      approveDisabled: (() => {
+        const btn = document.querySelector('[data-testid="approval-approve"]')
+        if (!btn) return null
+        return btn.disabled === true || btn.getAttribute('disabled') !== null
+      })(),
+      container: window.hamster?.container ?? null,
+      sessionOrigin:
+        typeof window.hamster?.sessionOrigin === 'function' ? window.hamster.sessionOrigin() : null,
+      controlBase:
+        typeof window.hamster?.controlBaseUrl === 'function' ? window.hamster.controlBaseUrl() : null,
+      bodySnippet: (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+    }
+  })
 }
 
 const report = {
@@ -768,9 +811,8 @@ const case8 = {
   pass:
     snap.pathname === pathBeforeDown &&
     !snap.hasGate &&
-    (snap.hasBanner ||
-      (snap.bodySnippet || '').includes("Can't reach") ||
-      (snap.bodySnippet || '').includes('无法连接')) &&
+    snap.hasBanner === true &&
+    snap.connectionNoticeCount === 1 &&
     ((snap.bodySnippet || '').includes('E2E gate fixture') ||
       (snap.bodySnippet || '').includes('fixture-gate-dashboard-body') ||
       hadFixture) &&
@@ -795,40 +837,136 @@ report.steps.push({
 })
 report.pass.retryReconnect = snap.origin === originB
 
-// --- 9) Fail-closed approval channel ---
-log('case9: fail-closed approvals')
-await page.evaluate(() => location.assign('/approvals'))
-await page.waitForTimeout(1500)
-state.down = true
-await page.waitForTimeout(4000)
+// --- 9) Fail-closed: visible pending ticket FIRST, then client-offline transport block ---
+log('case9: fail-closed approvals with visible pending ticket')
+await page.setViewportSize({ width: 1183, height: 761 })
+state.down = false
 await page.evaluate(() => location.assign('/approvals'))
 await page.waitForTimeout(2000)
-snap = await snapshot(page)
-const approveDisabled = await page.evaluate(() => {
-  const btn = document.querySelector('[data-testid="approval-approve"]')
-  return !btn || btn.disabled === true || btn.getAttribute('disabled') !== null
+let preOffline = await snapshot(page)
+const ticketVisible =
+  preOffline.approvalCardCount >= 1 &&
+  (preOffline.approvalIds || []).includes(state.approvalId) &&
+  preOffline.approveDisabled === false
+report.steps.push({
+  step: 'fail-closed-pending-visible-first',
+  snap: preOffline,
+  expectedApprovalId: state.approvalId,
+  pass: ticketVisible,
+  fixtureScope: 'client-offline-behavior-only',
 })
-const mutBefore = state.mutations.length
-const approve = page.getByTestId('approval-approve')
-if (await approve.count()) {
-  try {
-    await approve.click({ timeout: 1000, force: true })
-  } catch {
-    // expected if disabled
+report.pass.failClosedPendingVisible = ticketVisible
+await page.screenshot({ path: path.join(OUT, '12a-approvals-pending-online.png') })
+
+if (!ticketVisible) {
+  report.pass.failClosedApprovals = false
+  report.steps.push({
+    step: 'fail-closed-approvals',
+    pass: false,
+    reason: 'UNVERIFIED: no visible pending ticket before offline — refuse false-positive',
+  })
+} else {
+  const mutBefore = state.mutations.length
+  state.down = true
+  // Trigger shell disconnect without remounting away from ticket list (poll / soft API).
+  await page.waitForTimeout(4500)
+  // Soft refetch that fails transport but ApprovalsPage keeps last-loaded cards.
+  await page.evaluate(async () => {
+    try {
+      await fetch('/api/approvals?status=pending', { cache: 'no-store' })
+    } catch {
+      // expected offline
+    }
+  })
+  await page.waitForTimeout(1500)
+  snap = await snapshot(page)
+  await page.screenshot({ path: path.join(OUT, '12-fail-closed-approvals-en.png') })
+
+  // ZH frame — same disconnect, language controls reachable, one notice.
+  const zhBtn = page.locator('[data-testid="shell-sidebar"] [data-testid="locale-zh"]')
+  if (await zhBtn.count()) {
+    await zhBtn.click()
+    await page.waitForTimeout(400)
   }
+  const snapZh = await snapshot(page)
+  await page.screenshot({ path: path.join(OUT, '12-fail-closed-approvals-zh.png') })
+  const enBtn = page.locator('[data-testid="shell-sidebar"] [data-testid="locale-en"]')
+  if (await enBtn.count()) await enBtn.click()
+
+  // Attempt high-risk action only if button still present — must be disabled (no force-click absent).
+  const approveCount = await page.getByTestId('approval-approve').count()
+  let clickAttempted = false
+  if (approveCount > 0) {
+    const disabled = await page.getByTestId('approval-approve').isDisabled()
+    if (!disabled) {
+      clickAttempted = true
+      await page.getByTestId('approval-approve').click({ timeout: 1000 }).catch(() => {})
+    }
+  }
+  await page.waitForTimeout(500)
+  const mutAfter = state.mutations.length
+  const stillPending = state.approvalStatus === 'pending'
+  const noSurpriseMutations = mutAfter === mutBefore
+
+  // Reconnect — ticket still pending; requires explicit confirmation (status unchanged).
+  state.down = false
+  const retry2 = page.getByRole('button', { name: /Retry|重试/ }).first()
+  if (await retry2.count()) {
+    await retry2.click()
+    await page.waitForTimeout(2500)
+  }
+  const afterReconnect = await snapshot(page)
+  await page.screenshot({ path: path.join(OUT, '12b-approvals-after-reconnect.png') })
+  const stillPendingAfter = state.approvalStatus === 'pending'
+  const noQueuedApprove = state.mutations.slice(mutBefore).length === 0
+  const ticketStillVisible =
+    (afterReconnect.approvalIds || []).includes(state.approvalId) ||
+    afterReconnect.approvalCardCount >= 1
+
+  const case9 = {
+    snap,
+    snapZh,
+    afterReconnect,
+    expectedApprovalId: state.approvalId,
+    approveCountOffline: approveCount,
+    clickAttempted,
+    mutationsDuringOffline: state.mutations.slice(mutBefore),
+    backendApprovalStatus: state.approvalStatus,
+    fixtureScope: 'client-offline-behavior-only — not complete control-plane safety proof',
+    pass:
+      snap.connectionNoticeCount === 1 &&
+      snap.hasBanner === true &&
+      snap.localeEnReachable === true &&
+      snap.localeZhReachable === true &&
+      snapZh.connectionNoticeCount === 1 &&
+      (snap.approvalIds || []).includes(state.approvalId) &&
+      (snap.approveDisabled === true || approveCount === 0) &&
+      stillPending &&
+      noSurpriseMutations &&
+      stillPendingAfter &&
+      noQueuedApprove &&
+      ticketStillVisible &&
+      !clickAttempted,
+  }
+  report.steps.push({ step: 'fail-closed-approvals', ...case9 })
+  report.pass.failClosedApprovals = case9.pass
+  report.pass.approvalsDisconnectSingleNotice = snap.connectionNoticeCount === 1
+  report.pass.approvalsLocaleReachable = snap.localeEnReachable && snap.localeZhReachable
 }
-await page.waitForTimeout(500)
-const mutAfter = state.mutations.length
-await page.screenshot({ path: path.join(OUT, '12-fail-closed-approvals.png') })
-const case9 = {
-  snap,
-  approveDisabled,
-  mutations: state.mutations.slice(mutBefore),
-  pass: mutAfter === mutBefore && state.approvalStatus === 'pending',
+
+// Claim narrowing: A/B share one fixture API — proves route reset only, not cross-instance
+// ID/credential/approval-state isolation.
+report.claimNarrowing = {
+  aToB: {
+    proven: 'route pathname resets to / on origin change via local gate',
+    notProven:
+      'cross-instance ID/credential/approval isolation (A and B reverse-proxy the same fixture API)',
+  },
+  failClosedApprovals: {
+    proven: 'client-offline UI fail-closed with visible pending ticket + zero fixture mutations',
+    notProven: 'complete control-plane safety policy (see separate verify-p0 / safety run)',
+  },
 }
-report.steps.push({ step: 'fail-closed-approvals', ...case9 })
-report.pass.failClosedApprovals = case9.pass
-state.down = false
 
 await app.close()
 stream.end()
@@ -840,7 +978,7 @@ fs.writeFileSync(path.join(OUT, 'e2e-log.txt'), logs.join('\n'))
 fs.writeFileSync(path.join(OUT, 'result.json'), JSON.stringify(report, null, 2))
 fs.writeFileSync(path.join(OUT, 'testedSha.txt'), testedSha + '\n')
 
-console.log(JSON.stringify({ testedSha, pass: report.pass }, null, 2))
+console.log(JSON.stringify({ testedSha, pass: report.pass, claimNarrowing: report.claimNarrowing }, null, 2))
 
 procB.kill('SIGTERM')
 server.close()
@@ -858,6 +996,7 @@ const required = [
   'aToBReset',
   'restartSameUserData',
   'tempDisconnectRetain',
+  'failClosedPendingVisible',
   'failClosedApprovals',
 ]
 const failed = required.filter((k) => !report.pass[k])

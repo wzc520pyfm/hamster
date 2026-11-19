@@ -9,17 +9,20 @@ export function ConversationPage({
   locale,
   conversationId,
   onApprovalsChanged,
+  onNetworkError,
+  connectionError = false,
 }: {
   locale: Locale
   conversationId: string | null
   onApprovalsChanged: () => void
+  onNetworkError?: () => void
+  connectionError?: boolean
 }) {
   const t = getCopy(locale)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [connectionError, setConnectionError] = useState(false)
   const [kbHeight, setKbHeight] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
@@ -30,34 +33,28 @@ export function ConversationPage({
     setTimeline(next)
   }, [conversationId])
 
-  const retryConnection = useCallback(async () => {
-    setConnectionError(false)
-    await refresh()
-  }, [refresh])
-
   useEffect(() => {
     let cancelled = false
-    setConnectionError(false)
     ;(async () => {
       try {
         await refresh()
       } catch (err) {
         if (!cancelled) {
-          if (isNetworkError(err)) setConnectionError(true)
+          if (isNetworkError(err)) onNetworkError?.()
           else setError(err instanceof Error ? err.message : String(err))
         }
       }
     })()
     const timer = setInterval(() => {
       void refresh().catch((err) => {
-        if (isNetworkError(err)) setConnectionError(true)
+        if (isNetworkError(err)) onNetworkError?.()
       })
     }, 2500)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [refresh])
+  }, [refresh, onNetworkError])
 
   // Keyboard rise (mobile virtual keyboard): shrink the composer column to the live
   // visual viewport so the composer and approval buttons stay usable.
@@ -103,7 +100,7 @@ export function ConversationPage({
       await refresh()
       onApprovalsChanged()
     } catch (err) {
-      if (isNetworkError(err)) setConnectionError(true)
+      if (isNetworkError(err)) onNetworkError?.()
       else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSending(false)
@@ -163,22 +160,15 @@ export function ConversationPage({
         pending={pendingApprovals}
         locale={locale}
         onDeny={async (id) => {
+          // Fail-closed when control channel unavailable — do not deny offline.
+          if (connectionError) return
           await api.deny(id)
           await refresh()
           onApprovalsChanged()
         }}
       />
 
-      {connectionError ? (
-        <div className="shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
-          {t.connect}
-          <div className="mt-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
-              {t.retry}
-            </Button>
-          </div>
-        </div>
-      ) : error ? (
+      {error && !connectionError ? (
         <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
           {error}
         </div>

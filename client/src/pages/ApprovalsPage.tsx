@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ApprovalCard } from '@/components/ApprovalCard'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
@@ -12,9 +13,12 @@ export function ApprovalsPage({
   onApprovalsChanged: () => void
 }) {
   const t = getCopy(locale)
+  const [searchParams] = useSearchParams()
+  const focusId = (searchParams.get('id') || searchParams.get('focus') || '').trim()
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState(false)
+  const focusedRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async () => {
     const list = await api.listApprovals()
@@ -50,6 +54,16 @@ export function ApprovalsPage({
     }
   }, [refresh])
 
+  // Deep-link: scroll/focus the exact ticket — do not leave the operator hunting the list.
+  useEffect(() => {
+    if (!focusId || approvals.length === 0) return
+    const el = document.querySelector(`[data-approval-id="${CSS.escape(focusId)}"]`)
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      focusedRef.current = el as HTMLDivElement
+    }
+  }, [focusId, approvals])
+
   return (
     <div className="flex flex-col gap-3">
       <header className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
@@ -80,6 +94,7 @@ export function ApprovalsPage({
               key={a.id}
               approval={a}
               locale={locale}
+              focused={Boolean(focusId) && a.id === focusId}
               onApprove={async (id) => {
                 await api.approve(id)
                 await refresh()

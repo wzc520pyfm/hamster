@@ -110,7 +110,10 @@ export function Shell({
   )
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-h-[100dvh] min-h-0 max-w-6xl flex-col gap-0 overflow-hidden md:h-auto md:max-h-none md:min-h-screen md:flex-row md:gap-4 md:overflow-visible md:p-4">
+    <div
+      className="mx-auto flex h-[100dvh] max-h-[100dvh] min-h-0 max-w-6xl flex-col gap-0 overflow-hidden md:flex-row md:gap-4 md:p-4"
+      data-shell-bounded="true"
+    >
       {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
       <header className="safe-area-top sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
         <div className="min-w-0">
@@ -173,7 +176,7 @@ export function Shell({
 
       {/* Desktop sidebar (unchanged composition at md+). */}
       <aside
-        className="sticky top-0 hidden h-[calc(100vh-2rem)] w-[13.5rem] shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-4 backdrop-blur-md md:flex"
+        className="hidden h-full w-[13.5rem] shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-4 backdrop-blur-md md:flex"
         style={{ animation: 'shell-in 420ms ease-out' }}
       >
         {brandBlock}

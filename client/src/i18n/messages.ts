@@ -88,6 +88,10 @@ const copy = {
     installBody: 'Add Hamster to your home screen for full-screen use.',
     installAction: 'Install',
     dismissInstall: 'Dismiss',
+    viewDetails: 'View details',
+    morePending: (n: number) => (n === 1 ? '1 more pending' : `${n} more pending`),
+    openPendingApprovals: 'Open pending approvals',
+    approvalTarget: 'Target',
   },
   zh: {
     brand: 'Hamster',
@@ -135,6 +139,10 @@ const copy = {
     installBody: '把 Hamster 加到主屏幕以使用全屏模式。',
     installAction: '安装',
     dismissInstall: '关闭',
+    viewDetails: '查看详情',
+    morePending: (n: number) => `还有 ${n} 项待审批`,
+    openPendingApprovals: '打开待审批',
+    approvalTarget: '目标',
   },
 } as const
 

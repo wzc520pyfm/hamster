@@ -32,10 +32,29 @@ Independently reproduced, then fixed (small patch):
 3. **Security tidy** — `hamster:session-origin` sync IPC requires trusted sender; `setWindowOpenHandler`
    default-deny; `/internal` not proxied; `safeJoinDist` uses root+sep boundary; shared vs electron
    origin helpers covered by consistency tests.
-4. **Install affordance + pending actions** — conversation column is `flex-1` inside `100dvh` shell;
-   pending approvals sit in a compact dock **above** the composer (outside the message scroller) so
-   Deny / Approve are not overflow-clipped or covered. Headless 390×844 evidence uses
-   `elementFromPoint` + clip checks (viewport bbox alone is **not** acceptance).
+4. **Install affordance + pending actions** — conversation column is `flex-1` inside `100dvh` shell
+   (desktop included; no unbounded grow-below-fold). Pending approvals sit in a compact dock
+   **above** the composer (outside the message scroller). Headless evidence uses `elementFromPoint`
+   + clip checks (viewport bbox alone is **not** acceptance).
+
+### Product follow-up (information sufficiency) — SUMMARY → EXACT FULL → CONFIRM
+
+Prior dock visibility fix was accepted as visibility-only; Product rejected **information sufficiency**
+of a compact card that hid title / safeParams / expiry while offering direct Approve.
+
+**Required route (this tip):**
+
+1. **Dock summary** — pins **one** pending summary only (+ remaining count + entry to pending list).
+   Shows plain action, identifiable target (title · assetId · channel), status vocabulary, **View details**
+   / **查看详情**, Deny may stay. **Never Approve** on the summary (desktop or narrow).
+2. **View details** deep-links to `/approvals?id=<exactApprovalId>` (also accepts `?focus=`), focuses that
+   ticket (ring + scroll). Full confirmation card shows task title/id, plain action, safeParams
+   (asset/channel/task; secrets masked as `•••`), expiry, Deny + Approve. Ticket binding fail-closed;
+   navigation does not auto-approve.
+3. **Install body** — no `truncate` / text-overflow; full EN/ZH wrap:
+   `Add Hamster to your home screen for full-screen use.` /
+   `把 Hamster 加到主屏幕以使用全屏模式。`
+4. Capture matrix script: `node scripts/p1-approval-summary-matrix.mjs` (fixture mock API only).
 
 ---
 
@@ -62,20 +81,28 @@ ConnectGate title: `Connect to Hamster` / `连接 Hamster`. Disconnect remains
 
 ## 3. Evidence (provenance)
 
-### Current-tip (this follow-up) — raw files under `/opt/cursor/artifacts/p1-followup-evidence/`
+### Current tip — SUMMARY → CONFIRM matrix
+
+Raw: `/opt/cursor/artifacts/p1-approval-summary-evidence/` (see `INDEX.md`).
+Repo copy: `docs/evidence/p1-electron-pwa/approval-summary-2026-11-19/`.
+
+| ID | Shot | Result |
+| --- | --- | --- |
+| A | desktop 1200×800 EN, two pending, composer | PASS — one summary, no Approve, View details + more-pending |
+| B | 390×844 ZH, one pending + install + composer | PASS — full ZH install body |
+| C | 390×667 EN, two pending + install + composer | PASS — hit-test after bounded scroll |
+| D-en / D-zh | exact `appr_p1_ticket_A` full confirm | PASS — title, asset, channel, expiry, redacted token, Deny+Approve |
+| interaction | View details → Approve A; B unchanged | PASS — also `noApproveDesktop` |
+
+`matrix-report.json`, `prod-build-*.txt`, `unit-tests.tap.txt` (19 PASS) stored with the shots.
+**Platform label:** Chromium headless — **NOT** Electron / **NOT** physical phone.
+
+### Prior follow-up (preserved) — `/opt/cursor/artifacts/p1-followup-evidence/`
 
 | Artifact | Result |
 | --- | --- |
-| `bake-with-env-example-*.txt` (pre-fix reproduce) | CONFIRMED loopback bake |
-| `prod-build-stdout.txt` / `stderr` | PASS empty bake |
-| `unit-tests.tap.txt` | PASS (19 tests) |
-| `readme-compose-bake-regression.txt` | PASS |
-| `cross-origin-gate-cors.log` | CONFIRMED renderer CORS block vs production server |
-| `nonlocalhost-proxy-verify.json` | PASS |
-| `p1-narrow-install-affordance-bbox.png` + `.json` | PASS after hit-test fix (headless; **not** physical) |
-| `cross-origin-gate-cors.log` | Documents **pre-fix** renderer CORS failure only |
-
-Also copied bbox shot into `docs/evidence/p1-electron-pwa/`.
+| bake / CORS / proxy / hitfix bbox logs | retained; see that dir `INDEX.md` |
+| `p1-narrow-install-affordance-bbox.png` | prior visibility fix (superseded for Approve-in-dock route) |
 
 ### Inherited / unverified
 

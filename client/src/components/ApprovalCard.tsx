@@ -5,7 +5,8 @@ import { approvalActionLabel, approvalDecisionCopy, getCopy, type Locale } from 
 import type { Approval } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 
-function safeParams(params: Record<string, unknown> | null | undefined) {
+/** Redact secret-ish param values; keep assetId/channel/task identifiers visible. */
+export function safeParams(params: Record<string, unknown> | null | undefined) {
   const entries = Object.entries(params ?? {}).filter(([, value]) => value !== undefined)
   return entries.map(([key, value]) => {
     const lower = key.toLowerCase()
@@ -13,7 +14,7 @@ function safeParams(params: Record<string, unknown> | null | undefined) {
       lower.includes('secret') ||
       lower.includes('password') ||
       lower.includes('token') ||
-      lower.includes('key')
+      (lower.includes('key') && lower !== 'assetid')
     return {
       key,
       value: secretish ? '•••' : typeof value === 'string' ? value : JSON.stringify(value),
@@ -21,102 +22,57 @@ function safeParams(params: Record<string, unknown> | null | undefined) {
   })
 }
 
+/**
+ * Full confirmation card (Approvals page / focused ticket).
+ * SUMMARY dock never uses Approve — only this card does, after View details.
+ */
 export function ApprovalCard({
   approval,
   locale,
   onApprove,
   onDeny,
-  compact = false,
+  focused = false,
 }: {
   approval: Approval
   locale: Locale
   onApprove: (id: string) => Promise<void>
   onDeny: (id: string) => Promise<void>
-  /** Narrow dock above composer: keep actions reachable without a tall card. */
-  compact?: boolean
+  focused?: boolean
 }) {
   const t = getCopy(locale)
   const [busy, setBusy] = useState(false)
   const pending = approval.status === 'pending'
   const expiresAt = approval.expiresAt ?? approval.expires_at ?? null
   const note = approval.decisionNote ?? approval.decision_note ?? null
-  // Closed-state footer must use the design-table wording in the ACTIVE locale
-  // (EN | 中文), not the raw (English-stored) decision note. Pending tickets carry
-  // no decision sentence. Exact design-table pairs only; no synonym rewrites.
   const decisionCopy = approvalDecisionCopy(approval.status, locale)
   const footer = decisionCopy ?? note
   const params = safeParams(approval.params)
   const title = approvalActionLabel(approval.action, approval.params, locale)
 
-  const actions =
-    pending ? (
-      <div className={`flex flex-wrap gap-2 ${compact ? 'mt-2' : 'mt-4'}`} data-testid="approval-actions">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          data-testid="approval-deny"
-          onClick={async () => {
-            setBusy(true)
-            try {
-              await onDeny(approval.id)
-            } finally {
-              setBusy(false)
-            }
-          }}
-        >
-          {t.deny}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={busy}
-          data-testid="approval-approve"
-          onClick={async () => {
-            setBusy(true)
-            try {
-              await onApprove(approval.id)
-            } finally {
-              setBusy(false)
-            }
-          }}
-        >
-          {t.approveThisAction}
-        </Button>
-      </div>
-    ) : null
-
-  if (compact) {
-    return (
-      <article
-        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2.5"
-        data-testid="approval-card-compact"
-      >
-        <header className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold leading-snug">{title}</h3>
-            <div className="mt-0.5 font-mono text-[10px] text-[var(--color-muted-foreground)]">
-              {t.taskId}: {approval.taskId}
-            </div>
-          </div>
-          <ApprovalStatusLabel status={approval.status} locale={locale} />
-        </header>
-        {actions}
-      </article>
-    )
-  }
-
   return (
-    <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
+    <article
+      id={`approval-${approval.id}`}
+      data-testid="approval-card"
+      data-approval-id={approval.id}
+      data-focused={focused ? 'true' : 'false'}
+      className={`rounded-lg border bg-[var(--color-card)] p-4 ${
+        focused
+          ? 'border-[var(--color-ring)] ring-2 ring-[var(--color-ring)]'
+          : 'border-[var(--color-border)]'
+      }`}
+    >
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="text-base font-semibold">{title}</h3>
+          <h3 className="text-base font-semibold" data-testid="approval-full-action">
+            {title}
+          </h3>
           <div className="mt-1 font-mono text-[11px] text-[var(--color-muted-foreground)]">
             {t.taskId}: {approval.taskId}
           </div>
           {approval.taskTitle ? (
-            <div className="text-sm text-[var(--color-muted-foreground)]">{approval.taskTitle}</div>
+            <div className="text-sm text-[var(--color-muted-foreground)]" data-testid="approval-full-task-title">
+              {approval.taskTitle}
+            </div>
           ) : null}
         </div>
         <ApprovalStatusLabel status={approval.status} locale={locale} />
@@ -126,9 +82,12 @@ export function ApprovalCard({
         {params.length > 0 ? (
           <div>
             <dt className="text-xs text-[var(--color-muted-foreground)]">{t.params}</dt>
-            <dd className="mt-1 rounded-md bg-[var(--color-muted)]/60 px-2.5 py-2 font-mono text-xs">
+            <dd
+              className="mt-1 rounded-md bg-[var(--color-muted)]/60 px-2.5 py-2 font-mono text-xs whitespace-normal"
+              data-testid="approval-full-params"
+            >
               {params.map((p) => (
-                <div key={p.key}>
+                <div key={p.key} data-param-key={p.key}>
                   {p.key}: {p.value}
                 </div>
               ))}
@@ -138,13 +97,51 @@ export function ApprovalCard({
         {expiresAt ? (
           <div>
             <dt className="text-xs text-[var(--color-muted-foreground)]">{t.expires}</dt>
-            <dd>{formatTime(expiresAt, locale === 'zh' ? 'zh-CN' : 'en-US')}</dd>
+            <dd data-testid="approval-full-expires">
+              {formatTime(expiresAt, locale === 'zh' ? 'zh-CN' : 'en-US')}
+            </dd>
           </div>
         ) : null}
         {footer ? <div className="text-[var(--color-muted-foreground)]">{footer}</div> : null}
       </dl>
 
-      {actions}
+      {pending ? (
+        <div className="mt-4 flex flex-wrap gap-2" data-testid="approval-actions">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            data-testid="approval-deny"
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await onDeny(approval.id)
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            {t.deny}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy}
+            data-testid="approval-approve"
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await onApprove(approval.id)
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            {t.approveThisAction}
+          </Button>
+        </div>
+      ) : null}
     </article>
   )
 }

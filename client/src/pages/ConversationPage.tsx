@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ApprovalCard } from '@/components/ApprovalCard'
+import { PendingApprovalDock } from '@/components/PendingApprovalDock'
 import { TaskCard } from '@/components/TaskCard'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
@@ -158,33 +158,16 @@ export function ConversationPage({
         <div ref={bottomRef} />
       </div>
 
-      {/* Pending tickets stay outside the message scroller so Approve/Deny are not
-          overflow-clipped or covered by the composer / install affordance. */}
-      {pendingApprovals.length > 0 ? (
-        <div
-          className="flex shrink-0 flex-col gap-2"
-          data-testid="pending-approvals-dock"
-        >
-          {pendingApprovals.map((a) => (
-            <ApprovalCard
-              key={a.id}
-              approval={a}
-              locale={locale}
-              compact
-              onApprove={async (id) => {
-                await api.approve(id)
-                await refresh()
-                onApprovalsChanged()
-              }}
-              onDeny={async (id) => {
-                await api.deny(id)
-                await refresh()
-                onApprovalsChanged()
-              }}
-            />
-          ))}
-        </div>
-      ) : null}
+      {/* One summary only — SUMMARY → full ticket on /approvals?id=… → CONFIRM. No Approve here. */}
+      <PendingApprovalDock
+        pending={pendingApprovals}
+        locale={locale}
+        onDeny={async (id) => {
+          await api.deny(id)
+          await refresh()
+          onApprovalsChanged()
+        }}
+      />
 
       {connectionError ? (
         <div className="shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">

@@ -1,0 +1,454 @@
+{
+  "shots": [
+    {
+      "id": "A",
+      "checks": {
+        "summaryCount": 1,
+        "hasApproveInSummary": false,
+        "hasViewDetails": true,
+        "hasMore": true,
+        "expectMore": true,
+        "expectInstall": false,
+        "actionText": "Publish this dashboard to shared workspace",
+        "targetText": "Target: Weekly metrics dashboard · assetId: asset_p1_metrics_A · shared workspace",
+        "actionHasEllipsis": false,
+        "targetHasEllipsis": false,
+        "installText": "",
+        "installHasEllipsis": false,
+        "installCompleteEn": true,
+        "installCompleteZh": true,
+        "viewHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 326,
+              "y": 621,
+              "hit": true
+            },
+            {
+              "x": 301.4,
+              "y": 621,
+              "hit": true
+            },
+            {
+              "x": 350.6,
+              "y": 621,
+              "hit": true
+            },
+            {
+              "x": 326,
+              "y": 611.4,
+              "hit": true
+            },
+            {
+              "x": 326,
+              "y": 630.6,
+              "hit": true
+            },
+            {
+              "x": 326,
+              "y": 634.44,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 605,
+            "bottom": 637
+          }
+        },
+        "composerHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 680.5,
+              "y": 748,
+              "hit": true
+            },
+            {
+              "x": 443.20000000000005,
+              "y": 748,
+              "hit": true
+            },
+            {
+              "x": 917.8000000000001,
+              "y": 748,
+              "hit": true
+            },
+            {
+              "x": 680.5,
+              "y": 727,
+              "hit": true
+            },
+            {
+              "x": 680.5,
+              "y": 769,
+              "hit": true
+            },
+            {
+              "x": 680.5,
+              "y": 777.4,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 713,
+            "bottom": 783
+          }
+        },
+        "installHit": {
+          "skipped": true
+        },
+        "viewClipped": false,
+        "composerClipped": false,
+        "clearAboveComposer": true,
+        "pass": true
+      },
+      "shot": "/opt/cursor/artifacts/p1-approval-summary-evidence/A-desktop-1200x800-en-two-pending.png"
+    },
+    {
+      "id": "B",
+      "checks": {
+        "summaryCount": 1,
+        "hasApproveInSummary": false,
+        "hasViewDetails": true,
+        "hasMore": false,
+        "expectMore": false,
+        "expectInstall": true,
+        "actionText": "将此 Dashboard 发布到shared workspace",
+        "targetText": "目标: Weekly metrics dashboard · assetId: asset_p1_metrics_A · shared workspace",
+        "actionHasEllipsis": false,
+        "targetHasEllipsis": false,
+        "installText": "把 Hamster 加到主屏幕以使用全屏模式。",
+        "installHasEllipsis": false,
+        "installCompleteEn": false,
+        "installCompleteZh": true,
+        "viewHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 60,
+              "y": 619.5,
+              "hit": true
+            },
+            {
+              "x": 39,
+              "y": 619.5,
+              "hit": true
+            },
+            {
+              "x": 81,
+              "y": 619.5,
+              "hit": true
+            },
+            {
+              "x": 60,
+              "y": 609.9,
+              "hit": true
+            },
+            {
+              "x": 60,
+              "y": 629.1,
+              "hit": true
+            },
+            {
+              "x": 60,
+              "y": 632.94,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 603.5,
+            "bottom": 635.5
+          }
+        },
+        "composerHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 195,
+              "y": 704.5,
+              "hit": true
+            },
+            {
+              "x": 93,
+              "y": 704.5,
+              "hit": true
+            },
+            {
+              "x": 297,
+              "y": 704.5,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 684.7,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 724.3,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 732.22,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 671.5,
+            "bottom": 737.5
+          }
+        },
+        "installHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 195,
+              "y": 805.25,
+              "hit": true
+            },
+            {
+              "x": 85.2,
+              "y": 805.25,
+              "hit": true
+            },
+            {
+              "x": 304.8,
+              "y": 805.25,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 791.6,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 818.9,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 824.36,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 782.5,
+            "bottom": 828
+          }
+        },
+        "viewClipped": false,
+        "composerClipped": false,
+        "clearAboveComposer": true,
+        "pass": true,
+        "installTextExact": "把 Hamster 加到主屏幕以使用全屏模式。"
+      },
+      "shot": "/opt/cursor/artifacts/p1-approval-summary-evidence/B-narrow-390x844-zh-one-pending-install.png"
+    },
+    {
+      "id": "C",
+      "checks": {
+        "summaryCount": 1,
+        "hasApproveInSummary": false,
+        "hasViewDetails": true,
+        "hasMore": true,
+        "expectMore": true,
+        "expectInstall": true,
+        "actionText": "Publish this dashboard to shared workspace",
+        "targetText": "Target: Weekly metrics dashboard · assetId: asset_p1_metrics_A · shared workspace",
+        "actionHasEllipsis": false,
+        "targetHasEllipsis": false,
+        "installText": "Add Hamster to your home screen for full-screen use.",
+        "installHasEllipsis": false,
+        "installCompleteEn": true,
+        "installCompleteZh": false,
+        "viewHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 66,
+              "y": 404.5,
+              "hit": true
+            },
+            {
+              "x": 41.400000000000006,
+              "y": 404.5,
+              "hit": true
+            },
+            {
+              "x": 90.60000000000001,
+              "y": 404.5,
+              "hit": true
+            },
+            {
+              "x": 66,
+              "y": 394.9,
+              "hit": true
+            },
+            {
+              "x": 66,
+              "y": 414.1,
+              "hit": true
+            },
+            {
+              "x": 66,
+              "y": 417.94,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 388.5,
+            "bottom": 420.5
+          }
+        },
+        "composerHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 195,
+              "y": 511,
+              "hit": true
+            },
+            {
+              "x": 93,
+              "y": 511,
+              "hit": true
+            },
+            {
+              "x": 297,
+              "y": 511,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 491.2,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 530.8,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 538.72,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 478,
+            "bottom": 544
+          }
+        },
+        "installHit": {
+          "hittable": true,
+          "samples": [
+            {
+              "x": 195,
+              "y": 620,
+              "hit": true
+            },
+            {
+              "x": 85.2,
+              "y": 620,
+              "hit": true
+            },
+            {
+              "x": 304.8,
+              "y": 620,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 601.4,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 638.6,
+              "hit": true
+            },
+            {
+              "x": 195,
+              "y": 646.04,
+              "hit": true
+            }
+          ],
+          "box": {
+            "top": 589,
+            "bottom": 651
+          }
+        },
+        "viewClipped": false,
+        "composerClipped": false,
+        "clearAboveComposer": true,
+        "pass": true,
+        "installTextExact": "Add Hamster to your home screen for full-screen use."
+      },
+      "shot": "/opt/cursor/artifacts/p1-approval-summary-evidence/C-narrow-390x667-en-two-pending-install.png"
+    },
+    {
+      "id": "D-en",
+      "checks": {
+        "focused": true,
+        "action": "Publish this dashboard to shared workspace",
+        "title": "Weekly metrics dashboard",
+        "params": "assetId: asset_p1_metrics_A\nchannel: shared workspace\napiToken: •••",
+        "expires": "Nov 20, 2026, 6:00 PM",
+        "hasApprove": true,
+        "hasDeny": true,
+        "hasAsset": true,
+        "hasChannel": true,
+        "tokenRedacted": true,
+        "noRawToken": true,
+        "noEllipsis": true,
+        "pass": true
+      },
+      "shot": "/opt/cursor/artifacts/p1-approval-summary-evidence/D-full-confirm-en-ticket-A.png"
+    },
+    {
+      "id": "D-zh",
+      "checks": {
+        "focused": true,
+        "action": "将此 Dashboard 发布到shared workspace",
+        "title": "Weekly metrics dashboard",
+        "params": "assetId: asset_p1_metrics_A\nchannel: shared workspace\napiToken: •••",
+        "expires": "2026年11月20日 18:00",
+        "hasApprove": true,
+        "hasDeny": true,
+        "hasAsset": true,
+        "hasChannel": true,
+        "tokenRedacted": true,
+        "noRawToken": true,
+        "noEllipsis": true,
+        "pass": true
+      },
+      "shot": "/opt/cursor/artifacts/p1-approval-summary-evidence/D-full-confirm-zh-ticket-A.png"
+    }
+  ],
+  "interaction": {
+    "noApproveDesktop": true,
+    "noApproveOnSummary": true,
+    "navigatedExactId": true,
+    "fieldsOk": {
+      "asset": true,
+      "channel": true,
+      "redacted": true,
+      "title": true,
+      "expires": true
+    },
+    "approveCalls": [
+      {
+        "id": "appr_p1_ticket_A",
+        "body": "{\"decidedBy\":\"local-user\"}"
+      }
+    ],
+    "aApproved": true,
+    "bStillPending": true,
+    "pass": true
+  },
+  "platform": "Chromium headless — NOT Electron / NOT physical phone",
+  "pass": true
+}

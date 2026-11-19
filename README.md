@@ -69,7 +69,7 @@ ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY=sk-... for openai
 2. Ask an unrelated follow-up — the worker keeps running.
 3. Use the Task card: `Check progress`, `Steer this task`, `Cancel this task`.
 4. Open the Dashboard from the card or **Dashboards** — both use `/assets/:assetId` and render the persisted OpenUI document.
-5. Approvals use `Deny` / `Approve this action` only. Ignoring a ticket expires with `Expired — not approved, so it did not run`.
+5. Approvals: conversation dock shows a **summary** (plain action + target + **View details** / Deny — **never Approve**). Confirm only on the exact ticket at `/approvals?id=…` with `Deny` / `Approve this action`. Ignoring a ticket expires with `Expired — not approved, so it did not run`.
 
 Shell language switch: **EN | 中文** (same layout; fixed status words from the design table).
 

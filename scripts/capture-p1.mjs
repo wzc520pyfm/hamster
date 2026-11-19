@@ -69,19 +69,35 @@ async function installChecks(page) {
   const data = await page.evaluate(async () => {
     const res = await fetch('/manifest.webmanifest')
     const manifest = res.ok ? await res.json() : null
-    const icon192 = await fetch('/icons/icon-192.png').then((r) => r.status).catch(() => 0)
-    const icon512 = await fetch('/icons/icon-512.png').then((r) => r.status).catch(() => 0)
+    const icons = Array.isArray(manifest?.icons) ? manifest.icons : []
+    const iconResults = await Promise.all(
+      icons.map(async (icon) => {
+        const iconRes = await fetch(icon.src).then((r) => r.status).catch(() => 0)
+        return {
+          src: icon.src,
+          type: icon.type,
+          status: iconRes,
+          ok: iconRes === 200 && icon.type === 'image/png',
+        }
+      }),
+    )
     const theme = document.querySelector('meta[name="theme-color"]')?.content || null
     const manifestLink = document.querySelector('link[rel="manifest"]')?.href || null
     const swReg = typeof navigator !== 'undefined' && 'serviceWorker' in navigator
       ? await navigator.serviceWorker.getRegistration('/sw.js').then((r) => (r ? 'registered' : 'missing')).catch(() => 'error')
       : 'unsupported'
-    return { manifest, icon192, icon512, theme, manifestLink, swReg }
+    return { manifest, icons, iconResults, theme, manifestLink, swReg }
   })
-  return {
-    ok: Boolean(data.manifest && data.manifest.display === 'standalone' && data.manifest.start_url === '/' && Array.isArray(data.manifest.icons)),
-    ...data,
-  }
+  const ok =
+    Boolean(data.manifest) &&
+    data.manifest.display === 'standalone' &&
+    data.manifest.start_url === '/' &&
+    Array.isArray(data.manifest.icons) &&
+    data.manifest.icons.length > 0 &&
+    data.iconResults.length > 0 &&
+    data.iconResults.every((icon) => icon.ok) &&
+    data.swReg === 'registered'
+  return { ok, ...data }
 }
 
 const browser = await chromium.launch({ headless: true })
@@ -204,6 +220,10 @@ for (const [locale, text] of [
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   await page.goto(CLIENT_BASE + '/', { waitUntil: 'networkidle' })
   results.install = await installChecks(page)
+  if (results.install.ok !== true) {
+    console.error('P1 FAIL: install checks not ok', JSON.stringify(results.install))
+    process.exitCode = 1
+  }
   await page.close()
 }
 

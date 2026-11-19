@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Shell } from '@/components/Shell'
-import { ConnectGateMount } from '@/components/ConnectGate'
+import { ConnectGateMount, shouldShowConnectGate } from '@/components/ConnectGate'
 import { LocaleProvider, useLocale } from '@/i18n/LocaleContext'
 import { api, isNetworkError } from '@/lib/api'
 import { getCopy } from '@/i18n/messages'
@@ -19,6 +19,7 @@ function AppRoutes() {
   const [conversationTitle, setConversationTitle] = useState('')
   const [pendingApprovals, setPendingApprovals] = useState(0)
   const [connectionError, setConnectionError] = useState(false)
+  const connectGateShowing = shouldShowConnectGate()
 
   const refreshPending = useCallback(async () => {
     try {
@@ -81,16 +82,20 @@ function AppRoutes() {
     return () => off?.()
   }, [navigate])
 
+  if (connectGateShowing) {
+    // Electron window that is not same-origin with the control plane: render the quiet gate only.
+    // Never stack the disconnect screen or the main routes underneath it.
+    return <ConnectGateMount />
+  }
+
   return (
     <>
-      <ConnectGateMount />
       {connectionError ? (
         <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-4">
           <div className="flex flex-col gap-3 rounded-xl border border-[#e2c4c4] bg-[#f8ecec] p-4">
             <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--color-destructive)]">
               {t.connect}
             </h1>
-            <p className="text-sm text-[var(--color-muted-foreground)]">{t.connectAddressLabel}</p>
             <Button onClick={() => void retryConnection()}>{t.retry}</Button>
           </div>
         </div>

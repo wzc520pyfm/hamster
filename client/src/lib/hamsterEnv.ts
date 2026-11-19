@@ -2,9 +2,14 @@
  * Container-aware connection helpers for the Electron main client + installable PWA.
  *
  * The same React client runs in three containers:
- * - `electron` : the Electron main-computer window (bridge injected by electron/preload + main)
+ * - `electron` : the Electron main-computer window (bridge injected by electron/preload + main:
+ *   `window.hamster` with `container` + `controlBaseUrl`; string or function forms both accepted)
  * - `pwa`      : installed standalone PWA (display-mode: standalone)
  * - `browser`  : ordinary browser tab / dev server
+ *
+ * The `window.hamster` bridge (see electron/preload.js) is authoritative when present; the older
+ * injected globals (`window.__HAMSTER_CONTAINER__` / `window.__HAMSTER_CONTROL_BASE__`) are still
+ * accepted when the bridge is not there. Container identity must not come from page scripts.
  *
  * These helpers are intentionally tiny; they do not add a second visual language.
  */
@@ -17,8 +22,29 @@ export interface HamsterEnv {
   standalone: boolean
 }
 
+type HamsterBridge = {
+  container?: string | (() => string)
+  controlBaseUrl?: string | (() => string)
+}
+
+function readHamsterBridge(): HamsterBridge {
+  const w = window as Window & { hamster?: HamsterBridge }
+  return w.hamster ?? {}
+}
+
+function resolveBridgeString(value: string | (() => string) | undefined): string | undefined {
+  if (typeof value === 'function') {
+    const resolved = (value as () => string)()
+    return typeof resolved === 'string' ? resolved : undefined
+  }
+  return value
+}
+
 function readContainer(): HamsterContainer {
-  const raw = (window as Window & { __HAMSTER_CONTAINER__?: string }).__HAMSTER_CONTAINER__
+  const bridge = readHamsterBridge()
+  const fromBridge = resolveBridgeString(bridge.container)?.trim()
+  const injected = (window as Window & { __HAMSTER_CONTAINER__?: string }).__HAMSTER_CONTAINER__
+  const raw = fromBridge || injected || ''
   if (raw === 'electron' || raw === 'pwa') return raw
   return 'browser'
 }
@@ -32,16 +58,36 @@ function readControlBaseInjected(): string {
   return ''
 }
 
+function readControlBaseBridge(): string {
+  const bridge = readHamsterBridge()
+  const fromBridge = resolveBridgeString(bridge.controlBaseUrl)
+  const raw = fromBridge || readControlBaseInjected()
+  if (typeof raw !== 'string') return ''
+  const stripped = raw.trim().replace(/\/+$/, '')
+  return stripped || ''
+}
+
 export function getHamsterEnv(): HamsterEnv {
   const injected = readControlBaseInjected()
+  const bridged = readControlBaseBridge()
   const fromEnv =
     (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
-  const controlBase = injected || fromEnv || window.location.origin
+  const controlBase = bridged || injected || fromEnv || window.location.origin
   return {
     container: readContainer(),
     controlBase,
     standalone: isStandaloneDisplay(),
   }
+}
+
+/**
+ * True when the current renderer already serves the control plane (same origin), i.e. when the
+ * Electron quiet ConnectGate should stay closed. Derived from the `window.hamster` bridge (via
+ * `controlBaseUrl()`), falling back to injected globals / env / current origin.
+ */
+export function isSameOriginControlBase(): boolean {
+  if (typeof window === 'undefined') return true
+  return window.location.origin === getHamsterEnv().controlBase
 }
 
 export function isStandaloneDisplay(): boolean {

@@ -5,10 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { freshnessLabel, getCopy, type Locale } from '@/i18n/messages'
 import { api, isNetworkError, type AssetDetail, type Freshness } from '@/lib/api'
+import { controlBaseUrl } from '@/lib/hamsterEnv'
 import { formatTime } from '@/lib/utils'
 import { hamsterOpenUiLibrary, RefreshTokenContext } from '@/openui/library'
+import { resolveApiBase } from '@/lib/hamsterOrigin'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+function dashboardApiBase(): string {
+  return resolveApiBase({
+    pageOrigin: window.location.origin,
+    controlBase: controlBaseUrl(),
+    viteApiBase: (import.meta.env.VITE_API_BASE_URL as string | undefined) || '',
+  })
+}
 
 /**
  * Persistent dashboard surface (Line B).
@@ -75,7 +83,7 @@ export function DashboardView({
       metrics_weekly: async (args: Record<string, unknown>) => {
         void args
         const res = await fetch(
-          `${API_BASE}/api/assets/${encodeURIComponent(assetId)}/query/metrics_weekly`,
+          `${dashboardApiBase()}/api/assets/${encodeURIComponent(assetId)}/query/metrics_weekly`,
         )
         if (!res.ok) {
           const body = await res.text()

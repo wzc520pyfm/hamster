@@ -209,10 +209,12 @@ export function Shell({
             </Button>
           </div>
         ) : null}
-        <Outlet />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Outlet />
+        </div>
+        {/* In-flow install affordance: sits below the page column so composer/approvals stay visible. */}
+        <InstallPrompt />
       </main>
-
-      <InstallPrompt />
 
       <style>{`
         @keyframes shell-in {

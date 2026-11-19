@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Shell } from '@/components/Shell'
 import { ConnectGateMount, shouldShowConnectGate } from '@/components/ConnectGate'
@@ -10,6 +10,18 @@ import { ApprovalsPage } from '@/pages/ApprovalsPage'
 import { AssetPage } from '@/pages/AssetPage'
 import { AssetsLibraryPage } from '@/pages/AssetsLibraryPage'
 import { ConversationPage } from '@/pages/ConversationPage'
+
+function ElectronRouteReporter() {
+  const location = useLocation()
+  useEffect(() => {
+    window.hamster?.reportRoute?.({
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    })
+  }, [location.pathname, location.search, location.hash])
+  return null
+}
 
 function AppRoutes() {
   const { locale } = useLocale()
@@ -90,6 +102,7 @@ function AppRoutes() {
 
   return (
     <>
+      <ElectronRouteReporter />
       {connectionError ? (
         <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-4">
           <div className="flex flex-col gap-3 rounded-xl border border-[#e2c4c4] bg-[#f8ecec] p-4">

@@ -57,10 +57,17 @@ services:
       - "8080:8080"
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        # Empty => production SPA uses same-origin /api via client/server.mjs reverse proxy.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+      API_UPSTREAM: ${API_UPSTREAM:-http://api:8080}
+      PORT: "3000"
+      # Allow LAN origins when operators set HAMSTER_CORS_ORIGIN (comma-separated optional future);
+      # browser API calls are same-origin through the client proxy, so CORS is unused for PWA.
     ports:
       - "3000:3000"
     depends_on:

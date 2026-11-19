@@ -7,12 +7,14 @@
  * - `pwa`      : installed standalone PWA (display-mode: standalone)
  * - `browser`  : ordinary browser tab / dev server
  *
- * The `window.hamster` bridge (see electron/preload.js) is authoritative when present; the older
- * injected globals (`window.__HAMSTER_CONTAINER__` / `window.__HAMSTER_CONTROL_BASE__`) are still
- * accepted when the bridge is not there. Container identity must not come from page scripts.
+ * The `window.hamster` bridge (see electron/preload.js) is authoritative for *container identity*
+ * when present. Control-plane base for API fetches prefers the current page origin once it is a
+ * remembered / configured Hamster client origin (same-origin /api via reverse proxy).
  *
  * These helpers are intentionally tiny; they do not add a second visual language.
  */
+
+import { stripTrailingSlash } from '@/lib/hamsterOrigin'
 
 export type HamsterContainer = 'electron' | 'pwa' | 'browser'
 
@@ -22,9 +24,12 @@ export interface HamsterEnv {
   standalone: boolean
 }
 
+export const LAST_GOOD_CONTROL_BASE_KEY = 'hamster.controlBase'
+
 type HamsterBridge = {
   container?: string | (() => string)
   controlBaseUrl?: string | (() => string)
+  sessionOrigin?: string | (() => string)
 }
 
 function readHamsterBridge(): HamsterBridge {
@@ -52,7 +57,7 @@ function readContainer(): HamsterContainer {
 function readControlBaseInjected(): string {
   const raw = (window as Window & { __HAMSTER_CONTROL_BASE__?: string }).__HAMSTER_CONTROL_BASE__
   if (typeof raw === 'string') {
-    const stripped = raw.trim().replace(/\/+$/, '')
+    const stripped = stripTrailingSlash(raw)
     if (stripped) return stripped
   }
   return ''
@@ -61,18 +66,59 @@ function readControlBaseInjected(): string {
 function readControlBaseBridge(): string {
   const bridge = readHamsterBridge()
   const fromBridge = resolveBridgeString(bridge.controlBaseUrl)
-  const raw = fromBridge || readControlBaseInjected()
-  if (typeof raw !== 'string') return ''
-  const stripped = raw.trim().replace(/\/+$/, '')
-  return stripped || ''
+  if (typeof fromBridge !== 'string') return ''
+  return stripTrailingSlash(fromBridge)
 }
 
+function readLastGoodControlBase(): string {
+  try {
+    if (typeof localStorage === 'undefined') return ''
+    return stripTrailingSlash(localStorage.getItem(LAST_GOOD_CONTROL_BASE_KEY) || '')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Control-plane origin the renderer should treat as authoritative for API + ConnectGate.
+ * Prefer: current page when it matches last-good or bootstrap bridge; else last-good; else bridge;
+ * else vite env; else page origin. This keeps remembered ConnectGate URLs wired after navigate
+ * without leaving API stuck on a build-time localhost bake.
+ */
 export function getHamsterEnv(): HamsterEnv {
-  const injected = readControlBaseInjected()
+  const page = typeof window !== 'undefined' ? window.location.origin : ''
+  const lastGood = readLastGoodControlBase()
   const bridged = readControlBaseBridge()
+  const injected = readControlBaseInjected()
+  const sessionOrigin = stripTrailingSlash(
+    resolveBridgeString(readHamsterBridge().sessionOrigin) || '',
+  )
   const fromEnv =
     (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
-  const controlBase = bridged || injected || fromEnv || window.location.origin
+
+  let controlBase = page
+  if (lastGood && lastGood === page) {
+    controlBase = page
+  } else if (sessionOrigin && sessionOrigin === page) {
+    controlBase = page
+  } else if (bridged && bridged === page) {
+    controlBase = page
+  } else if (injected && injected === page) {
+    controlBase = page
+  } else if (lastGood) {
+    controlBase = lastGood
+  } else if (sessionOrigin) {
+    controlBase = sessionOrigin
+  } else if (bridged) {
+    controlBase = bridged
+  } else if (injected) {
+    controlBase = injected
+  } else if (fromEnv) {
+    controlBase = fromEnv
+  } else {
+    controlBase = page
+  }
+
   return {
     container: readContainer(),
     controlBase,
@@ -81,13 +127,27 @@ export function getHamsterEnv(): HamsterEnv {
 }
 
 /**
- * True when the current renderer already serves the control plane (same origin), i.e. when the
- * Electron quiet ConnectGate should stay closed. Derived from the `window.hamster` bridge (via
- * `controlBaseUrl()`), falling back to injected globals / env / current origin.
+ * True when the Electron quiet ConnectGate should stay closed.
+ * Closed when the window is already on the bootstrap origin, or on a remembered validated origin.
  */
 export function isSameOriginControlBase(): boolean {
   if (typeof window === 'undefined') return true
-  return window.location.origin === getHamsterEnv().controlBase
+  const page = window.location.origin
+  const lastGood = readLastGoodControlBase()
+  if (lastGood && lastGood === page) return true
+  const bridged = readControlBaseBridge()
+  if (bridged && bridged === page) return true
+  const injected = readControlBaseInjected()
+  if (injected && injected === page) return true
+  // Electron session restore may land on a trusted LAN origin while bootstrap env still
+  // points at localhost — treat main-process session origin as authoritative when it matches.
+  const bridge = readHamsterBridge()
+  const sessionOrigin = stripTrailingSlash(resolveBridgeString(bridge.sessionOrigin) || '')
+  if (sessionOrigin && sessionOrigin === page) return true
+  // Browser / PWA always treat the serving origin as the control plane (same-origin /api).
+  if (!isElectronContainer()) return true
+  // Electron without last-good: only same as bootstrap bridge.
+  return Boolean(bridged && bridged === page)
 }
 
 export function isStandaloneDisplay(): boolean {
@@ -105,7 +165,12 @@ export function isStandaloneDisplay(): boolean {
 }
 
 export function isElectronContainer(): boolean {
-  return getHamsterEnv().container === 'electron'
+  // Prefer the preload bridge only — do not trust page-script __HAMSTER_CONTAINER__ for Electron
+  // privilege decisions (ConnectGate / IPC). Injected global remains a non-authoritative hint for
+  // display helpers via getHamsterEnv().container when bridge is absent.
+  const bridge = readHamsterBridge()
+  const fromBridge = resolveBridgeString(bridge.container)?.trim()
+  return fromBridge === 'electron'
 }
 
 /** Control-plane base the renderer uses for control-plane calls. */

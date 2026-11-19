@@ -9,7 +9,7 @@ type BeforeInstallPromptEvent = Event & {
 
 /**
  * Quiet, dismissible install affordance for the standalone-capable PWA.
- * Never blocks work; only appears when the browser fired `beforeinstallprompt`.
+ * In-flow (not a fixed overlay) so it cannot cover the composer or approval controls.
  */
 export function InstallPrompt() {
   const { t } = useLocale()
@@ -46,8 +46,10 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="safe-area-bottom fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-card)]/95 px-3 py-2 backdrop-blur"
+      className="safe-area-bottom shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
       data-testid="install-prompt"
+      role="region"
+      aria-label={t.installTitle}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">

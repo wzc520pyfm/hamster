@@ -1,7 +1,20 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+import { controlBaseUrl } from '@/lib/hamsterEnv'
+import { resolveApiBase } from '@/lib/hamsterOrigin'
+
+/** Runtime API base: same-origin relative when on the validated Hamster client; never a stale bake-only host. */
+function apiBase(): string {
+  if (typeof window === 'undefined') {
+    return (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+  }
+  return resolveApiBase({
+    pageOrigin: window.location.origin,
+    controlBase: controlBaseUrl(),
+    viteApiBase: (import.meta.env.VITE_API_BASE_URL as string | undefined) || '',
+  })
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',

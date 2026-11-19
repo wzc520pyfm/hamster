@@ -4,14 +4,17 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-ARG VITE_API_BASE_URL=http://localhost:8080
+# Same-origin relative /api (empty). Do NOT bake localhost:8080 — phones would hit their own loopback.
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
 FROM node:24-bookworm-slim
 WORKDIR /app
-RUN npm install -g serve@14
 COPY --from=build /app/dist ./dist
+COPY server.mjs ./server.mjs
+ENV PORT=3000
+ENV API_UPSTREAM=http://api:8080
 EXPOSE 3000
 USER node
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["node", "server.mjs"]

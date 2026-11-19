@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "start:prod": "node server.mjs",
     "smoke:locale": "node ../scripts/ui-smoke-locale.mjs"
   },
   "dependencies": {

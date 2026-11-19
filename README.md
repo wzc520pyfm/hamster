@@ -80,9 +80,46 @@ cd client && npm install && VITE_API_BASE_URL=http://localhost:8080 npm run buil
 ./scripts/verify-p0.sh
 ```
 
+## Electron desktop client (P1 slice)
+
+Same web client, new container. The Electron window only adds window, install, safe-area and
+background-reachability behaviour; the product UI, status words, and IDs are unchanged.
+
+```bash
+# 1. Control plane (self-hosted, fixture path)
+sudo docker compose up --build -d        # client published at http://localhost:3000
+
+# 2. Client (serves the origin the Electron window will load)
+cd client && npm install && npm run build && npm run preview -- --port 3000
+
+# 3. Electron
+cd electron && npm install && npx electron .
+```
+
+- Default window is about 1200×800 with the sidebar visible side-by-side (min 820×560); below the
+  existing `md` / 768 breakpoint the shell reuses the Menu drawer.
+- Minimal native menu: Hamster / Edit / View / Window. Product navigation stays in the app shell.
+- If the window is not loaded same-origin with the control plane, a quiet connect gate (address +
+  Connect, remembers the last good address) is shown.
+
+## Installable PWA from the self-hosted origin (P1 slice)
+
+The web client is installable as a standalone PWA (not store-listed) from a self-hosted origin:
+
+```bash
+cd client && npm install && npm run build && npm run preview -- --port 3000
+# open http://localhost:3000 in a supporting browser and install (quiet, dismissible)
+```
+
+After install, opening from the home screen enters the same main conversation (standalone, no promo
+page). Safe area, virtual-keyboard handling, long-copy wrapping, Retry placement, disconnect copy, and
+the shell-only service-worker cache are implemented for this path.
+
 ## Status
 
-See `docs/p0-report.md`. Contract checks and OpenUI Renderer wiring are documented there with fixture limitations called out. This is still exploratory P0.
+See `docs/p0-report.md` and `docs/p1-electron-pwa.md`. Contract checks and OpenUI Renderer wiring are
+documented in the P0 report with fixture limitations called out. This is still exploratory P0; the P1
+Electron/PWA slice adds the two new containers without a design-gate pass.
 
 ## License
 

@@ -1,7 +1,8 @@
 control_plane_code_under_test=437d3cca32558fe42e9d4389080811fefae89a2b
+unplanted_evidence_commit=9917e076eb789453789cc1d5146d771c7e0e6010
+docs_branch_tip=048a516c09e5e7a17d71fd176b11c491eda7bae7
 docs_evidence_commit_previous=2efad7612d343532a3527f3101237975ecef0bd8
 branch=feat/p1-electron-pwa-20261119
 unplanted_singleuse_stack=hamster_p1_cp_437d3cc_su1 api=54100 agent=34600
 unplanted_ticket=appr_eWG4buCDNWhz0ska
-note=verify-p0 r3 + unplanted single-use chain ran against API/agent sources at 437d3cc; docs-only evidence commits do not change production source
-docs_evidence_commit=9917e076eb789453789cc1d5146d771c7e0e6010
+note=production source unchanged at 437d3cc; 9917e07 holds unplanted chain artifacts; tip advances with pointer-only docs commits

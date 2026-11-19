@@ -4,8 +4,8 @@
  * Scope of this main process:
  * - Quiet window (~1200x800 default, sidebar visible side-by-side; narrow => shell drawer)
  * - Minimal native menu: Hamster / Edit / View / Window (product nav stays in the shell)
- * - Injected connection base + container id for the React connect gate
- * - Background approval return: notification (when permitted) + dock badge; fail closed
+ * - Preload bridge (window.hamster: container + controlBaseUrl) for the React connect gate
+ * - Background approval return: notification (when permitted) + taskbar/dock badge; fail closed
  *
  * Not in scope (postponed): tray-as-sole-entry, auto-update UI, packaging polish.
  */
@@ -68,22 +68,24 @@ function installMenu() {
 }
 
 function clearDockBadge() {
+  setDockBadge(0)
+}
+
+function setDockBadge(count) {
+  const value = Number(count) > 0 ? String(Number(count)) : ''
+  // macOS: dock icon badge.
   if (app.dock) {
     try {
-      app.dock.setBadge('')
+      app.dock.setBadge(value)
     } catch {
       // dock badge unsupported on this platform — notification path remains
     }
   }
-}
-
-function setDockBadge(count) {
-  if (app.dock) {
-    try {
-      app.dock.setBadge(count > 0 ? String(count) : '')
-    } catch {
-      // best effort
-    }
+  // Taskbar badge (Electron: app.setBadgeCount covers dock/taskbar-class badges; best effort).
+  try {
+    app.setBadgeCount(Number(value))
+  } catch {
+    // taskbar/Unity badge unsupported here — best effort, fail closed elsewhere
   }
 }
 
@@ -123,26 +125,21 @@ function createWindow() {
     title: 'Hamster',
     width: 1200,
     height: 800,
-    minWidth: 820,
+    minWidth: 480,
     minHeight: 560,
     show: false,
     webPreferences: {
-      preloadPath: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      // Never expose node here; the renderer uses the tiny bridge only.
-      sandbox: false,
+      // Preload uses contextBridge only; sandbox keeps the renderer node-free.
+      // contextBridge is the supported preload surface under sandbox in current Electron.
+      sandbox: true,
     },
   })
-  mainWindow.once('did-start-load', () => {
-    mainWindow?.webContents
-      .executeJavaScript(
-        `window.__HAMSTER_CONTROL_BASE__=${JSON.stringify(CONTROL_BASE)};window.__HAMSTER_CONTAINER__='electron';`,
-        { userGesture: false },
-      )
-      .catch(() => undefined)
-  })
-  mainWindow.on('did-finish-load', () => {
+  // Preload exposes window.hamster (container + controlBaseUrl); container identity must not
+  // come from executeJavaScript injection, so show on the standard lifecycle event.
+  mainWindow.once('ready-to-show', () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
   })
   mainWindow.loadURL(CLIENT_ORIGIN)

@@ -1,0 +1,356 @@
+{
+  "platform": "Chromium headless — NOT Electron / NOT physical phone",
+  "scenario": "C-390x667 more-row reachability",
+  "selectors": {
+    "more": "[data-testid=\"approval-summary-more\"]",
+    "open": "[data-testid=\"open-pending-approvals\"]",
+    "dock": "[data-testid=\"pending-approvals-dock\"]"
+  },
+  "scrollResult": {
+    "ok": true,
+    "before": {
+      "scrollTop": 0,
+      "clientHeight": 187,
+      "scrollHeight": 205
+    },
+    "after": {
+      "scrollTop": 18,
+      "clientHeight": 187,
+      "scrollHeight": 205
+    },
+    "scrolledBy": 18
+  },
+  "before": {
+    "exists": {
+      "more": true,
+      "open": true
+    },
+    "dock": {
+      "scrollTop": 0,
+      "clientHeight": 187,
+      "scrollHeight": 205,
+      "canScroll": true
+    },
+    "more": {
+      "hit": {
+        "hittable": false,
+        "samples": [
+          {
+            "x": 195,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 85.2,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 304.8,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 195,
+            "y": 445.9,
+            "hit": true,
+            "tag": "DIV",
+            "testid": "approval-summary-more"
+          },
+          {
+            "x": 195,
+            "y": 465.1,
+            "hit": false,
+            "tag": "FORM",
+            "testid": null
+          },
+          {
+            "x": 195,
+            "y": 468.94,
+            "hit": false,
+            "tag": "FORM",
+            "testid": null
+          }
+        ],
+        "box": {
+          "top": 439.5,
+          "bottom": 471.5,
+          "left": 12,
+          "right": 378,
+          "height": 32,
+          "width": 366
+        }
+      },
+      "clip": {
+        "clipped": true,
+        "offenders": [
+          {
+            "testid": "pending-approvals-dock",
+            "className": "flex max-h-[min(28vh,16rem)] shrink-0 flex-col gap-2 overflow-y-auto",
+            "overflowY": "auto",
+            "parentBox": {
+              "top": 266.25,
+              "bottom": 453,
+              "height": 186.75
+            },
+            "elBox": {
+              "top": 439.5,
+              "bottom": 471.5,
+              "height": 32
+            }
+          }
+        ]
+      },
+      "text": "1 more pendingOpen pending approvals"
+    },
+    "open": {
+      "hit": {
+        "hittable": false,
+        "samples": [
+          {
+            "x": 303,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 259.2,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 346.8,
+            "y": 455.5,
+            "hit": false,
+            "tag": "DIV",
+            "testid": "conversation-column"
+          },
+          {
+            "x": 303,
+            "y": 445.9,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 303,
+            "y": 465.1,
+            "hit": false,
+            "tag": "FORM",
+            "testid": null
+          },
+          {
+            "x": 303,
+            "y": 468.94,
+            "hit": false,
+            "tag": "FORM",
+            "testid": null
+          }
+        ],
+        "box": {
+          "top": 439.5,
+          "bottom": 471.5,
+          "left": 230,
+          "right": 376,
+          "height": 32,
+          "width": 146
+        }
+      },
+      "clip": {
+        "clipped": true,
+        "offenders": [
+          {
+            "testid": "pending-approvals-dock",
+            "className": "flex max-h-[min(28vh,16rem)] shrink-0 flex-col gap-2 overflow-y-auto",
+            "overflowY": "auto",
+            "parentBox": {
+              "top": 266.25,
+              "bottom": 453,
+              "height": 186.75
+            },
+            "elBox": {
+              "top": 439.5,
+              "bottom": 471.5,
+              "height": 32
+            }
+          }
+        ]
+      },
+      "text": "Open pending approvals"
+    }
+  },
+  "after": {
+    "exists": {
+      "more": true,
+      "open": true
+    },
+    "dock": {
+      "scrollTop": 18,
+      "clientHeight": 187,
+      "scrollHeight": 205,
+      "canScroll": true
+    },
+    "more": {
+      "hit": {
+        "hittable": true,
+        "samples": [
+          {
+            "x": 195,
+            "y": 437.5,
+            "hit": true,
+            "tag": "DIV",
+            "testid": "approval-summary-more"
+          },
+          {
+            "x": 85.2,
+            "y": 437.5,
+            "hit": true,
+            "tag": "SPAN",
+            "testid": null
+          },
+          {
+            "x": 304.8,
+            "y": 437.5,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 195,
+            "y": 427.9,
+            "hit": true,
+            "tag": "DIV",
+            "testid": "approval-summary-more"
+          },
+          {
+            "x": 195,
+            "y": 447.1,
+            "hit": true,
+            "tag": "DIV",
+            "testid": "approval-summary-more"
+          },
+          {
+            "x": 195,
+            "y": 450.94,
+            "hit": true,
+            "tag": "DIV",
+            "testid": "approval-summary-more"
+          }
+        ],
+        "box": {
+          "top": 421.5,
+          "bottom": 453.5,
+          "left": 12,
+          "right": 378,
+          "height": 32,
+          "width": 366
+        }
+      },
+      "clip": {
+        "clipped": false,
+        "offenders": []
+      },
+      "text": "1 more pendingOpen pending approvals"
+    },
+    "open": {
+      "hit": {
+        "hittable": true,
+        "samples": [
+          {
+            "x": 303,
+            "y": 437.5,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 259.2,
+            "y": 437.5,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 346.8,
+            "y": 437.5,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 303,
+            "y": 427.9,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 303,
+            "y": 447.1,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          },
+          {
+            "x": 303,
+            "y": 450.94,
+            "hit": true,
+            "tag": "A",
+            "testid": "open-pending-approvals"
+          }
+        ],
+        "box": {
+          "top": 421.5,
+          "bottom": 453.5,
+          "left": 230,
+          "right": 376,
+          "height": 32,
+          "width": 146
+        }
+      },
+      "clip": {
+        "clipped": false,
+        "offenders": []
+      },
+      "text": "Open pending approvals"
+    }
+  },
+  "shots": {
+    "before": "/opt/cursor/artifacts/p1-c-more-row-evidence/C-390x667-more-row-BEFORE-scroll.png",
+    "after": "/opt/cursor/artifacts/p1-c-more-row-evidence/C-390x667-more-row-AFTER-scroll.png",
+    "route": "/opt/cursor/artifacts/p1-c-more-row-evidence/C-390x667-after-open-pending-ticket-B.png"
+  },
+  "moreReachable": true,
+  "openReachable": true,
+  "routeCheck": {
+    "attempted": true,
+    "url": "http://127.0.0.1:13011/approvals",
+    "pathOk": true,
+    "pathname": "/approvals",
+    "ticketB": {
+      "present": true,
+      "title": "Ops health board",
+      "hasAssetB": true,
+      "box": {
+        "top": 468,
+        "bottom": 768.5,
+        "height": 300.5
+      },
+      "inViewport": true
+    },
+    "shot": "/opt/cursor/artifacts/p1-c-more-row-evidence/C-390x667-after-open-pending-ticket-B.png",
+    "pass": true
+  },
+  "layoutUnchangedAssumption": true,
+  "pass": true,
+  "note": "hasMore DOM existence is insufficient; this report requires 6-point elementFromPoint + clip=false for more and open after scrolling the dock scroller."
+}

@@ -354,15 +354,79 @@ const report = { shots: [], interaction: null, platform: 'Chromium headless — 
   report.shots.push({ id: 'B', ...checks })
 }
 
-// C: 390x667 EN two pending + install + composer
+// C: 390x667 EN two pending + install + composer — more-row must be dock-scroll reachable (not DOM-only)
 {
   const checks = await withPage({ width: 390, height: 667 }, 'en', [APPR_A, APPR_B], async (page) => {
     const c = await conversationChecks(page, { expectInstall: true, expectMore: true })
     const body = await page.getByTestId('install-body').innerText()
     c.installTextExact = body.replace(/\s+/g, ' ').trim()
     c.installCompleteEn = c.installTextExact === 'Add Hamster to your home screen for full-screen use.'
-    // Short screen: dock may scroll internally; detail entry + composer must remain hittable
-    c.pass = c.pass && c.installCompleteEn
+
+    // Dedicated more-row reachability: scroll the dock scroller itself (not unrelated scrollIntoView).
+    const moreReach = await page.evaluate(() => {
+      function hitAll(el) {
+        const r = el.getBoundingClientRect()
+        const pts = [
+          [0.5, 0.5],
+          [0.2, 0.5],
+          [0.8, 0.5],
+          [0.5, 0.2],
+          [0.5, 0.8],
+          [0.5, 0.92],
+        ]
+        const samples = pts.map(([fx, fy]) => {
+          const x = r.left + r.width * fx
+          const y = r.top + r.height * fy
+          const top = document.elementFromPoint(x, y)
+          return { hit: Boolean(top && (top === el || el.contains(top))) }
+        })
+        return { hittable: samples.every((s) => s.hit), samples }
+      }
+      function clipped(el) {
+        const r = el.getBoundingClientRect()
+        let node = el.parentElement
+        while (node && node !== document.documentElement) {
+          const style = getComputedStyle(node)
+          const clips =
+            ['auto', 'scroll', 'hidden'].includes(style.overflowY) ||
+            ['auto', 'scroll', 'hidden'].includes(style.overflowX)
+          if (clips) {
+            const pr = node.getBoundingClientRect()
+            const fully =
+              r.top >= pr.top - 0.5 &&
+              r.bottom <= pr.bottom + 0.5 &&
+              r.left >= pr.left - 0.5 &&
+              r.right <= pr.right + 0.5
+            if (!fully) return true
+          }
+          node = node.parentElement
+        }
+        return false
+      }
+      const dock = document.querySelector('[data-testid="pending-approvals-dock"]')
+      const more = document.querySelector('[data-testid="approval-summary-more"]')
+      const open = document.querySelector('[data-testid="open-pending-approvals"]')
+      const before = dock
+        ? { scrollTop: dock.scrollTop, clientHeight: dock.clientHeight, scrollHeight: dock.scrollHeight }
+        : null
+      if (dock) dock.scrollTop = Math.max(0, dock.scrollHeight - dock.clientHeight)
+      const after = dock
+        ? { scrollTop: dock.scrollTop, clientHeight: dock.clientHeight, scrollHeight: dock.scrollHeight }
+        : null
+      return {
+        before,
+        after,
+        more: more ? { hittable: hitAll(more).hittable, clipped: clipped(more) } : null,
+        open: open ? { hittable: hitAll(open).hittable, clipped: clipped(open) } : null,
+      }
+    })
+    c.moreRowReachability = moreReach
+    c.moreRowReachable =
+      moreReach.more?.hittable === true &&
+      moreReach.more?.clipped === false &&
+      moreReach.open?.hittable === true &&
+      moreReach.open?.clipped === false
+    c.pass = c.pass && c.installCompleteEn && c.moreRowReachable
     const shot = path.join(OUT, 'C-narrow-390x667-en-two-pending-install.png')
     await page.screenshot({ path: shot, fullPage: false })
     return { checks: c, shot }

@@ -81,6 +81,14 @@ ConnectGate title: `Connect to Hamster` / `连接 Hamster`. Disconnect remains
 
 ## 3. Evidence (provenance)
 
+### Narrow follow-up — C390×667 more-row reachability (evidence-only)
+
+**Code under test:** `13bd2bed7ccd5ed03fb999a1f410bdd15aba796f` (production layout unchanged).
+Dock scroller (`scrollTop` 0→18) exposes `approval-summary-more` + `open-pending-approvals`;
+6-point hit-test + clip=false; click → `/approvals` with ticket B accessible.
+Raw: `/opt/cursor/artifacts/p1-c-more-row-evidence/`. Repo: `docs/evidence/p1-electron-pwa/c-more-row-2026-11-19/`.
+This is **not** overall Product acceptance.
+
 ### Current tip — SUMMARY → CONFIRM matrix
 
 Raw: `/opt/cursor/artifacts/p1-approval-summary-evidence/` (see `INDEX.md`).

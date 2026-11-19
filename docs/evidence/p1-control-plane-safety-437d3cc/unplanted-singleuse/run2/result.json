@@ -1,0 +1,34 @@
+{
+  "pass": true,
+  "chain": "unplanted-worker-pending->real-approve->wrong-deny-unconsumed->exact-allow-same-ticket->exact-deny",
+  "ticketId": "appr_eWG4buCDNWhz0ska",
+  "taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f",
+  "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8",
+  "exactParams": {
+    "taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f",
+    "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8",
+    "channel": "shared workspace"
+  },
+  "approveHttp": "200",
+  "wrong": {
+    "allow": false,
+    "reason": "no_valid_ticket"
+  },
+  "afterWrongDb": "approved|NULL",
+  "first": {
+    "allow": true,
+    "ticketId": "appr_eWG4buCDNWhz0ska"
+  },
+  "second": {
+    "allow": false,
+    "reason": "no_valid_ticket"
+  },
+  "evePid": 29369,
+  "stagger": "approvals row FOR UPDATE held across approve answerInteraction; SIGSTOP after COMMIT",
+  "plantedApprovedTicket": false,
+  "checks": {
+    "wrongDenyUnconsumed": true,
+    "firstAllowSameTicket": true,
+    "secondDeny": true
+  }
+}

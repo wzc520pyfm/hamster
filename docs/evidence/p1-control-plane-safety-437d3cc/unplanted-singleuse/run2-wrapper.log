@@ -1,0 +1,139 @@
+2026-11-19T18:45:57.768Z === unplanted single-use chain start ===
+2026-11-19T18:45:58.109Z API_BASE=http://127.0.0.1:54100 EVE_PID=29369
+2026-11-19T18:45:58.878Z TIMING "event":"start","eve_pid":29369
+2026-11-19T18:45:59.213Z eve_initial_state=S
+2026-11-19T18:46:01.256Z conversationId=conv_762235a5-892e-468a-8d90-a2aea2b6278c
+2026-11-19T18:46:03.396Z taskId=task_8ae267f1-7819-4477-9140-d7fad60fc53f runtimeSessionId=wrun_01M7TJ2JNF13XQFN903H34ZVDV
+2026-11-19T18:46:06.058Z poll#1 status=waiting_for_approval asset=asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 appr=appr_eWG4buCDNWhz0ska
+2026-11-19T18:46:07.841Z TIMING "event":"pending_issued","ticketId":"appr_eWG4buCDNWhz0ska","taskId":"task_8ae267f1-7819-4477-9140-d7fad60fc53f"
+=== DB snapshot label=04-pending-before-lock ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:08.313Z ===
+          id           |                  task_id                  |      action       | status  |                           params_hash                            | consumed | consumed_at | decided_at |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+---------+------------------------------------------------------------------+----------+-------------+------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | pending | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | f        |             |            | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     |        status        |                  asset_id                  |          updated_at           
+-------------------------------------------+----------------------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | waiting_for_approval | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:03.968683+00
+(1 row)
+
+2026-11-19T18:46:10.159Z lock_ready=LOCKED ('appr_eWG4buCDNWhz0ska', 'pending', False)
+2026-11-19T18:46:10.990Z TIMING "event":"row_locked","ticketId":"appr_eWG4buCDNWhz0ska","lock_helper_pid":29808
+=== DB snapshot label=06-pending-while-locked ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:11.337Z ===
+          id           |                  task_id                  |      action       | status  |                           params_hash                            | consumed | consumed_at | decided_at |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+---------+------------------------------------------------------------------+----------+-------------+------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | pending | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | f        |             |            | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     |        status        |                  asset_id                  |          updated_at           
+-------------------------------------------+----------------------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | waiting_for_approval | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:03.968683+00
+(1 row)
+
+2026-11-19T18:46:12.409Z TIMING "event":"approve_http_start","ticketId":"appr_eWG4buCDNWhz0ska"
+2026-11-19T18:46:13.375Z approve_bg_pid=29835
+2026-11-19T18:46:18.243Z TIMING "event":"pre_commit_after_stagger_wait"
+=== DB snapshot label=08-still-pending-before-commit ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:18.753Z ===
+          id           |                  task_id                  |      action       | status  |                           params_hash                            | consumed | consumed_at | decided_at |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+---------+------------------------------------------------------------------+----------+-------------+------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | pending | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | f        |             |            | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     | status |                  asset_id                  |          updated_at           
+-------------------------------------------+--------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | failed | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:15.246743+00
+(1 row)
+
+2026-11-19T18:46:19.453Z TIMING "event":"commit_lock_and_sigstop","eve_pid":29369
+2026-11-19T18:46:21.419Z TIMING "event":"sigstop","eve_pid":29369,"at":"2026-11-19T18:46:20.253Z"
+2026-11-19T18:46:22.172Z SIGSTOP eve pid=29369 at 2026-11-19T18:46:20.253Z state=T
+2026-11-19T18:46:22.591Z approve_http_code=200
+2026-11-19T18:46:23.520Z TIMING "event":"approve_http_done","http_code":"200"
+=== DB snapshot label=09-after-approve ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:23.953Z ===
+          id           |                  task_id                  |      action       |  status  |                           params_hash                            | consumed | consumed_at |          decided_at           |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+----------+------------------------------------------------------------------+----------+-------------+-------------------------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | approved | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | f        |             | 2026-11-19 18:46:15.188103+00 | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     | status |                  asset_id                  |          updated_at           
+-------------------------------------------+--------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | failed | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:15.246743+00
+(1 row)
+
+2026-11-19T18:46:25.132Z post_approve_state=approved|NULL
+2026-11-19T18:46:25.999Z TIMING "event":"wrong_params_check"
+=== DB snapshot label=11-after-wrong ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:28.320Z ===
+          id           |                  task_id                  |      action       |  status  |                           params_hash                            | consumed | consumed_at |          decided_at           |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+----------+------------------------------------------------------------------+----------+-------------+-------------------------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | approved | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | f        |             | 2026-11-19 18:46:15.188103+00 | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     | status |                  asset_id                  |          updated_at           
+-------------------------------------------+--------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | failed | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:15.246743+00
+(1 row)
+
+2026-11-19T18:46:28.827Z wrong_body={"allow":false,"reason":"no_valid_ticket"} after_wrong=approved|NULL
+2026-11-19T18:46:29.539Z TIMING "event":"exact_params_first_consume"
+=== DB snapshot label=13-after-first-consume ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:31.809Z ===
+          id           |                  task_id                  |      action       |  status  |                           params_hash                            | consumed |          consumed_at          |          decided_at           |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+----------+------------------------------------------------------------------+----------+-------------------------------+-------------------------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | approved | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | t        | 2026-11-19 18:46:30.574278+00 | 2026-11-19 18:46:15.188103+00 | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     | status |                  asset_id                  |          updated_at           
+-------------------------------------------+--------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | failed | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:15.246743+00
+(1 row)
+
+2026-11-19T18:46:32.184Z first_body={"allow":true,"ticketId":"appr_eWG4buCDNWhz0ska"}
+2026-11-19T18:46:33.227Z TIMING "event":"exact_params_second_consume"
+=== DB snapshot label=15-after-second ticket=appr_eWG4buCDNWhz0ska at 2026-11-19T18:46:35.126Z ===
+          id           |                  task_id                  |      action       |  status  |                           params_hash                            | consumed |          consumed_at          |          decided_at           |          expires_at           |                                                                   params_json                                                                   
+-----------------------+-------------------------------------------+-------------------+----------+------------------------------------------------------------------+----------+-------------------------------+-------------------------------+-------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------
+ appr_eWG4buCDNWhz0ska | task_8ae267f1-7819-4477-9140-d7fad60fc53f | publish_dashboard | approved | 03cfb365a49b394bfd54b74e8f1cfa558d0a0e2410861a09959faa7603a10153 | t        | 2026-11-19 18:46:30.574278+00 | 2026-11-19 18:46:15.188103+00 | 2026-11-19 18:56:03.967589+00 | {"taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f", "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8", "channel": "shared workspace"}
+(1 row)
+
+                    id                     | status |                  asset_id                  |          updated_at           
+-------------------------------------------+--------+--------------------------------------------+-------------------------------
+ task_8ae267f1-7819-4477-9140-d7fad60fc53f | failed | asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 | 2026-11-19 18:46:15.246743+00
+(1 row)
+
+2026-11-19T18:46:35.540Z second_body={"allow":false,"reason":"no_valid_ticket"}
+{
+  "pass": true,
+  "chain": "unplanted-worker-pending->real-approve->wrong-deny-unconsumed->exact-allow-same-ticket->exact-deny",
+  "ticketId": "appr_eWG4buCDNWhz0ska",
+  "taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f",
+  "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8",
+  "exactParams": {
+    "taskId": "task_8ae267f1-7819-4477-9140-d7fad60fc53f",
+    "assetId": "asset_078f99fd-8101-4bd3-bf2a-8997c723fee8",
+    "channel": "shared workspace"
+  },
+  "approveHttp": "200",
+  "wrong": {
+    "allow": false,
+    "reason": "no_valid_ticket"
+  },
+  "afterWrongDb": "approved|NULL",
+  "first": {
+    "allow": true,
+    "ticketId": "appr_eWG4buCDNWhz0ska"
+  },
+  "second": {
+    "allow": false,
+    "reason": "no_valid_ticket"
+  },
+  "evePid": 29369,
+  "stagger": "approvals row FOR UPDATE held across approve answerInteraction; SIGSTOP after COMMIT",
+  "plantedApprovedTicket": false,
+  "checks": {
+    "wrongDenyUnconsumed": true,
+    "firstAllowSameTicket": true,
+    "secondDeny": true
+  }
+}
+2026-11-19T18:46:36.635Z TIMING "event":"sigcont","eve_pid":29369,"at":"2026-11-19T18:46:36.232Z"
+2026-11-19T18:46:37.208Z SIGCONT eve pid=29369 at 2026-11-19T18:46:36.232Z
+2026-11-19T18:46:37.685Z === chain end verdict=0 ===

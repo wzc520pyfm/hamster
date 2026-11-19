@@ -1,0 +1,12 @@
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Access-Control-Allow-Origin: http://127.0.0.1:3000
+Access-Control-Allow-Methods: GET,POST,OPTIONS
+Access-Control-Allow-Headers: Content-Type, x-hamster-internal-secret
+Content-Type: application/json; charset=utf-8
+Content-Length: 575
+ETag: W/"23f-DXJT2ouPGwFP926+eo3xwNVp35I"
+Date: Thu, 19 Nov 2026 18:46:02 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

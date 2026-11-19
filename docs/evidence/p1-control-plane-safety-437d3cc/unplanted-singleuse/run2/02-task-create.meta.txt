@@ -1,0 +1,5 @@
+label=02-task-create
+method=POST
+url=http://127.0.0.1:54100/api/conversations/conv_762235a5-892e-468a-8d90-a2aea2b6278c/messages
+http_code=201
+wall_ts=2026-11-19T18:46:02.659Z

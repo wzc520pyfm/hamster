@@ -1,16 +1,11 @@
-MEASURED — real control-plane security regression on testedSha 437d3cca32558fe42e9d4389080811fefae89a2b
+MEASURED — see EVIDENCE-LAYERS.md
 
-Environment: noDocker (Docker unavailable on this VM). Isolated local PostgreSQL 16 + Node 24 API + eve@1.0.2 agent with empty HAMSTER_MODEL_ID (mockModel worker path). Unique DB hamster_p1_cp_437d3cc_r3; unique host ports API=54083 AGENT=34549. No compose project; no shared stack touched.
+testedSha (production source): 437d3cca32558fe42e9d4389080811fefae89a2b
+Docker: UNAVAILABLE. noDocker real API+Postgres.
 
-verify-p0.sh: PASS=24 FAIL=0 NOTE=2 (NOTE includes mockModel disclaimer + planted-invalidation note).
-Supplemental single-use + exact params_hash binding on live authorize(): PASS (singleuse-result.json).
+Accepted: verify-p0 r3 PASS=24 FAIL=0 NOTE=2.
+Gate supplement: unplanted-singleuse/run2 result pass=true (worker pending → real approve → wrong deny unconsumed → exact allow same ticket → exact deny).
+Runnable script: unplanted-singleuse/run-unplanted-singleuse-chain.sh
+Successful API stdout: unplanted-singleuse/api.stdout.log (parent api.log EADDRINUSE is NOT successful startup).
 
-Proven on real API+DB (not Electron fixture HTTP):
-- omit-approval denied
-- unknown action denied  
-- real expiry + expired cannot authorize
-- cancel invalidates unused tickets
-- parameter binding (wrong/incomplete params → no_valid_ticket)
-- single-use consumption (first allow, second deny; consumed_at set)
-
-Not claimed: live-model provider path; Docker Compose isolation (Docker absent).
+Do not claim: natural worker expiry consumption (planted expiry hash mismatch); planted single-use as gate close; live provider path; Docker isolation.

@@ -1,0 +1,5 @@
+label=10-policy-wrong
+method=POST
+url=http://127.0.0.1:54100/internal/policy/check
+http_code=200
+wall_ts=2026-11-19T18:46:27.618Z

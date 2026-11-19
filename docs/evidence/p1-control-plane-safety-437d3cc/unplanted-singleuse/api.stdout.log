@@ -1,0 +1,5 @@
+
+> hamster-api@0.0.0 start
+> node index.js
+
+Hamster control plane listening on port 54100

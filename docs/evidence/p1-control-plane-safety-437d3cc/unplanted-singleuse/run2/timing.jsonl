@@ -1,0 +1,12 @@
+{"ts":"2026-11-19T18:45:58.557Z","event":"start","eve_pid":29369}
+{"ts":"2026-11-19T18:46:07.478Z","event":"pending_issued","ticketId":"appr_eWG4buCDNWhz0ska","taskId":"task_8ae267f1-7819-4477-9140-d7fad60fc53f"}
+{"ts":"2026-11-19T18:46:10.536Z","event":"row_locked","ticketId":"appr_eWG4buCDNWhz0ska","lock_helper_pid":29808}
+{"ts":"2026-11-19T18:46:11.588Z","event":"approve_http_start","ticketId":"appr_eWG4buCDNWhz0ska"}
+{"ts":"2026-11-19T18:46:17.168Z","event":"pre_commit_after_stagger_wait"}
+{"ts":"2026-11-19T18:46:19.022Z","event":"commit_lock_and_sigstop","eve_pid":29369}
+{"ts":"2026-11-19T18:46:20.532Z","event":"sigstop","eve_pid":29369,"at":"2026-11-19T18:46:20.253Z"}
+{"ts":"2026-11-19T18:46:23.172Z","event":"approve_http_done","http_code":"200"}
+{"ts":"2026-11-19T18:46:25.570Z","event":"wrong_params_check"}
+{"ts":"2026-11-19T18:46:29.167Z","event":"exact_params_first_consume"}
+{"ts":"2026-11-19T18:46:32.836Z","event":"exact_params_second_consume"}
+{"ts":"2026-11-19T18:46:36.234Z","event":"sigcont","eve_pid":29369,"at":"2026-11-19T18:46:36.232Z"}

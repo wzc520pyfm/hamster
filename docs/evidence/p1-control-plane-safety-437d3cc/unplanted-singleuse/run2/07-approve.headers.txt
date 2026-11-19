@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: http://127.0.0.1:3000
+Access-Control-Allow-Methods: GET,POST,OPTIONS
+Access-Control-Allow-Headers: Content-Type, x-hamster-internal-secret
+Content-Type: application/json; charset=utf-8
+Content-Length: 142
+ETag: W/"8e-PHyX7jRkAfn8bDB1VPEq7JS97TU"
+Date: Thu, 19 Nov 2026 18:46:19 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

@@ -15,5 +15,6 @@
   "firstTicketId": "appr_plant_su_01fc0917",
   "secondConsumeAllow": false,
   "secondReason": "no_valid_ticket",
-  "note": "Planted approved ticket used to avoid worker race after UI approve; proves authorize() single-use + exact params_hash binding on real API+DB"
+  "note": "HISTORICAL only: planted approved ticket used to dodge post-approve worker race. Safety gate supplement is unplanted-singleuse/ (worker-issued pending + real approve).",
+  "gateStatus": "HISTORICAL_INCOMPLETE_planted_approved_ticket"
 }

@@ -1,0 +1,5 @@
+label=03-task-poll-01
+method=GET
+url=http://127.0.0.1:54100/api/tasks/task_8ae267f1-7819-4477-9140-d7fad60fc53f
+http_code=200
+wall_ts=2026-11-19T18:46:05.103Z

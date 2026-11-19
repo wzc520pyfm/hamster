@@ -1,0 +1,25 @@
+
+> hamster-agent@0.0.0 start
+> eve start
+
+➜ Listening on: http://localhost:34600/ (all interfaces)
+[START] server listening at http://localhost:34600/
+[eve:harness.tool-loop] tool execution failed {
+  toolName: 'publish_dashboard',
+  toolCallId: 'mock-tool-call-1-4-1-10',
+  error: {
+    errorId: '2c6030d1-b5a4-4006-96f1-4d46ec4a9da3',
+    message: 'Error: Control plane denied publish_dashboard: no_valid_ticket',
+    detail: 'Error: Control plane denied publish_dashboard: no_valid_ticket\n' +
+      '    at Object.execute (file:///agent/repos/hamster/agent/.output/server/_chunks/node-server.mjs:360:30)\n' +
+      '    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n' +
+      '    at async raceAbort (file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:10825:27)\n' +
+      '    at async file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:10737:16\n' +
+      '    at async file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:10724:45\n' +
+      '    at async Object.execute (file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:10907:4)\n' +
+      '    at async executeToolCall (file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:10721:4)\n' +
+      '    at async file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:11109:11\n' +
+      '    at async Promise.allSettled (index 0)\n' +
+      '    at async runApprovedCalls (file:///agent/repos/hamster/agent/.output/server/_libs/eve89.mjs:11091:10)'
+  }
+}

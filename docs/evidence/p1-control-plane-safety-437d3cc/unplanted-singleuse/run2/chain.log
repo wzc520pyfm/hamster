@@ -1,0 +1,34 @@
+2026-11-19T18:45:57.768Z === unplanted single-use chain start ===
+2026-11-19T18:45:58.109Z API_BASE=http://127.0.0.1:54100 EVE_PID=29369
+2026-11-19T18:45:58.878Z TIMING "event":"start","eve_pid":29369
+2026-11-19T18:45:59.213Z eve_initial_state=S
+2026-11-19T18:46:00.873Z HTTP 01-conversation → 200
+2026-11-19T18:46:01.256Z conversationId=conv_762235a5-892e-468a-8d90-a2aea2b6278c
+2026-11-19T18:46:02.998Z HTTP 02-task-create → 201
+2026-11-19T18:46:03.396Z taskId=task_8ae267f1-7819-4477-9140-d7fad60fc53f runtimeSessionId=wrun_01M7TJ2JNF13XQFN903H34ZVDV
+2026-11-19T18:46:05.284Z HTTP 03-task-poll-01 → 200
+2026-11-19T18:46:06.058Z poll#1 status=waiting_for_approval asset=asset_078f99fd-8101-4bd3-bf2a-8997c723fee8 appr=appr_eWG4buCDNWhz0ska
+2026-11-19T18:46:07.841Z TIMING "event":"pending_issued","ticketId":"appr_eWG4buCDNWhz0ska","taskId":"task_8ae267f1-7819-4477-9140-d7fad60fc53f"
+2026-11-19T18:46:10.159Z lock_ready=LOCKED ('appr_eWG4buCDNWhz0ska', 'pending', False)
+2026-11-19T18:46:10.990Z TIMING "event":"row_locked","ticketId":"appr_eWG4buCDNWhz0ska","lock_helper_pid":29808
+2026-11-19T18:46:12.409Z TIMING "event":"approve_http_start","ticketId":"appr_eWG4buCDNWhz0ska"
+2026-11-19T18:46:13.375Z approve_bg_pid=29835
+2026-11-19T18:46:18.243Z TIMING "event":"pre_commit_after_stagger_wait"
+2026-11-19T18:46:19.453Z TIMING "event":"commit_lock_and_sigstop","eve_pid":29369
+2026-11-19T18:46:21.419Z TIMING "event":"sigstop","eve_pid":29369,"at":"2026-11-19T18:46:20.253Z"
+2026-11-19T18:46:22.172Z SIGSTOP eve pid=29369 at 2026-11-19T18:46:20.253Z state=T
+2026-11-19T18:46:22.591Z approve_http_code=200
+2026-11-19T18:46:23.520Z TIMING "event":"approve_http_done","http_code":"200"
+2026-11-19T18:46:25.132Z post_approve_state=approved|NULL
+2026-11-19T18:46:25.999Z TIMING "event":"wrong_params_check"
+2026-11-19T18:46:27.820Z HTTP 10-policy-wrong → 200
+2026-11-19T18:46:28.827Z wrong_body={"allow":false,"reason":"no_valid_ticket"} after_wrong=approved|NULL
+2026-11-19T18:46:29.539Z TIMING "event":"exact_params_first_consume"
+2026-11-19T18:46:31.381Z HTTP 12-policy-exact-first → 200
+2026-11-19T18:46:32.184Z first_body={"allow":true,"ticketId":"appr_eWG4buCDNWhz0ska"}
+2026-11-19T18:46:33.227Z TIMING "event":"exact_params_second_consume"
+2026-11-19T18:46:34.752Z HTTP 14-policy-exact-second → 200
+2026-11-19T18:46:35.540Z second_body={"allow":false,"reason":"no_valid_ticket"}
+2026-11-19T18:46:36.635Z TIMING "event":"sigcont","eve_pid":29369,"at":"2026-11-19T18:46:36.232Z"
+2026-11-19T18:46:37.208Z SIGCONT eve pid=29369 at 2026-11-19T18:46:36.232Z
+2026-11-19T18:46:37.685Z === chain end verdict=0 ===

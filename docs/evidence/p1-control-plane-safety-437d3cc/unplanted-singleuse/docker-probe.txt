@@ -1,0 +1,5 @@
+date=2026-11-19T18:42:09Z
+command -v docker: MISSING
+docker.sock: ls: cannot access '/var/run/docker.sock': No such file or directory
+podman: MISSING
+nerdctl: MISSING

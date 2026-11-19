@@ -1,0 +1,16 @@
+MEASURED — unplanted single-use chain on testedSha 437d3cca32558fe42e9d4389080811fefae89a2b
+
+Environment (this supplement only): noDocker. Fresh isolated PostgreSQL DB hamster_p1_cp_437d3cc_su1 + role hamster_p1_su1; API :54100; eve mockModel agent :34600; HAMSTER_MODEL_ID empty; no provider keys. Old r3 stack (:54083/:34549 / hamster_p1_cp_437d3cc_r3) left untouched.
+
+Chain (run2/, result.json pass=true):
+1. Production worker issued pending ticket appr_eWG4buCDNWhz0ska (not planted).
+2. Real POST /api/approvals/:id/approve → HTTP 200, status=approved.
+3. Wrong params /internal/policy/check → allow=false; DB still approved|unconsumed.
+4. Exact params → allow=true, ticketId=appr_eWG4buCDNWhz0ska (same ticket); consumed_at set.
+5. Exact params repeat → allow=false no_valid_ticket.
+
+Stagger (not a policy change): approvals row FOR UPDATE held across approve’s answerInteraction so worker’s first authorize saw pending; SIGSTOP eve after COMMIT (state T) then SIGCONT after chain. timing.jsonl + lock-helper.log record pause/resume.
+
+Successful API startup stdout: api.stdout.log (“listening on port 54100”). Do NOT treat parent control-plane-safety/api.log EADDRINUSE as successful startup.
+
+Prior planted single-use (singleuse-result.json / singleuse2-*): HISTORICAL incomplete chain — planted approved ticket; NOT this gate.

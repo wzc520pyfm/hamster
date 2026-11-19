@@ -1,0 +1,8 @@
+api_stdout_head:
+
+> hamster-api@0.0.0 start
+> node index.js
+
+Hamster control plane listening on port 54100
+health={"status":"ok"}
+NOTE: Parent folder control-plane-safety/api.log may contain EADDRINUSE from a later collision; it is NOT this successful startup. Successful listen is api.stdout.log / unplanted-singleuse only.

@@ -1,0 +1,16 @@
+MEASURED — real control-plane security regression on testedSha 437d3cca32558fe42e9d4389080811fefae89a2b
+
+Environment: noDocker (Docker unavailable on this VM). Isolated local PostgreSQL 16 + Node 24 API + eve@1.0.2 agent with empty HAMSTER_MODEL_ID (mockModel worker path). Unique DB hamster_p1_cp_437d3cc_r3; unique host ports API=54083 AGENT=34549. No compose project; no shared stack touched.
+
+verify-p0.sh: PASS=24 FAIL=0 NOTE=2 (NOTE includes mockModel disclaimer + planted-invalidation note).
+Supplemental single-use + exact params_hash binding on live authorize(): PASS (singleuse-result.json).
+
+Proven on real API+DB (not Electron fixture HTTP):
+- omit-approval denied
+- unknown action denied  
+- real expiry + expired cannot authorize
+- cancel invalidates unused tickets
+- parameter binding (wrong/incomplete params → no_valid_ticket)
+- single-use consumption (first allow, second deny; consumed_at set)
+
+Not claimed: live-model provider path; Docker Compose isolation (Docker absent).

@@ -1,0 +1,6 @@
+testedSha=437d3cca32558fe42e9d4389080811fefae89a2b
+api_index_sha256=d479b0cdbc090bff0945061e308d7964d9c5f97b68ba27f5b45ae032e3533535
+api_policy_sha256=d3ff6b5f78f573b59f584781ca51136e0484a2f4edc22092312c0e29f0d7fb35
+package=hamster-api@0.0.0
+eve_pkg=1.0.2
+node=v24.22.3

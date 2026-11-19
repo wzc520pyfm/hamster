@@ -1,0 +1,19 @@
+{
+  "pass": true,
+  "pendingTicketId": "appr_DyRO8bmNdNCrL8iS",
+  "plantedApprovedTicketId": "appr_plant_su_01fc0917",
+  "taskId": "task_530da580-0359-44ab-9b85-aa71b193a047",
+  "assetId": "asset_5454d272-e43b-4430-b5b2-55e1cda57951",
+  "exactParams": {
+    "taskId": "task_530da580-0359-44ab-9b85-aa71b193a047",
+    "assetId": "asset_5454d272-e43b-4430-b5b2-55e1cda57951",
+    "channel": "shared workspace"
+  },
+  "wrongParamsAllow": false,
+  "omitAllow": false,
+  "firstConsumeAllow": true,
+  "firstTicketId": "appr_plant_su_01fc0917",
+  "secondConsumeAllow": false,
+  "secondReason": "no_valid_ticket",
+  "note": "Planted approved ticket used to avoid worker race after UI approve; proves authorize() single-use + exact params_hash binding on real API+DB"
+}

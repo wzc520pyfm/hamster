@@ -1,0 +1,24 @@
+{
+  "mode": "noDocker-local-postgres16+node24+eve-1.0.2-mockModel",
+  "reasonDockerUnavailable": "docker/podman/nerdctl/docker.sock all missing on this VM",
+  "testedSha": "437d3cca32558fe42e9d4389080811fefae89a2b",
+  "apiPort": 54083,
+  "agentPort": 34549,
+  "databaseName": "hamster_p1_cp_437d3cc_r3",
+  "databaseRole": "hamster_p1_cp",
+  "postgresVersion": "16.15",
+  "nodeAgent": "v24.22.3",
+  "HAMSTER_MODEL_ID": "",
+  "HAMSTER_MODEL_PROVIDER": null,
+  "HAMSTER_APPROVAL_TTL_SECONDS": 30,
+  "API_BASE": "http://127.0.0.1:54083",
+  "DB_CMD": "sudo -u postgres psql -d hamster_p1_cp_437d3cc",
+  "docker": "UNAVAILABLE \u2014 docker/podman/nerdctl/docker.sock missing (see docker-probe.txt, runtime-probe-full.txt)",
+  "HAMSTER_STEP_DELAY_MS": 8000,
+  "verifyP0": {
+    "PASS": 24,
+    "FAIL": 0,
+    "NOTE": 2
+  },
+  "singleUseSupplemental": true
+}

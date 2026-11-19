@@ -112,18 +112,25 @@ Repo copy: `docs/evidence/p1-electron-pwa/approval-summary-2026-11-19/`.
 | bake / CORS / proxy / hitfix bbox logs | retained; see that dir `INDEX.md` |
 | `p1-narrow-install-affordance-bbox.png` | prior visibility fix (superseded for Approve-in-dock route) |
 
+### Electron diagnostic (post-`687af52`)
+
+Raw: `/opt/cursor/artifacts/p1-electron-diagnostic-evidence/` (hypothesis first, then controls).
+
+- dbus/GPU stderr: **incidental** (same-URL Electron load PASS while those lines still print).
+- Production client + `window.hamster` preload: **PASS** on live `DISPLAY=:1`.
+- A→B ConnectGate: invoke deadlock from `await loadURL` inside `hamster:request-connect` — **fixed**
+  by returning the invoke result then scheduling navigate (`setImmediate`). Re-check PASS.
+- Historical reopen smoke `ERR_FAILED` remains harness history; do not treat Node sessionStore as window proof.
+
 ### Inherited / unverified
 
 - Fixture six PNGs from earlier free-CLI capture.
-- Electron BrowserWindow reopen: still **FAILED** historically (dbus/GPU); **not re-looped**.
-- Post-fix **real Electron** ConnectGate A→B window path: **UNVERIFIED** (do not treat Node/CORS
-  reproduce logs as Electron connection success).
+- Physical notification/dock hardware; packaging polish.
 
 ---
 
 ## 4. Remaining gaps
 
 - Physical-device PWA install / keyboard / safe-area.
-- Successful Electron window visual / reopen on a healthy display host.
 - Real notification/dock hardware.
 - ProductBot re-review — **stop without PR**.

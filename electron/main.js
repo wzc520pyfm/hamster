@@ -239,10 +239,15 @@ app.whenReady().then(() => {
     }
     persistSession()
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const url = resolveStartupUrl(session, validated.origin)
-      await mainWindow.loadURL(url)
-    }
+    const url = resolveStartupUrl(session, validated.origin)
+    // Return the invoke result BEFORE navigating. Awaiting loadURL here tears down the
+    // calling renderer while it is still waiting on ipcRenderer.invoke → deadlock/timeout.
+    // Navigate on the next turn so ConnectGate A→B can complete fail-closed and trusted.
+    setImmediate(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        void mainWindow.loadURL(url)
+      }
+    })
     return { ok: true, origin: validated.origin }
   })
 

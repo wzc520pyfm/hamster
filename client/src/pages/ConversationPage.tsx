@@ -111,8 +111,9 @@ export function ConversationPage({
     // Keyboard-open state (mobile visual viewport) shrinks this column so the composer
     // and approval buttons stay usable instead of being pushed off-screen.
     <div
-      className="flex h-[calc(100dvh-5.75rem)] min-h-0 flex-col gap-3 md:h-[calc(100vh-2rem)]"
-      style={kbHeight ? { height: `calc(${kbHeight}px - 5.75rem)` } : undefined}
+      className="flex min-h-0 flex-1 flex-col gap-3"
+      style={kbHeight ? { height: `${kbHeight}px`, maxHeight: `${kbHeight}px` } : undefined}
+      data-testid="conversation-column"
     >
       <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
         <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">

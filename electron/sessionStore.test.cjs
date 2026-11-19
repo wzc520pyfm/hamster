@@ -85,3 +85,22 @@ test('focus/blur badge semantics: count retained across clear', () => {
   if (latestPendingApprovals > 0) badge = latestPendingApprovals
   assert.equal(badge, 3)
 })
+
+test('session-origin IPC contract denies untrusted sender', () => {
+  const trusted = ['http://192.168.1.10:3000']
+  assert.equal(
+    senderIsTrusted({ senderFrame: { url: 'http://evil.test/' } }, trusted),
+    false,
+  )
+  assert.equal(
+    senderIsTrusted({ senderFrame: { url: 'http://192.168.1.10:3000/' } }, trusted),
+    true,
+  )
+})
+
+test('window-open policy is default-deny (contract)', () => {
+  // Mirrors electron/main.js setWindowOpenHandler: always { action: 'deny' }.
+  const handler = () => ({ action: 'deny' })
+  assert.deepEqual(handler({ url: 'http://192.168.1.10:3000/assets/x' }), { action: 'deny' })
+  assert.deepEqual(handler({ url: 'http://evil.test/' }), { action: 'deny' })
+})

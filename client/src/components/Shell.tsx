@@ -110,7 +110,7 @@ export function Shell({
   )
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-0 md:flex-row md:gap-4 md:p-4">
+    <div className="mx-auto flex h-[100dvh] max-h-[100dvh] min-h-0 max-w-6xl flex-col gap-0 overflow-hidden md:h-auto md:max-h-none md:min-h-screen md:flex-row md:gap-4 md:overflow-visible md:p-4">
       {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
       <header className="safe-area-top sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
         <div className="min-w-0">
@@ -209,10 +209,10 @@ export function Shell({
             </Button>
           </div>
         ) : null}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Outlet />
         </div>
-        {/* In-flow install affordance: sits below the page column so composer/approvals stay visible. */}
+        {/* In-flow install affordance: shrink-0 below the flex-1 conversation column (not fixed overlay). */}
         <InstallPrompt />
       </main>
 

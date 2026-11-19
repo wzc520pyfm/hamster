@@ -27,7 +27,11 @@ cp .env.example .env   # optional overrides; defaults are placeholders only
 sudo docker compose up --build
 ```
 
-Then open `http://localhost:3000` (API at `http://localhost:8080` via `VITE_API_BASE_URL`).
+Then open `http://localhost:3000` (or `http://<LAN-IP>:3000` on a phone). The client
+container serves the SPA and reverse-proxies **same-origin** `/api` to the api service.
+Compose forces an empty `VITE_API_BASE_URL` bake — do not set it to `http://localhost:8080`
+(that would make phones call their own loopback). Direct `http://localhost:8080` remains
+available for host-side debugging only, not for the production client bundle.
 
 Default placeholder env values (overridable; not real secrets):
 
@@ -76,7 +80,8 @@ Postgres + Node 24+ can run the same loop (also what the latest contract evidenc
 ```bash
 cd agent && npm install && npx eve build && PORT=8081 HAMSTER_API_URL=http://127.0.0.1:8080 npx eve start --host 127.0.0.1 --port 8081
 cd api && npm install && DATABASE_URL=postgres://hamster:changeme@127.0.0.1:5432/hamster EVE_API_URL=http://127.0.0.1:8081 node index.js
-cd client && npm install && VITE_API_BASE_URL=http://localhost:8080 npm run build && npm run preview -- --port 3000
+cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=http://127.0.0.1:8080 npm run start:prod
+# (dev-only alternative: npm run preview still Vite-proxies /api; prefer start:prod for production-path checks)
 ./scripts/verify-p0.sh
 ```
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Production static client + same-origin /api (and /internal) reverse proxy.
+ * Production static client + same-origin /api reverse proxy.
  * Replaces bare `serve` so phones on a LAN origin hit this host's /api, not localhost:8080.
+ * /internal is intentionally NOT proxied (agent↔api only; not a browser surface).
  *
  * Env:
  *   PORT          (default 3000)
@@ -37,7 +38,22 @@ function contentType(filePath) {
 }
 
 function isProxyPath(pathname) {
-  return pathname === '/api' || pathname.startsWith('/api/') || pathname === '/internal' || pathname.startsWith('/internal/')
+  return pathname === '/api' || pathname.startsWith('/api/')
+}
+
+/** Export for unit tests. */
+export function safeJoinDistForTest(distRoot, urlPath) {
+  return safeJoinDistWithRoot(distRoot, urlPath)
+}
+
+function safeJoinDistWithRoot(distRoot, urlPath) {
+  const root = path.resolve(distRoot)
+  const decoded = decodeURIComponent((urlPath || '/').split('?')[0])
+  const rel = decoded.replace(/^\/+/, '')
+  const candidate = path.resolve(root, rel || 'index.html')
+  // Prefix boundary: require root + sep (or exact root), not path.startsWith(root) alone.
+  if (candidate !== root && !candidate.startsWith(root + path.sep)) return null
+  return candidate
 }
 
 async function proxyApi(req, res) {
@@ -73,11 +89,7 @@ async function proxyApi(req, res) {
 }
 
 function safeJoinDist(urlPath) {
-  const decoded = decodeURIComponent((urlPath || '/').split('?')[0])
-  const rel = decoded.replace(/^\/+/, '')
-  const candidate = path.normalize(path.join(DIST, rel || 'index.html'))
-  if (!candidate.startsWith(DIST)) return null
-  return candidate
+  return safeJoinDistWithRoot(DIST, urlPath)
 }
 
 async function serveStatic(req, res) {
@@ -112,17 +124,23 @@ async function serveStatic(req, res) {
   await pipeline(fs.createReadStream(filePath), res)
 }
 
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
-  if (isProxyPath(url.pathname)) {
-    void proxyApi(req, res)
-    return
-  }
-  void serveStatic(req, res).catch(() => {
-    if (!res.headersSent) res.writeHead(500).end('error')
+export function createClientServer() {
+  return http.createServer((req, res) => {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+    if (isProxyPath(url.pathname)) {
+      void proxyApi(req, res)
+      return
+    }
+    void serveStatic(req, res).catch(() => {
+      if (!res.headersSent) res.writeHead(500).end('error')
+    })
   })
-})
+}
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`hamster-client listening on 0.0.0.0:${PORT} (api → ${API_UPSTREAM})`)
-})
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain) {
+  const server = createClientServer()
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`hamster-client listening on 0.0.0.0:${PORT} (api → ${API_UPSTREAM})`)
+  })
+}

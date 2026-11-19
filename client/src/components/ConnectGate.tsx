@@ -23,6 +23,10 @@ export function shouldShowConnectGate(): boolean {
  * Quiet connect gate for Electron windows that are not loaded same-origin with the control plane.
  * Address + Connect only; remembers the last *verified-successful* Hamster client+API origin.
  * Not an onboarding carousel, not a settings center.
+ *
+ * Electron: only normalize locally, then `requestConnect` — main process owns validation +
+ * navigation. Renderer must NOT cross-origin fetch-validate B from A (production server has no
+ * CORS; that path blocks before the trusted verifier).
  */
 function ConnectGateInner() {
   const { t } = useLocale()
@@ -38,7 +42,6 @@ function ConnectGateInner() {
     e.preventDefault()
     const value = address.trim()
     if (!value) {
-      // Empty-field validation uses a non-disconnect state, not the disconnect sentence.
       setError(true)
       return
     }
@@ -50,27 +53,18 @@ function ConnectGateInner() {
       return
     }
 
-    const validated = await validateHamsterClientApiOrigin(normalized.origin)
-    if (!validated.ok) {
-      setError(true)
-      return
-    }
-    const origin = validated.origin
-
-    try {
-      localStorage.setItem(LAST_GOOD_CONTROL_BASE_KEY, origin)
-    } catch {
-      // storage unavailable (private mode) — connect still proceeds
-    }
-    ;(window as Window & { __HAMSTER_CONTROL_BASE__?: string }).__HAMSTER_CONTROL_BASE__ = origin
-
-    // Electron: ask main to trust + navigate so will-navigate allowlist and session restore stay in sync.
+    // Electron: trusted main validates + navigates (no renderer cross-origin fetch).
     if (typeof window.hamster?.requestConnect === 'function') {
       try {
-        const result = await window.hamster.requestConnect(origin)
+        const result = await window.hamster.requestConnect(normalized.origin)
         if (!result?.ok) {
           setError(true)
           return
+        }
+        try {
+          localStorage.setItem(LAST_GOOD_CONTROL_BASE_KEY, result.origin || normalized.origin)
+        } catch {
+          // private mode — navigate still proceeded in main
         }
         return
       } catch {
@@ -79,6 +73,19 @@ function ConnectGateInner() {
       }
     }
 
+    // Non-Electron fallback (gate normally never mounts here): same-origin validate is fine.
+    const validated = await validateHamsterClientApiOrigin(normalized.origin)
+    if (!validated.ok) {
+      setError(true)
+      return
+    }
+    const origin = validated.origin
+    try {
+      localStorage.setItem(LAST_GOOD_CONTROL_BASE_KEY, origin)
+    } catch {
+      // ignore
+    }
+    ;(window as Window & { __HAMSTER_CONTROL_BASE__?: string }).__HAMSTER_CONTROL_BASE__ = origin
     if (origin === window.location.origin) {
       window.location.reload()
     } else {

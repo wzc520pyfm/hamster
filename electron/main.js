@@ -134,11 +134,9 @@ function notifyPendingApprovals(count, taskTitle) {
 function attachNavigationGuards(win) {
   const contents = win.webContents
 
-  contents.setWindowOpenHandler(({ url }) => {
-    // Never open untrusted windows with our preload. Deny popups; operator uses in-app navigation.
-    if (isUrlOnTrustedOrigin(url, trustedSet())) {
-      return { action: 'allow' }
-    }
+  contents.setWindowOpenHandler(() => {
+    // Default deny: even allowed-origin popups would skip our BrowserWindow guard attachment.
+    // In-app navigation stays in this window (will-navigate allowlist applies).
     return { action: 'deny' }
   })
 
@@ -214,7 +212,11 @@ app.whenReady().then(() => {
   createWindow()
 
   ipcMain.on('hamster:session-origin', (event) => {
-    // Synchronous reply for preload; only meaningful for our BrowserWindow frames.
+    // Synchronous reply for preload — only trusted senders may read session origin.
+    if (!senderIsTrusted(event, session.trustedOrigins)) {
+      event.returnValue = ''
+      return
+    }
     event.returnValue = stripTrailingSlash(session.lastOrigin || CLIENT_ORIGIN)
   })
 

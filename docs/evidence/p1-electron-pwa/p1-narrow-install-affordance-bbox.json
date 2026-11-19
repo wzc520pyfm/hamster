@@ -1,0 +1,29 @@
+{
+  "shot": "/opt/cursor/artifacts/p1-followup-evidence/p1-narrow-install-affordance-bbox.png",
+  "boxes": {
+    "viewportH": 844,
+    "install": {
+      "sel": "[data-testid=\"install-prompt\"]",
+      "top": 783,
+      "bottom": 828,
+      "height": 45,
+      "width": 366
+    },
+    "composer": {
+      "sel": "textarea",
+      "top": 648,
+      "bottom": 738,
+      "height": 90,
+      "width": 340
+    },
+    "approveBox": {
+      "sel": "approve-button",
+      "top": 621.203125,
+      "bottom": 653.203125,
+      "height": 32,
+      "width": 150
+    },
+    "fullyVisible": true
+  },
+  "note": "Headless Chromium 390x844 — not a physical device. Install prompt forced via beforeinstallprompt."
+}

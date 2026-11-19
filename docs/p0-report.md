@@ -2,7 +2,7 @@
 
 Provisional-name **private** exploration. Not a product launch. **Eve is not frozen.** This report deliberately does **not** treat script tallies as a product gate pass. ProductBot decides freeze / P0 pass after review.
 
-**Branch:** `feat/p0-selfhost-verify-20261119` (PR against `main`; do not merge from this note alone)
+**Branch:** `cursor/p0-selfhost-verify-3b1c` (from tip `e4c96d6` / prior empty `feat/p0-selfhost-verify-20261119`; PR against `main`; do not merge from this note alone)
 
 **Engine under test:** `eve@1.0.2` self-hosted. Worker path used eve’s deterministic **`mockModel` fixture** because `HAMSTER_MODEL_ID` was empty and no provider credentials were present. Hermes was **not** started. No live-model results were invented.
 

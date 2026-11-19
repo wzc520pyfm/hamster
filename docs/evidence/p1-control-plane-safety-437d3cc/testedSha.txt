@@ -4,3 +4,4 @@ branch=feat/p1-electron-pwa-20261119
 unplanted_singleuse_stack=hamster_p1_cp_437d3cc_su1 api=54100 agent=34600
 unplanted_ticket=appr_eWG4buCDNWhz0ska
 note=verify-p0 r3 + unplanted single-use chain ran against API/agent sources at 437d3cc; docs-only evidence commits do not change production source
+docs_evidence_commit=9917e076eb789453789cc1d5146d771c7e0e6010

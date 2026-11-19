@@ -2,39 +2,54 @@
  * Hamster Electron main process — private preview slice.
  *
  * Scope of this main process:
- * - Quiet window (~1200x800 default, sidebar visible side-by-side; narrow => shell drawer)
- * - Minimal native menu: Hamster / Edit / View / Window (product nav stays in the shell)
- * - Preload bridge (window.hamster) only for BrowserWindows we create; navigation allowlisted
- * - Persist/restore last in-app route on trusted client origin (reload / close / reopen)
- * - Background approval return: notification (when permitted) + taskbar/dock badge; fail closed
+ * - Quiet window (~1200x800 default; min 480x560)
+ * - Local trusted bootstrap Connect gate (file://) when no successful mount
+ * - Preload bridge only for BrowserWindows we create; navigation allowlisted
+ * - Persist last-successful origin + same-source route (reload / close / reopen)
+ * - Background approval return: notification + badge; fail closed
  *
  * Not in scope (postponed): tray-as-sole-entry, auto-update UI, packaging polish.
  */
 const { app, BrowserWindow, Menu, ipcMain, Notification } = require('electron')
 const path = require('node:path')
+const { pathToFileURL } = require('node:url')
 const {
   stripTrailingSlash,
   normalizeHamsterOrigin,
   validateHamsterClientApiOrigin,
   isUrlOnTrustedOrigin,
+  buildClientUrl,
 } = require('./hamsterOrigin.cjs')
 const {
   loadSession,
   saveSession,
   rememberLocation,
-  resolveStartupUrl,
-  trustOrigin,
+  resolveSuccessfulStartupUrl,
+  recordSuccessfulMount,
   senderIsTrusted,
 } = require('./sessionStore.cjs')
 
-const CLIENT_ORIGIN = stripTrailingSlash(process.env.HAMSTER_CONTROL_ORIGIN || 'http://localhost:3000')
-const CONTROL_BASE = stripTrailingSlash(process.env.HAMSTER_CONTROL_BASE_URL || CLIENT_ORIGIN)
+/** Explicit operator env only — bare hardcoded localhost is NOT successful config. */
+const EXPLICIT_CONTROL_ORIGIN = process.env.HAMSTER_CONTROL_ORIGIN
+  ? stripTrailingSlash(process.env.HAMSTER_CONTROL_ORIGIN)
+  : null
+const EXPLICIT_CONTROL_BASE = process.env.HAMSTER_CONTROL_BASE_URL
+  ? stripTrailingSlash(process.env.HAMSTER_CONTROL_BASE_URL)
+  : null
+const BOOTSTRAP_HINT = EXPLICIT_CONTROL_ORIGIN || EXPLICIT_CONTROL_BASE || ''
+
 const NOTIFICATION_ICON = path.join(__dirname, 'build', 'icon.png')
+const GATE_HTML = path.join(__dirname, 'gate.html')
+const GATE_FILE_URL = pathToFileURL(GATE_HTML).href
 const SESSION_FILE = path.join(app.getPath('userData'), 'hamster-session.json')
+const MOUNT_TIMEOUT_MS = 20000
 
 let mainWindow = null
 let latestPendingApprovals = 0
-let session = loadSession(SESSION_FILE, CLIENT_ORIGIN)
+let session = loadSession(SESSION_FILE)
+/** Origin allowed for in-flight mount attempt (navigation + mount IPC) before success record. */
+let pendingMountOrigin = null
+let mountWaiters = []
 
 function persistSession() {
   saveSession(SESSION_FILE, session)
@@ -42,6 +57,79 @@ function persistSession() {
 
 function trustedSet() {
   return new Set(session.trustedOrigins.map(stripTrailingSlash))
+}
+
+function navigationAllowedOrigins() {
+  const set = trustedSet()
+  if (pendingMountOrigin) set.add(stripTrailingSlash(pendingMountOrigin))
+  return set
+}
+
+function isLocalGateUrl(urlString) {
+  try {
+    const u = new URL(urlString)
+    if (u.protocol !== 'file:') return false
+    // Compare normalized paths (file URL encoding differences).
+    const gatePath = path.normalize(GATE_HTML)
+    let filePath = decodeURIComponent(u.pathname)
+    if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(filePath)) {
+      filePath = filePath.slice(1)
+    }
+    return path.normalize(filePath) === gatePath
+  } catch {
+    return false
+  }
+}
+
+function senderIsLocalGate(event) {
+  try {
+    const url = event.senderFrame?.url || event.sender?.getURL?.() || ''
+    return isLocalGateUrl(url)
+  } catch {
+    return false
+  }
+}
+
+function canRequestConnect(event) {
+  return senderIsLocalGate(event) || senderIsTrusted(event, session.trustedOrigins)
+}
+
+function senderMatchesPendingOrTrusted(event) {
+  if (senderIsTrusted(event, session.trustedOrigins)) return true
+  if (!pendingMountOrigin) return false
+  try {
+    const url = event.senderFrame?.url || event.sender?.getURL?.() || ''
+    const origin = stripTrailingSlash(new URL(url).origin)
+    return origin === stripTrailingSlash(pendingMountOrigin)
+  } catch {
+    return false
+  }
+}
+
+function resolveMountWaiters(ok) {
+  const waiters = mountWaiters
+  mountWaiters = []
+  for (const w of waiters) {
+    try {
+      w(ok)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function waitForClientMounted(timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (ok) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(ok)
+    }
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    mountWaiters.push(finish)
+  })
 }
 
 function installMenu() {
@@ -135,29 +223,99 @@ function attachNavigationGuards(win) {
   const contents = win.webContents
 
   contents.setWindowOpenHandler(() => {
-    // Default deny: even allowed-origin popups would skip our BrowserWindow guard attachment.
-    // In-app navigation stays in this window (will-navigate allowlist applies).
     return { action: 'deny' }
   })
 
   contents.on('will-navigate', (event, url) => {
-    if (!isUrlOnTrustedOrigin(url, trustedSet())) {
+    if (isLocalGateUrl(url)) return
+    if (!isUrlOnTrustedOrigin(url, navigationAllowedOrigins())) {
       event.preventDefault()
     }
   })
 
   contents.on('will-redirect', (event, url) => {
-    if (!isUrlOnTrustedOrigin(url, trustedSet())) {
+    if (isLocalGateUrl(url)) return
+    if (!isUrlOnTrustedOrigin(url, navigationAllowedOrigins())) {
       event.preventDefault()
     }
   })
 
   const remember = (_event, url) => {
+    if (isLocalGateUrl(url)) return
     session = rememberLocation(session, url)
     persistSession()
   }
   contents.on('did-navigate', remember)
   contents.on('did-navigate-in-page', remember)
+}
+
+function showLocalGate(opts = {}) {
+  const { draft = null, showError = false } = opts
+  pendingMountOrigin = null
+  resolveMountWaiters(false)
+  if (draft !== undefined && draft !== null) {
+    session = {
+      ...session,
+      gateDraftOrigin: stripTrailingSlash(draft) || null,
+      gateShowError: Boolean(showError),
+    }
+  } else if (showError) {
+    session = { ...session, gateShowError: true }
+  }
+  persistSession()
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  void mainWindow.loadFile(GATE_HTML)
+}
+
+/**
+ * Load a client URL and wait for usable-mount handshake (not load/HTTP alone).
+ * On success records lastSuccessfulOrigin. On failure preserves prior success.
+ */
+async function loadClientAndAwaitMount(url, origin) {
+  const targetOrigin = stripTrailingSlash(origin)
+  pendingMountOrigin = targetOrigin
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingMountOrigin = null
+    return { ok: false, reason: 'no_window' }
+  }
+  const contents = mainWindow.webContents
+  const onFailLoad = (_event, _code, _desc, failingUrl, isMainFrame) => {
+    if (!isMainFrame) return
+    try {
+      const failOrigin = stripTrailingSlash(new URL(failingUrl).origin)
+      if (failOrigin === targetOrigin) resolveMountWaiters(false)
+    } catch {
+      resolveMountWaiters(false)
+    }
+  }
+  contents.on('did-fail-load', onFailLoad)
+  const mountedPromise = waitForClientMounted(MOUNT_TIMEOUT_MS)
+  try {
+    await mainWindow.loadURL(url)
+  } catch {
+    contents.off('did-fail-load', onFailLoad)
+    pendingMountOrigin = null
+    resolveMountWaiters(false)
+    return { ok: false, reason: 'load_failed' }
+  }
+  const mounted = await mountedPromise
+  contents.off('did-fail-load', onFailLoad)
+  if (!mounted) {
+    pendingMountOrigin = null
+    return { ok: false, reason: 'mount_timeout' }
+  }
+  return { ok: true, origin: targetOrigin }
+}
+
+async function attemptStartupCandidate(url, origin) {
+  const result = await loadClientAndAwaitMount(url, origin)
+  if (result.ok) return true
+  // Preserve lastSuccessfulOrigin; show local gate (independent of remote SPA).
+  showLocalGate({
+    draft: session.gateDraftOrigin || origin,
+    showError: true,
+  })
+  return false
 }
 
 function createWindow() {
@@ -182,16 +340,11 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
   })
 
-  // Restore last validated in-app route on the trusted client origin (not always bare root).
-  const startupUrl = resolveStartupUrl(session, CLIENT_ORIGIN)
-  mainWindow.loadURL(startupUrl)
-
   mainWindow.on('closed', () => {
     mainWindow = null
   })
 
   mainWindow.on('focus', () => {
-    // Clear the badge while focused, but keep the pending count so blur can restore it.
     clearDockBadge()
   })
 
@@ -200,55 +353,138 @@ function createWindow() {
       setDockBadge(latestPendingApprovals)
     }
   })
+
+  void bootWindow()
+}
+
+async function bootWindow() {
+  const successUrl = resolveSuccessfulStartupUrl(session)
+  if (successUrl && session.lastSuccessfulOrigin) {
+    const ok = await attemptStartupCandidate(successUrl, session.lastSuccessfulOrigin)
+    if (ok) return
+    return
+  }
+
+  // Explicit preconfigured env may be attempted once — not bare localhost default.
+  const preconfigured = EXPLICIT_CONTROL_ORIGIN || EXPLICIT_CONTROL_BASE
+  if (preconfigured) {
+    const normalized = normalizeHamsterOrigin(preconfigured)
+    if (normalized.ok) {
+      const url = buildClientUrl(normalized.origin, '/', '', '')
+      const ok = await attemptStartupCandidate(url, normalized.origin)
+      if (ok) return
+      return
+    }
+  }
+
+  // Fresh empty profile / no usable candidate → local trusted gate.
+  showLocalGate({
+    draft: session.gateDraftOrigin || '',
+    showError: Boolean(session.gateShowError),
+  })
 }
 
 app.whenReady().then(() => {
-  // Bootstrap origin is always trusted (LAN or localhost as configured by the operator).
-  session = trustOrigin(session, CLIENT_ORIGIN)
-  session = trustOrigin(session, CONTROL_BASE)
-  persistSession()
-
   installMenu()
   createWindow()
 
+  ipcMain.on('hamster:gate-state', (event) => {
+    if (!senderIsLocalGate(event)) {
+      event.returnValue = { draft: '', showError: false }
+      return
+    }
+    event.returnValue = {
+      draft: session.gateDraftOrigin || '',
+      showError: Boolean(session.gateShowError),
+    }
+  })
+
   ipcMain.on('hamster:session-origin', (event) => {
-    // Synchronous reply for preload — only trusted senders may read session origin.
-    if (!senderIsTrusted(event, session.trustedOrigins)) {
+    // Allow pending mount origin so the renderer can treat the page as control plane
+    // before lastSuccessfulOrigin is recorded.
+    if (!senderMatchesPendingOrTrusted(event)) {
       event.returnValue = ''
       return
     }
-    event.returnValue = stripTrailingSlash(session.lastOrigin || CLIENT_ORIGIN)
+    event.returnValue = stripTrailingSlash(
+      pendingMountOrigin || session.lastSuccessfulOrigin || session.lastOrigin || '',
+    )
+  })
+
+  ipcMain.on('hamster:client-mounted', (event) => {
+    if (!senderMatchesPendingOrTrusted(event)) return
+    let origin = ''
+    try {
+      origin = stripTrailingSlash(new URL(event.sender.getURL()).origin)
+    } catch {
+      return
+    }
+    if (!origin) return
+    if (pendingMountOrigin && origin !== stripTrailingSlash(pendingMountOrigin)) return
+    if (!pendingMountOrigin && !trustedSet().has(origin)) return
+
+    session = recordSuccessfulMount(session, origin)
+    // Capture current path after mount (same-source restore).
+    try {
+      session = rememberLocation(session, event.sender.getURL())
+    } catch {
+      // ignore
+    }
+    persistSession()
+    pendingMountOrigin = null
+    resolveMountWaiters(true)
   })
 
   ipcMain.handle('hamster:request-connect', async (event, rawOrigin) => {
-    if (!senderIsTrusted(event, session.trustedOrigins)) {
+    if (!canRequestConnect(event)) {
       return { ok: false, reason: 'untrusted_sender' }
     }
-    const normalized = normalizeHamsterOrigin(String(rawOrigin || ''))
-    if (!normalized.ok) return { ok: false, reason: normalized.reason }
-    const validated = await validateHamsterClientApiOrigin(normalized.origin)
-    if (!validated.ok) return { ok: false, reason: validated.reason }
-
-    session = trustOrigin(session, validated.origin)
-    // Keep the current in-app path when reconnecting to a newly trusted origin when possible.
-    const currentPath = session.lastPath || '/'
-    session = {
-      ...session,
-      lastOrigin: validated.origin,
-      lastPath: currentPath,
-    }
-    persistSession()
-
-    const url = resolveStartupUrl(session, validated.origin)
-    // Return the invoke result BEFORE navigating. Awaiting loadURL here tears down the
-    // calling renderer while it is still waiting on ipcRenderer.invoke → deadlock/timeout.
-    // Navigate on the next turn so ConnectGate A→B can complete fail-closed and trusted.
-    setImmediate(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        void mainWindow.loadURL(url)
+    const raw = String(rawOrigin || '')
+    const normalized = normalizeHamsterOrigin(raw)
+    if (!normalized.ok) {
+      // Never persist secret-bearing / non-origin input.
+      if (normalized.reason !== 'credentials' && normalized.reason !== 'not_origin') {
+        session = {
+          ...session,
+          gateDraftOrigin: null,
+          gateShowError: true,
+        }
+        persistSession()
+      } else {
+        session = { ...session, gateShowError: true }
+        persistSession()
       }
+      return { ok: false, reason: normalized.reason }
+    }
+
+    const validated = await validateHamsterClientApiOrigin(normalized.origin)
+    if (!validated.ok) {
+      session = {
+        ...session,
+        gateDraftOrigin: normalized.origin,
+        gateShowError: true,
+      }
+      persistSession()
+      return { ok: false, reason: validated.reason }
+    }
+
+    const origin = validated.origin
+    const sameSource = stripTrailingSlash(session.lastSuccessfulOrigin || '') === origin
+    const url = sameSource
+      ? resolveSuccessfulStartupUrl(session) || buildClientUrl(origin, '/', '', '')
+      : buildClientUrl(origin, '/', '', '')
+
+    // Return invoke result BEFORE navigating (avoid renderer teardown deadlock).
+    // Main completes mount handshake asynchronously; failure reloads local gate.
+    setImmediate(() => {
+      void (async () => {
+        const result = await loadClientAndAwaitMount(url, origin)
+        if (!result.ok) {
+          showLocalGate({ draft: origin, showError: true })
+        }
+      })()
     })
-    return { ok: true, origin: validated.origin }
+    return { ok: true, origin }
   })
 
   ipcMain.on('hamster:approval-activity', (event, count) => {
@@ -272,7 +508,7 @@ app.whenReady().then(() => {
     try {
       const origin = stripTrailingSlash(new URL(event.sender.getURL()).origin)
       if (!trustedSet().has(origin)) return
-      session = rememberLocation(session, buildUrl(origin, pathname, search, hash))
+      session = rememberLocation(session, buildClientUrl(origin, pathname, search, hash))
       persistSession()
     } catch {
       // ignore
@@ -280,17 +516,17 @@ app.whenReady().then(() => {
   })
 })
 
-function buildUrl(origin, pathname, search, hash) {
-  const { buildClientUrl } = require('./hamsterOrigin.cjs')
-  return buildClientUrl(origin, pathname, search, hash)
-}
-
 app.on('will-quit', () => {
-  // Task is owned by the control plane; quitting never cancels or approves.
   persistSession()
 })
 
 app.on('window-all-closed', () => {
-  // Default macOS behaviour: keep running. Client must not treat close as Cancel.
   if (process.platform !== 'darwin') app.quit()
 })
+
+// Exported for unit-level contracts in tests (not used at runtime by Electron).
+module.exports = {
+  isLocalGateUrl,
+  GATE_HTML,
+  BOOTSTRAP_HINT,
+}

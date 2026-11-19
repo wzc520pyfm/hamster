@@ -39,7 +39,10 @@ export function normalizeHamsterOrigin(value) {
   if (url.username || url.password) {
     return { ok: false, reason: 'credentials' }
   }
-  // Origin only — drop path/query/hash so ConnectGate cannot smuggle a deep link past validation.
+  // Reject path/query/fragment — do not silently strip (secrets/deep links must not be smuggled).
+  if ((url.pathname && url.pathname !== '/') || url.search || url.hash) {
+    return { ok: false, reason: 'not_origin' }
+  }
   const origin = stripTrailingSlash(url.origin)
   if (!origin) return { ok: false, reason: 'invalid_url' }
   return { ok: true, origin }

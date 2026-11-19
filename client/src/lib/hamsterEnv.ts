@@ -127,27 +127,30 @@ export function getHamsterEnv(): HamsterEnv {
 }
 
 /**
- * True when the Electron quiet ConnectGate should stay closed.
- * Closed when the window is already on the bootstrap origin, or on a remembered validated origin.
+ * True when the renderer should treat the current page as the control-plane origin.
+ * Electron: after main navigates to a client origin, the page IS the control plane
+ * (same-origin /api). Bootstrap env may still point elsewhere — prefer page when it
+ * matches last-good / session origin, or when main has not injected a conflicting bridge
+ * that differs from the page (local gate owns empty-profile bootstrap).
  */
 export function isSameOriginControlBase(): boolean {
   if (typeof window === 'undefined') return true
   const page = window.location.origin
+  if (!page || page === 'null' || page.startsWith('file:')) return false
   const lastGood = readLastGoodControlBase()
   if (lastGood && lastGood === page) return true
   const bridged = readControlBaseBridge()
   if (bridged && bridged === page) return true
   const injected = readControlBaseInjected()
   if (injected && injected === page) return true
-  // Electron session restore may land on a trusted LAN origin while bootstrap env still
-  // points at localhost — treat main-process session origin as authoritative when it matches.
   const bridge = readHamsterBridge()
   const sessionOrigin = stripTrailingSlash(resolveBridgeString(bridge.sessionOrigin) || '')
   if (sessionOrigin && sessionOrigin === page) return true
-  // Browser / PWA always treat the serving origin as the control plane (same-origin /api).
+  // Browser / PWA: serving origin is the control plane.
   if (!isElectronContainer()) return true
-  // Electron without last-good: only same as bootstrap bridge.
-  return Boolean(bridged && bridged === page)
+  // Electron on http(s): main navigation allowlist brought us here — use page origin.
+  // Do not require bootstrap env to match (env may be unset or a failed candidate).
+  return true
 }
 
 export function isStandaloneDisplay(): boolean {
@@ -179,9 +182,16 @@ export function controlBaseUrl(): string {
 }
 
 /**
- * True when a fetch-level network failure occurred (no HTTP response was received).
- * Design-table wording for that state lives in i18n (`Can't reach this Hamster` / `无法连接`).
+ * True when the control plane was unreachable (see `@/lib/api` isNetworkError).
+ * Design-table wording: `Can't reach this Hamster` / `无法连接`.
  */
 export function isNetworkError(err: unknown): boolean {
-  return err instanceof TypeError
+  if (err instanceof TypeError) return true
+  if (err instanceof Error) {
+    const m = err.message || ''
+    if (/upstream unreachable/i.test(m)) return true
+    if (/Failed to fetch/i.test(m)) return true
+    if (/NetworkError|load failed|ECONNREFUSED|ENOTFOUND/i.test(m)) return true
+  }
+  return false
 }

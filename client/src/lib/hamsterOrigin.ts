@@ -38,6 +38,10 @@ export function normalizeHamsterOrigin(value: string): NormalizeResult {
   if (url.username || url.password) {
     return { ok: false, reason: 'credentials' }
   }
+  // Reject path/query/fragment — do not silently strip.
+  if ((url.pathname && url.pathname !== '/') || url.search || url.hash) {
+    return { ok: false, reason: 'not_origin' }
+  }
   const origin = stripTrailingSlash(url.origin)
   if (!origin) return { ok: false, reason: 'invalid_url' }
   return { ok: true, origin }

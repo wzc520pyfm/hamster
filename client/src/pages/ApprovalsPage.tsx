@@ -95,12 +95,16 @@ export function ApprovalsPage({
               approval={a}
               locale={locale}
               focused={Boolean(focusId) && a.id === focusId}
+              actionsDisabled={connectionError}
               onApprove={async (id) => {
+                // Fail-closed: unavailable control channel must not execute or look granted.
+                if (connectionError) return
                 await api.approve(id)
                 await refresh()
                 onApprovalsChanged()
               }}
               onDeny={async (id) => {
+                if (connectionError) return
                 await api.deny(id)
                 await refresh()
                 onApprovalsChanged()

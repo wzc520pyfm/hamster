@@ -51,6 +51,13 @@ function AppRoutes() {
         setConversationId(conv.conversationId)
         setConversationTitle(conv.title)
         setConnectionError(false)
+        // Usable interactive mount handshake for Electron main (trusted sender).
+        window.hamster?.reportClientMounted?.()
+        try {
+          localStorage.setItem('hamster.controlBase', window.location.origin)
+        } catch {
+          // private mode
+        }
         await refreshPending()
       } catch (err) {
         if (cancelled) return
@@ -67,26 +74,27 @@ function AppRoutes() {
   }, [refreshPending])
 
   const retryConnection = useCallback(async () => {
+    // Same-source reconnect only — do not cancel/approve/deny or leave the route.
     setConnectionError(false)
     try {
       const conv = await api.currentConversation()
       setConversationId(conv.conversationId)
       setConversationTitle(conv.title)
+      window.hamster?.reportClientMounted?.()
+      await refreshPending()
     } catch (err) {
       if (isNetworkError(err)) setConnectionError(true)
     }
-  }, [])
+  }, [refreshPending])
 
   const sendApprovalActivity = useCallback((count: number) => {
     window.hamster?.sendApprovalActivity(count)
   }, [])
 
-  // Electron main process: push pending-approval activity (window not focused => notify + badge).
   useEffect(() => {
     sendApprovalActivity(pendingApprovals)
   }, [pendingApprovals, sendApprovalActivity])
 
-  // Deep link back from an approval notification: return to the same ticket.
   useEffect(() => {
     const off = window.hamster?.onOpenApprovals(() => {
       navigate('/approvals')
@@ -95,25 +103,27 @@ function AppRoutes() {
   }, [navigate])
 
   if (connectGateShowing) {
-    // Electron window that is not same-origin with the control plane: render the quiet gate only.
-    // Never stack the disconnect screen or the main routes underneath it.
+    // SPA fallback gate (Electron normally uses local file:// gate from main).
     return <ConnectGateMount />
   }
 
   return (
     <>
       <ElectronRouteReporter />
+      {/* Temp network loss: keep Routes/UI; banner only — never replace whole shell. */}
       {connectionError ? (
-        <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-4">
-          <div className="flex flex-col gap-3 rounded-xl border border-[#e2c4c4] bg-[#f8ecec] p-4">
-            <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--color-destructive)]">
-              {t.connect}
-            </h1>
-            <Button onClick={() => void retryConnection()}>{t.retry}</Button>
-          </div>
+        <div
+          className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-[#e2c4c4] bg-[#f8ecec] px-4 py-2"
+          data-testid="connection-banner"
+          role="alert"
+        >
+          <p className="text-sm text-[var(--color-destructive)]">{t.connect}</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
+            {t.retry}
+          </Button>
         </div>
-      ) : (
-        <Routes>
+      ) : null}
+      <Routes>
         <Route
           element={
             <Shell pendingApprovals={pendingApprovals} conversationTitle={conversationTitle} />
@@ -139,8 +149,7 @@ function AppRoutes() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-        </Routes>
-      )}
+      </Routes>
     </>
   )
 }

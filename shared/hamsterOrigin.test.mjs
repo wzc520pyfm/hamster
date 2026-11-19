@@ -8,15 +8,22 @@ import {
   buildClientUrl,
 } from './hamsterOrigin.mjs'
 
-test('normalize rejects credentials and non-http schemes', () => {
+test('normalize rejects credentials, non-http schemes, and non-origin URLs', () => {
   assert.equal(normalizeHamsterOrigin('').ok, false)
   assert.equal(normalizeHamsterOrigin('ftp://example.com').ok, false)
   assert.equal(normalizeHamsterOrigin('http://user:pass@example.com').reason, 'credentials')
+  assert.equal(normalizeHamsterOrigin('http://192.168.1.10:3000/assets/x').reason, 'not_origin')
+  assert.equal(normalizeHamsterOrigin('http://192.168.1.10:3000?q=1').reason, 'not_origin')
+  assert.equal(normalizeHamsterOrigin('http://192.168.1.10:3000#x').reason, 'not_origin')
   assert.deepEqual(normalizeHamsterOrigin('192.168.1.10:3000'), {
     ok: true,
     origin: 'http://192.168.1.10:3000',
   })
-  assert.deepEqual(normalizeHamsterOrigin('http://192.168.1.10:3000/assets/x'), {
+  assert.deepEqual(normalizeHamsterOrigin('http://192.168.1.10:3000'), {
+    ok: true,
+    origin: 'http://192.168.1.10:3000',
+  })
+  assert.deepEqual(normalizeHamsterOrigin('http://192.168.1.10:3000/'), {
     ok: true,
     origin: 'http://192.168.1.10:3000',
   })

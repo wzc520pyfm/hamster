@@ -153,12 +153,19 @@ export interface AssetDetail extends AssetSummary {
 }
 
 /**
- * True when the failure came from a fetch-level network error (no HTTP response was
- * received). The design-table wording for that disconnected state is `Can't reach this
- * Hamster` / `无法连接` (see i18n `connect`). HTTP error responses keep their status.
+ * True when the control plane was unreachable (fetch failed, or same-origin proxy
+ * reported upstream down). Design-table wording: `Can't reach this Hamster` / `无法连接`.
+ * Ordinary HTTP 4xx/5xx application errors are not treated as disconnect.
  */
 export function isNetworkError(err: unknown): boolean {
-  return err instanceof TypeError
+  if (err instanceof TypeError) return true
+  if (err instanceof Error) {
+    const m = err.message || ''
+    if (/upstream unreachable/i.test(m)) return true
+    if (/Failed to fetch/i.test(m)) return true
+    if (/NetworkError|load failed|ECONNREFUSED|ENOTFOUND/i.test(m)) return true
+  }
+  return false
 }
 
 export const api = {

@@ -9,38 +9,47 @@ const {
   isUrlOnTrustedOrigin,
 } = require('./hamsterOrigin.cjs')
 
-function defaultSession(bootstrapOrigin) {
-  const origin = stripTrailingSlash(bootstrapOrigin)
+/** Empty profile — no successful origin, no implied localhost success. */
+function emptySession() {
   return {
-    trustedOrigins: [origin],
-    lastOrigin: origin,
+    trustedOrigins: [],
+    lastSuccessfulOrigin: null,
+    lastOrigin: null,
     lastPath: '/',
     lastSearch: '',
     lastHash: '',
+    gateDraftOrigin: null,
+    gateShowError: false,
   }
 }
 
-function loadSession(filePath, bootstrapOrigin) {
+function loadSession(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8')
     const parsed = JSON.parse(raw)
-    const fallback = defaultSession(bootstrapOrigin)
     const trusted = Array.isArray(parsed.trustedOrigins)
       ? parsed.trustedOrigins.map(stripTrailingSlash).filter(Boolean)
-      : fallback.trustedOrigins
+      : []
     const set = new Set(trusted)
-    set.add(stripTrailingSlash(bootstrapOrigin))
-    const lastOrigin = stripTrailingSlash(parsed.lastOrigin || bootstrapOrigin)
+    const lastSuccessfulOrigin = stripTrailingSlash(parsed.lastSuccessfulOrigin || '') || null
+    if (lastSuccessfulOrigin) set.add(lastSuccessfulOrigin)
+    const lastOriginRaw = stripTrailingSlash(parsed.lastOrigin || '') || null
+    const lastOrigin =
+      lastOriginRaw && set.has(lastOriginRaw) ? lastOriginRaw : lastSuccessfulOrigin
     const lastPath = isRestorableClientPath(parsed.lastPath) ? parsed.lastPath || '/' : '/'
     return {
       trustedOrigins: [...set],
-      lastOrigin: set.has(lastOrigin) ? lastOrigin : stripTrailingSlash(bootstrapOrigin),
+      lastSuccessfulOrigin,
+      lastOrigin,
       lastPath,
       lastSearch: typeof parsed.lastSearch === 'string' ? parsed.lastSearch : '',
       lastHash: typeof parsed.lastHash === 'string' ? parsed.lastHash : '',
+      gateDraftOrigin:
+        typeof parsed.gateDraftOrigin === 'string' ? stripTrailingSlash(parsed.gateDraftOrigin) || null : null,
+      gateShowError: Boolean(parsed.gateShowError),
     }
   } catch {
-    return defaultSession(bootstrapOrigin)
+    return emptySession()
   }
 }
 
@@ -60,25 +69,29 @@ function rememberLocation(session, urlString) {
   } catch {
     return session
   }
+  if (url.protocol === 'file:') return session
   const origin = stripTrailingSlash(url.origin)
   if (!session.trustedOrigins.includes(origin)) return session
-  const next = {
+  return {
     ...session,
     lastOrigin: origin,
     lastPath: isRestorableClientPath(url.pathname) ? url.pathname : '/',
     lastSearch: url.search || '',
     lastHash: url.hash || '',
   }
-  return next
 }
 
-function resolveStartupUrl(session, bootstrapOrigin) {
-  const trusted = new Set(session.trustedOrigins.map(stripTrailingSlash))
-  trusted.add(stripTrailingSlash(bootstrapOrigin))
-  const origin = trusted.has(stripTrailingSlash(session.lastOrigin))
-    ? stripTrailingSlash(session.lastOrigin)
-    : stripTrailingSlash(bootstrapOrigin)
-  return buildClientUrl(origin, session.lastPath, session.lastSearch, session.lastHash)
+/** Restore URL only for a recorded successful origin (same-source route restore). */
+function resolveSuccessfulStartupUrl(session) {
+  const origin = stripTrailingSlash(session.lastSuccessfulOrigin || '')
+  if (!origin) return null
+  const pathName =
+    session.lastOrigin === origin && isRestorableClientPath(session.lastPath)
+      ? session.lastPath || '/'
+      : '/'
+  const search = session.lastOrigin === origin ? session.lastSearch || '' : ''
+  const hash = session.lastOrigin === origin ? session.lastHash || '' : ''
+  return buildClientUrl(origin, pathName, search, hash)
 }
 
 function trustOrigin(session, origin) {
@@ -86,6 +99,25 @@ function trustOrigin(session, origin) {
   if (!o) return session
   if (session.trustedOrigins.includes(o)) return session
   return { ...session, trustedOrigins: [...session.trustedOrigins, o] }
+}
+
+function recordSuccessfulMount(session, origin) {
+  const o = stripTrailingSlash(origin)
+  if (!o) return session
+  let next = trustOrigin(session, o)
+  const originChanged = stripTrailingSlash(next.lastSuccessfulOrigin || '') !== o
+  next = {
+    ...next,
+    lastSuccessfulOrigin: o,
+    lastOrigin: o,
+    // Origin change must not transfer prior route IDs — start at '/'.
+    lastPath: originChanged ? '/' : next.lastPath || '/',
+    lastSearch: originChanged ? '' : next.lastSearch || '',
+    lastHash: originChanged ? '' : next.lastHash || '',
+    gateDraftOrigin: null,
+    gateShowError: false,
+  }
+  return next
 }
 
 function senderIsTrusted(event, trustedOrigins) {
@@ -99,11 +131,14 @@ function senderIsTrusted(event, trustedOrigins) {
 }
 
 module.exports = {
-  defaultSession,
+  emptySession,
+  defaultSession: emptySession,
   loadSession,
   saveSession,
   rememberLocation,
-  resolveStartupUrl,
+  resolveSuccessfulStartupUrl,
+  resolveStartupUrl: resolveSuccessfulStartupUrl,
   trustOrigin,
+  recordSuccessfulMount,
   senderIsTrusted,
 }

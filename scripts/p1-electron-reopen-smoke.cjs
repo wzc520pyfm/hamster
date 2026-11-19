@@ -22,7 +22,7 @@ const runner = `
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs')
 const path = require('path')
-const { loadSession, saveSession, rememberLocation, resolveStartupUrl, trustOrigin } = require(${JSON.stringify(path.join(ROOT, 'electron/sessionStore.cjs'))})
+const { loadSession, saveSession, rememberLocation, resolveSuccessfulStartupUrl, recordSuccessfulMount } = require(${JSON.stringify(path.join(ROOT, 'electron/sessionStore.cjs'))})
 
 const SESSION = path.join(app.getPath('userData'), 'hamster-session.json')
 const ORIGIN = process.env.SMOKE_ORIGIN
@@ -30,7 +30,7 @@ const RESULT = process.env.SMOKE_RESULT
 let win
 
 app.whenReady().then(async () => {
-  let session = trustOrigin(loadSession(SESSION, ORIGIN), ORIGIN)
+  let session = recordSuccessfulMount(loadSession(SESSION), ORIGIN)
   win = new BrowserWindow({
     show: false,
     width: 800,
@@ -43,7 +43,7 @@ app.whenReady().then(async () => {
   saveSession(SESSION, session)
   win.destroy()
 
-  const restored = resolveStartupUrl(loadSession(SESSION, ORIGIN), ORIGIN)
+  const restored = resolveSuccessfulStartupUrl(loadSession(SESSION))
   win = new BrowserWindow({
     show: false,
     width: 800,

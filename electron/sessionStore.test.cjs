@@ -6,52 +6,64 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const {
+  emptySession,
   loadSession,
   saveSession,
   rememberLocation,
-  resolveStartupUrl,
+  resolveSuccessfulStartupUrl,
   trustOrigin,
+  recordSuccessfulMount,
   senderIsTrusted,
 } = require('./sessionStore.cjs')
-const { isUrlOnTrustedOrigin } = require('./hamsterOrigin.cjs')
+const { isUrlOnTrustedOrigin, normalizeHamsterOriginInput } = require('./hamsterOrigin.cjs')
 
-test('session restores last asset path on trusted origin', () => {
+test('empty profile has no successful origin (bare localhost is not success)', () => {
+  const s = emptySession()
+  assert.equal(s.lastSuccessfulOrigin, null)
+  assert.equal(resolveSuccessfulStartupUrl(s), null)
+  assert.deepEqual(s.trustedOrigins, [])
+})
+
+test('session restores last asset path only after successful mount recorded', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hamster-session-'))
   const file = path.join(dir, 'session.json')
-  let session = {
-    trustedOrigins: ['http://192.168.1.10:3000'],
-    lastOrigin: 'http://192.168.1.10:3000',
-    lastPath: '/assets/asset_demo',
-    lastSearch: '',
-    lastHash: '',
-  }
+  let session = recordSuccessfulMount(emptySession(), 'http://192.168.1.10:3000')
+  session = rememberLocation(session, 'http://192.168.1.10:3000/assets/asset_demo')
   saveSession(file, session)
-  const loaded = loadSession(file, 'http://localhost:3000')
-  assert.ok(loaded.trustedOrigins.includes('http://192.168.1.10:3000'))
-  assert.ok(loaded.trustedOrigins.includes('http://localhost:3000'))
+  const loaded = loadSession(file)
+  assert.equal(loaded.lastSuccessfulOrigin, 'http://192.168.1.10:3000')
   assert.equal(
-    resolveStartupUrl(loaded, 'http://localhost:3000'),
+    resolveSuccessfulStartupUrl(loaded),
     'http://192.168.1.10:3000/assets/asset_demo',
   )
 })
 
-test('rememberLocation ignores untrusted origins', () => {
-  let session = {
-    trustedOrigins: ['http://localhost:3000'],
-    lastOrigin: 'http://localhost:3000',
-    lastPath: '/',
-    lastSearch: '',
-    lastHash: '',
+test('failed attempted source does not overwrite lastSuccessfulOrigin', () => {
+  let session = recordSuccessfulMount(emptySession(), 'http://192.168.1.10:3000')
+  session = {
+    ...session,
+    gateDraftOrigin: 'http://192.168.1.99:3000',
+    gateShowError: true,
   }
+  assert.equal(session.lastSuccessfulOrigin, 'http://192.168.1.10:3000')
+  assert.equal(resolveSuccessfulStartupUrl(session), 'http://192.168.1.10:3000/')
+})
+
+test('origin change A→B resets to root path (no transferred route IDs)', () => {
+  let session = recordSuccessfulMount(emptySession(), 'http://192.168.1.10:3000')
+  session = rememberLocation(session, 'http://192.168.1.10:3000/assets/asset_old')
+  session = recordSuccessfulMount(session, 'http://192.168.1.20:3000')
+  assert.equal(session.lastSuccessfulOrigin, 'http://192.168.1.20:3000')
+  assert.equal(resolveSuccessfulStartupUrl(session), 'http://192.168.1.20:3000/')
+})
+
+test('rememberLocation ignores untrusted origins', () => {
+  let session = emptySession()
   session = rememberLocation(session, 'http://evil.test/assets/x')
   assert.equal(session.lastPath, '/')
   session = trustOrigin(session, 'http://192.168.1.10:3000')
   session = rememberLocation(session, 'http://192.168.1.10:3000/approvals')
   assert.equal(session.lastPath, '/approvals')
-  assert.equal(
-    resolveStartupUrl(session, 'http://localhost:3000'),
-    'http://192.168.1.10:3000/approvals',
-  )
 })
 
 test('navigation allowlist rejects foreign origins and credentials', () => {
@@ -74,32 +86,31 @@ test('IPC sender trust checks frame URL against allowlist', () => {
   )
 })
 
+test('gate file:// sender is not treated as remote SPA trusted origin', () => {
+  assert.equal(
+    senderIsTrusted({ senderFrame: { url: 'file:///tmp/gate.html' } }, ['http://192.168.1.10:3000']),
+    false,
+  )
+})
+
+test('normalize rejects userinfo/path/query/fragment rather than strip', () => {
+  assert.equal(normalizeHamsterOriginInput('http://192.168.1.10:3000/path').ok, false)
+  assert.equal(normalizeHamsterOriginInput('http://user:pass@192.168.1.10:3000').ok, false)
+  assert.equal(normalizeHamsterOriginInput('http://192.168.1.10:3000?x=1').ok, false)
+  assert.equal(normalizeHamsterOriginInput('http://192.168.1.10:3000#h').ok, false)
+  assert.equal(normalizeHamsterOriginInput('http://192.168.1.10:3000').ok, true)
+})
+
 test('focus/blur badge semantics: count retained across clear', () => {
-  // Pure behaviour contract used by main.js: clearing the badge must not zero the count.
   let latestPendingApprovals = 3
   let badge = latestPendingApprovals
-  // focus:
   badge = 0
   assert.equal(latestPendingApprovals, 3)
-  // blur:
   if (latestPendingApprovals > 0) badge = latestPendingApprovals
   assert.equal(badge, 3)
 })
 
-test('session-origin IPC contract denies untrusted sender', () => {
-  const trusted = ['http://192.168.1.10:3000']
-  assert.equal(
-    senderIsTrusted({ senderFrame: { url: 'http://evil.test/' } }, trusted),
-    false,
-  )
-  assert.equal(
-    senderIsTrusted({ senderFrame: { url: 'http://192.168.1.10:3000/' } }, trusted),
-    true,
-  )
-})
-
 test('window-open policy is default-deny (contract)', () => {
-  // Mirrors electron/main.js setWindowOpenHandler: always { action: 'deny' }.
   const handler = () => ({ action: 'deny' })
   assert.deepEqual(handler({ url: 'http://192.168.1.10:3000/assets/x' }), { action: 'deny' })
   assert.deepEqual(handler({ url: 'http://evil.test/' }), { action: 'deny' })

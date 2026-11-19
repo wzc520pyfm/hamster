@@ -32,12 +32,15 @@ export function ApprovalCard({
   onApprove,
   onDeny,
   focused = false,
+  actionsDisabled = false,
 }: {
   approval: Approval
   locale: Locale
   onApprove: (id: string) => Promise<void>
   onDeny: (id: string) => Promise<void>
   focused?: boolean
+  /** Fail-closed when control/approval channel unavailable. */
+  actionsDisabled?: boolean
 }) {
   const t = getCopy(locale)
   const [busy, setBusy] = useState(false)
@@ -111,9 +114,10 @@ export function ApprovalCard({
             type="button"
             size="sm"
             variant="outline"
-            disabled={busy}
+            disabled={busy || actionsDisabled}
             data-testid="approval-deny"
             onClick={async () => {
+              if (actionsDisabled) return
               setBusy(true)
               try {
                 await onDeny(approval.id)
@@ -127,9 +131,10 @@ export function ApprovalCard({
           <Button
             type="button"
             size="sm"
-            disabled={busy}
+            disabled={busy || actionsDisabled}
             data-testid="approval-approve"
             onClick={async () => {
+              if (actionsDisabled) return
               setBusy(true)
               try {
                 await onApprove(approval.id)

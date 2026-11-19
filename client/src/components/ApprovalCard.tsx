@@ -26,11 +26,14 @@ export function ApprovalCard({
   locale,
   onApprove,
   onDeny,
+  compact = false,
 }: {
   approval: Approval
   locale: Locale
   onApprove: (id: string) => Promise<void>
   onDeny: (id: string) => Promise<void>
+  /** Narrow dock above composer: keep actions reachable without a tall card. */
+  compact?: boolean
 }) {
   const t = getCopy(locale)
   const [busy, setBusy] = useState(false)
@@ -44,6 +47,65 @@ export function ApprovalCard({
   const footer = decisionCopy ?? note
   const params = safeParams(approval.params)
   const title = approvalActionLabel(approval.action, approval.params, locale)
+
+  const actions =
+    pending ? (
+      <div className={`flex flex-wrap gap-2 ${compact ? 'mt-2' : 'mt-4'}`} data-testid="approval-actions">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          data-testid="approval-deny"
+          onClick={async () => {
+            setBusy(true)
+            try {
+              await onDeny(approval.id)
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          {t.deny}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          data-testid="approval-approve"
+          onClick={async () => {
+            setBusy(true)
+            try {
+              await onApprove(approval.id)
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          {t.approveThisAction}
+        </Button>
+      </div>
+    ) : null
+
+  if (compact) {
+    return (
+      <article
+        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2.5"
+        data-testid="approval-card-compact"
+      >
+        <header className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold leading-snug">{title}</h3>
+            <div className="mt-0.5 font-mono text-[10px] text-[var(--color-muted-foreground)]">
+              {t.taskId}: {approval.taskId}
+            </div>
+          </div>
+          <ApprovalStatusLabel status={approval.status} locale={locale} />
+        </header>
+        {actions}
+      </article>
+    )
+  }
 
   return (
     <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
@@ -82,41 +144,7 @@ export function ApprovalCard({
         {footer ? <div className="text-[var(--color-muted-foreground)]">{footer}</div> : null}
       </dl>
 
-      {pending ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true)
-              try {
-                await onDeny(approval.id)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          >
-            {t.deny}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true)
-              try {
-                await onApprove(approval.id)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          >
-            {t.approveThisAction}
-          </Button>
-        </div>
-      ) : null}
+      {actions}
     </article>
   )
 }

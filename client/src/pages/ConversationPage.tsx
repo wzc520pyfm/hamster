@@ -74,10 +74,12 @@ export function ConversationPage({
   }, [])
 
   useEffect(() => {
+    // Only auto-stick within the message list. Pending approvals live outside this scroller
+    // (above the composer) so scrollIntoView must not drag Approve/Deny under the composer.
     if (stickToBottom.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [timeline?.messages.length, timeline?.tasks.length, timeline?.approvals.length])
+  }, [timeline?.messages.length, timeline?.tasks.length])
 
   const taskById = useMemo(() => {
     const map = new Map<string, Timeline['tasks'][number]>()
@@ -86,6 +88,8 @@ export function ConversationPage({
   }, [timeline])
 
   const pendingApprovals = (timeline?.approvals ?? []).filter((a) => a.status === 'pending')
+  // Closed approvals still appear in the timeline/history path via TaskCard state; active
+  // pending tickets are pinned above the composer so Deny / Approve stay reachable.
 
   async function send(raw: string) {
     if (!conversationId) return
@@ -149,32 +153,38 @@ export function ConversationPage({
                 onApprovalsChanged()
               },
             })}
-
-            {pendingApprovals.length > 0 ? (
-              <div className="mt-2 flex flex-col gap-3">
-                {pendingApprovals.map((a) => (
-                  <ApprovalCard
-                    key={a.id}
-                    approval={a}
-                    locale={locale}
-                    onApprove={async (id) => {
-                      await api.approve(id)
-                      await refresh()
-                      onApprovalsChanged()
-                    }}
-                    onDeny={async (id) => {
-                      await api.deny(id)
-                      await refresh()
-                      onApprovalsChanged()
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Pending tickets stay outside the message scroller so Approve/Deny are not
+          overflow-clipped or covered by the composer / install affordance. */}
+      {pendingApprovals.length > 0 ? (
+        <div
+          className="flex shrink-0 flex-col gap-2"
+          data-testid="pending-approvals-dock"
+        >
+          {pendingApprovals.map((a) => (
+            <ApprovalCard
+              key={a.id}
+              approval={a}
+              locale={locale}
+              compact
+              onApprove={async (id) => {
+                await api.approve(id)
+                await refresh()
+                onApprovalsChanged()
+              }}
+              onDeny={async (id) => {
+                await api.deny(id)
+                await refresh()
+                onApprovalsChanged()
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {connectionError ? (
         <div className="shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
@@ -201,8 +211,8 @@ export function ConversationPage({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
           <textarea
-            className="min-h-[4.5rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
-            rows={3}
+            className="min-h-[2.75rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
+            rows={pendingApprovals.length > 0 ? 2 : 3}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t.composerPlaceholder}

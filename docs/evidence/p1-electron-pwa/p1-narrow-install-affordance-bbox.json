@@ -1,29 +1,276 @@
 {
-  "shot": "/opt/cursor/artifacts/p1-followup-evidence/p1-narrow-install-affordance-bbox.png",
-  "boxes": {
-    "viewportH": 844,
-    "install": {
-      "sel": "[data-testid=\"install-prompt\"]",
+  "viewportH": 844,
+  "dockPresent": true,
+  "clearOfComposer": true,
+  "composerTop": 672,
+  "approveBottom": 636,
+  "denyBottom": 636,
+  "legacyBboxOnlyFalsePositiveMetric": true,
+  "install": {
+    "label": "install",
+    "box": {
       "top": 783,
       "bottom": 828,
+      "left": 12,
+      "right": 378,
       "height": 45,
       "width": 366
     },
-    "composer": {
-      "sel": "textarea",
-      "top": 648,
+    "clip": {
+      "clipped": false
+    },
+    "samples": [
+      {
+        "x": 195,
+        "y": 805.5,
+        "hit": true,
+        "topTag": "DIV",
+        "topTestId": null,
+        "topText": "Install Hamster"
+      },
+      {
+        "x": 85.2,
+        "y": 805.5,
+        "hit": true,
+        "topTag": "DIV",
+        "topTestId": null,
+        "topText": "Install Hamster"
+      },
+      {
+        "x": 304.8,
+        "y": 805.5,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": null,
+        "topText": "Install"
+      },
+      {
+        "x": 195,
+        "y": 792,
+        "hit": true,
+        "topTag": "DIV",
+        "topTestId": null,
+        "topText": "Install Hamster"
+      },
+      {
+        "x": 195,
+        "y": 819,
+        "hit": true,
+        "topTag": "DIV",
+        "topTestId": null,
+        "topText": "Add Hamster to your home screen for full"
+      },
+      {
+        "x": 195,
+        "y": 824.4,
+        "hit": true,
+        "topTag": "DIV",
+        "topTestId": null,
+        "topText": "Add Hamster to your home screen for full"
+      }
+    ],
+    "hitCount": 6,
+    "hittable": true
+  },
+  "composer": {
+    "label": "composer",
+    "box": {
+      "top": 672,
       "bottom": 738,
-      "height": 90,
+      "left": 25,
+      "right": 365,
+      "height": 66,
       "width": 340
     },
-    "approveBox": {
-      "sel": "approve-button",
-      "top": 621.203125,
-      "bottom": 653.203125,
+    "clip": {
+      "clipped": false
+    },
+    "samples": [
+      {
+        "x": 195,
+        "y": 705,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      },
+      {
+        "x": 93,
+        "y": 705,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      },
+      {
+        "x": 297,
+        "y": 705,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      },
+      {
+        "x": 195,
+        "y": 685.2,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      },
+      {
+        "x": 195,
+        "y": 724.8,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      },
+      {
+        "x": 195,
+        "y": 732.72,
+        "hit": true,
+        "topTag": "TEXTAREA",
+        "topTestId": null,
+        "topText": null
+      }
+    ],
+    "hitCount": 6,
+    "hittable": true
+  },
+  "approve": {
+    "label": "approve",
+    "box": {
+      "top": 604,
+      "bottom": 636,
+      "left": 89,
+      "right": 239,
       "height": 32,
       "width": 150
     },
-    "fullyVisible": true
+    "clip": {
+      "clipped": false
+    },
+    "samples": [
+      {
+        "x": 164,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      },
+      {
+        "x": 119,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      },
+      {
+        "x": 209,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      },
+      {
+        "x": 164,
+        "y": 610.4,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      },
+      {
+        "x": 164,
+        "y": 629.6,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      },
+      {
+        "x": 164,
+        "y": 633.44,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-approve",
+        "topText": "Approve this action"
+      }
+    ],
+    "hitCount": 6,
+    "hittable": true
   },
-  "note": "Headless Chromium 390x844 — not a physical device. Install prompt forced via beforeinstallprompt."
+  "deny": {
+    "label": "deny",
+    "box": {
+      "top": 604,
+      "bottom": 636,
+      "left": 25,
+      "right": 81,
+      "height": 32,
+      "width": 56
+    },
+    "clip": {
+      "clipped": false
+    },
+    "samples": [
+      {
+        "x": 53,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      },
+      {
+        "x": 36.2,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      },
+      {
+        "x": 69.80000000000001,
+        "y": 620,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      },
+      {
+        "x": 53,
+        "y": 610.4,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      },
+      {
+        "x": 53,
+        "y": 629.6,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      },
+      {
+        "x": 53,
+        "y": 633.44,
+        "hit": true,
+        "topTag": "BUTTON",
+        "topTestId": "approval-deny",
+        "topText": "Deny"
+      }
+    ],
+    "hitCount": 6,
+    "hittable": true
+  },
+  "pass": true,
+  "note": "Headless Chromium 390x844 — not physical. pass = full elementFromPoint + no clip + above composer.",
+  "shot": "/opt/cursor/artifacts/p1-followup-evidence/p1-narrow-install-affordance-bbox.png"
 }

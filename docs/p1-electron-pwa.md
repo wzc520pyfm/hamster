@@ -32,8 +32,10 @@ Independently reproduced, then fixed (small patch):
 3. **Security tidy** — `hamster:session-origin` sync IPC requires trusted sender; `setWindowOpenHandler`
    default-deny; `/internal` not proxied; `safeJoinDist` uses root+sep boundary; shared vs electron
    origin helpers covered by consistency tests.
-4. **Install affordance** — conversation column is `flex-1` inside `100dvh` shell so in-flow install
-   bar does not push composer/approvals off the first screen (headless 390×844 bbox evidence).
+4. **Install affordance + pending actions** — conversation column is `flex-1` inside `100dvh` shell;
+   pending approvals sit in a compact dock **above** the composer (outside the message scroller) so
+   Deny / Approve are not overflow-clipped or covered. Headless 390×844 evidence uses
+   `elementFromPoint` + clip checks (viewport bbox alone is **not** acceptance).
 
 ---
 
@@ -70,15 +72,17 @@ ConnectGate title: `Connect to Hamster` / `连接 Hamster`. Disconnect remains
 | `readme-compose-bake-regression.txt` | PASS |
 | `cross-origin-gate-cors.log` | CONFIRMED renderer CORS block vs production server |
 | `nonlocalhost-proxy-verify.json` | PASS |
-| `p1-narrow-install-affordance-bbox.png` + `.json` | PASS fullyVisible (headless; **not** physical) |
+| `p1-narrow-install-affordance-bbox.png` + `.json` | PASS after hit-test fix (headless; **not** physical) |
+| `cross-origin-gate-cors.log` | Documents **pre-fix** renderer CORS failure only |
 
 Also copied bbox shot into `docs/evidence/p1-electron-pwa/`.
 
-### Inherited (not re-owned as Electron/physical)
+### Inherited / unverified
 
 - Fixture six PNGs from earlier free-CLI capture.
-- Electron BrowserWindow reopen: still **FAILED** historically (dbus/GPU); **not re-looped**;
-  `sessionStore` unit tests are **not** a BrowserWindow reopen PASS.
+- Electron BrowserWindow reopen: still **FAILED** historically (dbus/GPU); **not re-looped**.
+- Post-fix **real Electron** ConnectGate A→B window path: **UNVERIFIED** (do not treat Node/CORS
+  reproduce logs as Electron connection success).
 
 ---
 

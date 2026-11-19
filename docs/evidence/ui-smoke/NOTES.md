@@ -1,6 +1,25 @@
-# UI smoke screenshots — narrow shell must-fix recapture
+# UI smoke screenshots — narrow shell must-fix + approval footer locales
 
 **Not a design-gate pass.** Eve is not frozen. Repo stays private. No merge.
+
+## 2026-11-19 — closed-state approval footers (Compose client)
+
+After `approvalDecisionCopy()` (active-locale design-table wording on closed footers), per-card
+screenshots were recaptured against the running Compose stack (`http://localhost:3000`,
+CORS-aligned). Badge and footer use the same exact pairs; pending has no decision sentence.
+
+| File | State shown |
+| --- | --- |
+| `approval-approved-this-action-only.webp` | EN footer+badge **Approved for this action only** |
+| `zh-approval-approved-this-action-only.webp` | ZH **仅批准此次动作** (locale footer, not English DB note) |
+| `approval-denied.webp` | EN **Denied** |
+| `zh-approval-denied.webp` | ZH **已拒绝** |
+| `approval-expired.webp` | EN **Expired — not approved, so it did not run** |
+| `zh-approval-expired.webp` | ZH **已过期，未获批准，动作未执行** |
+| `approval-invalidated.webp` | EN **Invalidated — approve again** |
+| `zh-approval-invalidated.webp` | ZH **已失效，请重新审批** |
+
+Helper: `scripts/capture-approval-footers.sh` (state setup) + per-card Playwright clip for distinct files.
 
 Kept prior evidence:
 
@@ -26,18 +45,12 @@ Capture helpers: `scripts/capture-ui-smoke-shellfix.sh`, `scripts/ui-smoke-cover
 | `zh-narrow-approval-pending-shellfix.webp` | ZH 390×844 pending: **需要批准** |
 | `zh-task-cancelled.webp` | **Repaired** — complete **已取消** badge + title (prior crop was defective) |
 | `zh-task-failed.webp` | **Repaired** — honest **已失败** (prior file was a byte-identical duplicate of `zh-task-succeeded.webp`) |
-| `approval-approved-this-action-only.webp` | Optional: **Approved for this action only** |
-| `zh-approval-approved-this-action-only.webp` | Optional: **仅批准此次动作** |
-| `zh-approval-expired.webp` | Optional: **已过期，未获批准，动作未执行** |
-| `zh-approval-denied.webp` | Optional: **已拒绝** |
-| `zh-approval-invalidated.webp` | Optional: **已失效，请重新审批** |
-
 ## Still unverified
 
 | State | Why |
 | --- | --- |
 | Dashboard freshness **Stale — still showing last success** / ZH **仍显示上次成功结果** | Schema + UI support `freshness=stale`, but no product path sets it. Not faked. |
-| ZH **Queued** / **Running** | Ephemeral windows; not re-held in this pass. Leave unverified. |
+| ZH **排队** / **运行中** | Ephemeral windows; not re-held honestly in this pass. Leave unverified. |
 
 ## Notes
 

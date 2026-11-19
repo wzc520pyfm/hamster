@@ -1,0 +1,32 @@
+=== Hamster P0 verification @ 2026-11-19T03:25:56Z ===
+API_BASE=http://127.0.0.1:8080
+NOTE: Worker path is eve mockModel/fixture unless HAMSTER_MODEL_ID + provider credentials are set
+PASS: control plane /api/health responds
+PASS: conversationId allocated: conv_a705acaa-5b1f-4240-9dad-f0e1eb534698
+PASS: task created taskId=task_a6b138e1-5645-41e5-9cb1-0a47d0eac7d1 status=running
+PASS: runtimeSessionId distinct from taskId: wrun_01M7RXDV4HJ2QX1SC538H01CB8
+PASS: conversationId / taskId / runtimeSessionId are separate values
+PASS: ordinary follow-up did not cancel or steer task (status=running, controls=0)
+PASS: progress answered from control-plane persisted state (not model estimate)
+poll#1 events=0 asset= approvals=0 steer_applied=False status=running
+poll#2 events=1 asset= approvals=0 steer_applied=False status=running
+PASS: steer receipt is pending_apply (not Applied)
+poll#3 events=2 asset= approvals=0 steer_applied=True status=running
+poll#4 events=3 asset=asset_32798a1a-f87d-469f-aace-2a80ea28f6f8 approvals=1 steer_applied=True status=waiting_for_approval
+PASS: task has 3 persisted events (progress source)
+PASS: steer control status machine visible as applied
+PASS: assetId created: asset_32798a1a-f87d-469f-aace-2a80ea28f6f8 (distinct from task/conversation)
+PASS: persisted openui is OpenUI React Lang 1.0 with Query + registered components
+PASS: successful refresh kept identical openui document and layoutVersion=1
+PASS: forced refresh failure: freshness=refresh_failed, openui unchanged, last success data retained
+PASS: pending approval ticket exists: appr_1vyseyvo0aNpyf0F
+PASS: policy denies publish without matching approved ticket (omit-approval fail-closed)
+PASS: policy denies unknown actions
+PASS: real approval expiry asserted status=expired with exact copy
+PASS: expired ticket cannot authorize publish (action did not run)
+PASS: cancel set task1 to cancelled
+PASS: cancel did not harm sibling task2 (status=running)
+PASS: cancelled task is denied new tool calls at policy layer
+PASS: cancel invalidated unused approvals (pending_before=1 invalidated=1 api=1)
+PASS: no obvious real secret material committed
+=== summary: PASS=24 FAIL=0 NOTE=1 ===

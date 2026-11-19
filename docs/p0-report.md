@@ -1,86 +1,93 @@
-# Hamster P0 evidence report (updated)
+# Hamster P0 evidence report (updated 2026-11-19)
 
-Provisional-name **private** exploration. Not a product launch. **Eve is not frozen.** This report deliberately does **not** treat a prior `19/0` script tally as a product gate pass.
+Provisional-name **private** exploration. Not a product launch. **Eve is not frozen.** This report deliberately does **not** treat script tallies as a product gate pass. ProductBot decides freeze / P0 pass after review.
 
-**Branch / PR:** `cursor/p0-react-client-hard-constraints-6139` → https://github.com/wzc520pyfm/hamster/pull/1  
+**Branch:** `cursor/p0-selfhost-verify-3b1c` (from tip `e4c96d6` / prior empty `feat/p0-selfhost-verify-20261119`; PR against `main`; do not merge from this note alone)
 
-**Engine under test:** `eve@1.0.2` self-hosted with the **scripted `mockModel` fixture** unless `HAMSTER_MODEL_ID` and provider credentials are set. Hermes was **not** started.
+**Engine under test:** `eve@1.0.2` self-hosted. Worker path used eve’s deterministic **`mockModel` fixture** because `HAMSTER_MODEL_ID` was empty and no provider credentials were present. Hermes was **not** started. No live-model results were invented.
 
 ---
 
-## How the stack was run
+## How the stack was run (this revision)
 
 | Path | Status |
 | --- | --- |
-| `docker compose build` (api + client after OpenUI change; agent image previously built) | Done on the verification host |
-| Full `docker compose up --build` end-to-end loop on this host | **Not claimed** — the contract tests used a local equivalent loop while those ports were occupied |
-| Equivalent local single-host loop | **Used for contract evidence:** Postgres 16 + `api` `:8080` + `eve start` `:8081` + Vite preview `:3000` |
+| Full `sudo docker compose up --build -d` on this host | **Done.** Images built; `db` + `agent` + `api` + `client` containers started; published ports `5432` / `8081` / `8080` / `3000`. |
+| Compose networking caveat on this host | Fresh Docker install used **nft** rules while **iptables-legacy FORWARD** defaulted to `DROP` with `bridge-nf-call-iptables=1`, so API→DB stayed in `SYN_SENT` until legacy FORWARD accepted the Compose bridge. After that fix, API listened and `/api/health` returned `{"status":"ok"}`. |
+| Contract script against Compose | **PASS=24 FAIL=0 NOTE=1** — `scripts/verify-p0.sh` with `DB_CMD="sudo docker compose exec -T db psql -U hamster -d hamster"`. |
+| Live provider model | **Not run.** `HAMSTER_MODEL_ID` unset → fixture path only (NOTE=1). |
 
-Acceptance remains: Compose *or equivalent* must complete without Vercel / hosted eve / OpenUI commercial Dashboard or Gateway.
+Acceptance remains: Compose *or equivalent* without Vercel / hosted eve / OpenUI commercial Dashboard or Gateway. This revision used **real Compose**, not only the prior local equivalent.
 
----
-
-## Newly proven in this revision
-
-### 1) OpenUI React Lang 1.0 — **implemented (was missing)**
-
-| Check | Evidence |
-| --- | --- |
-| Dependency | `client/package.json` → `@openuidev/react-lang` |
-| Persist real OpenUI Lang | `api/src/assets.js` emits `$rev`, `Query("metrics_weekly", { rev: $rev }, defaults)`, registered `Stack` / `CardHeader` / `KpiGrid` / `MetricsTable` / `Note` / `RevSync` |
-| Server-validate then persist | `api/src/openuiValidate.js` via `@openuidev/lang-core` `createParser`; invalid docs refused |
-| Official Renderer | `DashboardView.tsx` → `<Renderer response={asset.openui} library={hamsterOpenUiLibrary} toolProvider={…} />` |
-| Same asset / same route | `/assets/:assetId` for library and in-chat |
-| Constrained refresh | `$rev` bump through `RevSync` **without remounting** Renderer; `openui_document` unchanged |
-| Failure keeps last success | Forced named-query outage → `freshness=refresh_failed`, identical openui, retained data + `lastSuccessAt`; UI copy `Refresh failed — still showing last success` |
-| No competing runtime repo / no commercial Gateway | This private repo only |
-
-### 2) Strengthened `scripts/verify-p0.sh` — **hard fails when contract fails**
-
-Latest local equivalent run: **PASS=24 FAIL=0 NOTE=1** (the NOTE is the fixture-path disclaimer). Artifacts under `docs/evidence/`.
-
-Now asserts (among retained Line A / policy checks):
-
-1. **Forced refresh failure** (rename `metrics_weekly`, `POST /refresh`, restore) — `ok=false`, `freshness=refresh_failed`, unchanged openui, retained data.
-2. **Real approval expiry** — insert expired pending ticket, sweeper → status `expired` + exact `Expired — not approved, so it did not run`, policy still denies publish.
-3. **Cancel invalidation** — requires `invalidatedApprovals > 0` when unused pending tickets existed (no more `inv >= 0` always-pass).
-
-### 3) UI surfaces — **partially exercised**
-
-| Surface | Result | How |
-| --- | --- | --- |
-| Conversation shell | Observed | Browser smoke at `http://localhost:3000/` — Hamster / Private preview / composer / Task card statuses |
-| Dashboard library + `/assets/:assetId` | Observed | OpenUI-rendered KPIs + table; library list freshness included exact `Refresh failed — still showing last success`; Refresh kept layout |
-| Approvals | Observed | Cards with exact `Expired — not approved, so it did not run` and `Invalidated — approve again` (no live pending card in that dataset) |
-| EN \| 中文 | **Pass (Playwright)** | `scripts/ui-smoke-locale.mjs` — nav `对话` / `Dashboard 库` / `待审批`, header `主对话`, then back to EN. Earlier computer-use click coordinates falsely reported fail; deterministic Playwright proves the toggle. |
-
-Screenshots (browser smoke): `docs/evidence/ui-smoke/` (see `NOTES.md`). Coverage expansion plus narrow-shell must-fix recaptures (`*-shellfix.webp`): drawer nav below `md`, non-truncating freshness + visible Retry/重试 at 390×844, full composer placeholders. Prior `2f65210` truncated narrow-dashboard shot kept as failure evidence. **Stale** freshness remains unverified (no product path sets it). **Not a design-gate pass.**
-
-This is **not** a full product E2E suite.
+Artifacts: `docs/evidence/compose-20261119/` (compose build log excerpt, verify transcript, JSON fixtures) and refreshed `docs/evidence/verify-p0-latest.txt`.
 
 ---
 
-## Still fixture-limited / not claimed
+## What passed on the real Compose path
 
-- Worker path that created the asset/approval under contract tests used eve **`mockModel`**, not a live provider key.
-- Full `docker compose up --build` loop not re-recorded on this host this revision (Compose **build** yes; local equivalent loop used for runtime checks).
-- **Eve hard constraints are not announced as a product pass.** Eve is **not frozen.**
-- Prior `19/0` product-pass framing is **withdrawn**.
+Re-checked end-to-end with the Compose API + fixture agent (not a mocked HTTP layer):
+
+1. Health, conversation / task / `runtimeSessionId` separation, ordinary follow-up non-interference.
+2. Progress answered from control-plane persisted events (not a model estimate).
+3. Steer `pending_apply` → `applied`; asset created with OpenUI React Lang 1.0 (`Query` + registered components).
+4. Successful refresh keeps identical `openui` / `layoutVersion`; **forced** named-query outage → `freshness=refresh_failed`, openui unchanged, last success retained.
+5. Pending approval; omit-approval publish → fail-closed; unknown actions denied.
+6. Real expiry sweeper → status `expired` + exact `Expired — not approved, so it did not run`; expired ticket cannot authorize publish.
+7. Cancel sets task cancelled, sibling survives, cancelled task denied new tools, unused pending → `invalidated` with exact `Invalidated — approve again`.
+8. No obvious real secret material committed.
+
+**Still fixture-bound for the worker tool sequence:** the agent that produced the asset/approval under test was eve `mockModel`, not a live key.
 
 ---
 
-## Policy layer (unchanged intent, re-checked)
+## UI / locale (secondary, same PR)
 
-- High-risk `publish_dashboard` requires consume-once approved ticket with matching params hash.
-- Unknown actions denied; cancelled tasks denied new tool calls.
-- Eve omit-approval still cannot run high-risk work: no ticket ⇒ `no_valid_ticket`.
+Closed-state approval footers now use `approvalDecisionCopy()` so the footer follows the **active locale** design-table strings (same wording as the badge), instead of the English-stored `decision_note`. Pending has no decision sentence. Exact pairs only; no synonym rewrites.
+
+| State | EN | ZH | Evidence |
+| --- | --- | --- | --- |
+| Approved | Approved for this action only | 仅批准此次动作 | `docs/evidence/ui-smoke/approval-approved-this-action-only.webp`, `zh-approval-approved-this-action-only.webp` |
+| Denied | Denied | 已拒绝 | `approval-denied.webp`, `zh-approval-denied.webp` |
+| Expired | Expired — not approved, so it did not run | 已过期，未获批准，动作未执行 | `approval-expired.webp`, `zh-approval-expired.webp` |
+| Invalidated | Invalidated — approve again | 已失效，请重新审批 | `approval-invalidated.webp`, `zh-approval-invalidated.webp` |
+
+Per-card recaptures on the Compose client (2026-11-19). See `docs/evidence/ui-smoke/NOTES.md`.
+
+**Not recaptured / not claimed**
+
+- Dashboard freshness **Stale — still showing last success** / **仍显示上次成功结果** — no product path sets `freshness=stale`. Not faked.
+- ZH **排队** / **运行中** — ephemeral; not re-held honestly this pass.
+
+---
+
+## Model keys missing — runnable skeleton + hard-cut
+
+**Current runnable skeleton (no keys):** leave `HAMSTER_MODEL_ID` empty. `agent/agent/agent.ts` selects `mockModel({… scriptedRespond …})`. That path is what Compose + `verify-p0.sh` exercised. It must not be described as a live-model pass.
+
+**Exact hard-cut to a live model (when credentials exist):**
+
+1. Put provider credentials in the environment the **agent** process/container can read (never commit them; keep `.env` gitignored).
+2. Set `HAMSTER_MODEL_ID` to a real provider model id (see `.env.example` / README).
+3. `sudo docker compose up --build -d agent` (or rebuild the whole stack).
+4. Confirm agent logs show the configured model id, **not** `hamster-scripted` / fixture provider.
+5. Re-run `./scripts/verify-p0.sh` (with Compose `DB_CMD` if applicable). Treat failures as failures; do **not** invent model completions or paste fixture evidence as live-model evidence.
+6. Until step 5 is green on a live model, keep the fixture NOTE and do not announce an eve freeze or P0 product pass.
+
+---
+
+## Still not claimed
+
+- Eve hard constraints are **not** a product pass. Eve is **not** frozen.
+- Prior `19/0` product-pass framing remains **withdrawn**.
+- No Hermes. No Vercel deploy. No npm publish. Repo stays **private**.
+- This is **not** a full product E2E / design-gate pass.
 
 ---
 
 ## Out of scope
 
-Cloud computers, isolated desktops, BYO remotes, voice, channels, webhooks, team workspaces, multi-bot, schedule, bounded browser, memory correction, required Electron, native mobile, Memory Hub, Hermes, public launch, npm publish.
+Cloud computers, isolated desktops, BYO remotes, voice, channels, webhooks, team workspaces, multi-bot, schedule, bounded browser, memory correction, required Electron, native mobile, Memory Hub, Hermes, public launch, npm publish, logo work.
 
 ## Next step
 
-Keep the repo private and this PR open. Treat fixture-path contract green + OpenUI Renderer wiring as progress toward a gate, not a launch. Do not start Hermes unless eve fails an honest hard constraint.
+Keep the repo private and the PR open for ProductBot review. Fixture Compose green + locale footer fix are progress toward a gate, not a launch.

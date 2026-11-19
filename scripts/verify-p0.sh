@@ -9,6 +9,10 @@ set -euo pipefail
 API_BASE="${API_BASE:-http://127.0.0.1:8080}"
 INTERNAL_SECRET="${HAMSTER_INTERNAL_SECRET:-dev-internal-secret}"
 REPORT_DIR="${REPORT_DIR:-/tmp/hamster-p0-evidence}"
+# DB access differs between the local loop (sudo -u postgres psql -d hamster)
+# and the single-host Compose stack (db service). Override when running against
+# Compose, e.g.: DB_CMD="sudo docker compose exec -T db psql -d hamster"
+DB_CMD="${DB_CMD:-sudo -u postgres psql -d hamster}"
 mkdir -p "$REPORT_DIR"
 PASS=0
 FAIL=0
@@ -198,12 +202,12 @@ else
   fi
 
   # Force a real named-query failure; assert contract (not a NOTE).
-  sudo -u postgres psql -d hamster -c 'ALTER TABLE metrics_weekly RENAME TO metrics_weekly_bak;' >/dev/null
+  $DB_CMD -c 'ALTER TABLE metrics_weekly RENAME TO metrics_weekly_bak;' >/dev/null
   refresh_fail="$(req POST "/api/assets/$ASSET_ID/refresh" '{}')"
   echo "$refresh_fail" > "$REPORT_DIR/refresh-fail.json"
   asset_fail="$(req GET "/api/assets/$ASSET_ID")"
   echo "$asset_fail" > "$REPORT_DIR/asset-after-refresh-fail.json"
-  sudo -u postgres psql -d hamster -c 'ALTER TABLE metrics_weekly_bak RENAME TO metrics_weekly;' >/dev/null
+  $DB_CMD -c 'ALTER TABLE metrics_weekly_bak RENAME TO metrics_weekly;' >/dev/null
 
   fail_ok="$(printf '%s' "$refresh_fail" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("ok"))')"
   freshness="$(printf '%s' "$asset_fail" | json_get freshness)"
@@ -254,7 +258,7 @@ fi
 EXPIRY_NOTE='Expired — not approved, so it did not run'
 EXPIRY_ID="appr_expiry_$(python3 -c 'import uuid; print(uuid.uuid4().hex[:8])')"
 if [[ -n "$TASK_ID" ]]; then
-  sudo -u postgres psql -d hamster -v ON_ERROR_STOP=1 -c \
+  $DB_CMD -v ON_ERROR_STOP=1 -c \
     "INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
      VALUES ('$EXPIRY_ID', '$TASK_ID', 'publish_dashboard', '{\"assetId\":\"${ASSET_ID:-none}\",\"channel\":\"shared workspace\"}'::jsonb, 'expiry-demo-hash', 'pending', now() - interval '2 seconds');" \
     >/dev/null
@@ -335,7 +339,7 @@ else
   # Ensure the path still works by planting a pending ticket then cancelling a fresh task.
   note "task1 had no pending left at cancel time; planting explicit pending on sibling path"
   plant_id="appr_plant_$(python3 -c 'import uuid; print(uuid.uuid4().hex[:8])')"
-  sudo -u postgres psql -d hamster -c \
+  $DB_CMD -c \
     "INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
      VALUES ('$plant_id', '$TASK2', 'publish_dashboard', '{}'::jsonb, 'plant', 'pending', now() + interval '10 minutes');" \
     >/dev/null

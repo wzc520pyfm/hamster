@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ApprovalStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
-import { approvalActionLabel, getCopy, type Locale } from '@/i18n/messages'
+import { approvalActionLabel, approvalDecisionCopy, getCopy, type Locale } from '@/i18n/messages'
 import type { Approval } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 
@@ -37,6 +37,11 @@ export function ApprovalCard({
   const pending = approval.status === 'pending'
   const expiresAt = approval.expiresAt ?? approval.expires_at ?? null
   const note = approval.decisionNote ?? approval.decision_note ?? null
+  // Closed-state footer must use the design-table wording in the ACTIVE locale
+  // (EN | 中文), not the raw (English-stored) decision note. Pending tickets carry
+  // no decision sentence. Exact design-table pairs only; no synonym rewrites.
+  const decisionCopy = approvalDecisionCopy(approval.status, locale)
+  const footer = decisionCopy ?? note
   const params = safeParams(approval.params)
   const title = approvalActionLabel(approval.action, approval.params, locale)
 
@@ -74,7 +79,7 @@ export function ApprovalCard({
             <dd>{formatTime(expiresAt, locale === 'zh' ? 'zh-CN' : 'en-US')}</dd>
           </div>
         ) : null}
-        {note ? <div className="text-[var(--color-muted-foreground)]">{note}</div> : null}
+        {footer ? <div className="text-[var(--color-muted-foreground)]">{footer}</div> : null}
       </dl>
 
       {pending ? (

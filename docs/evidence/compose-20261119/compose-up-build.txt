@@ -1,0 +1,551 @@
+ db Pulling 
+ 98e9a0326760 Pulling fs layer 
+ 881fc932939e Pulling fs layer 
+ 6cedc56424d1 Pulling fs layer 
+ 59b353deb50e Pulling fs layer 
+ 7a36a4ed4172 Pulling fs layer 
+ cc382d912eb7 Pulling fs layer 
+ 576cb8ef4643 Pulling fs layer 
+ 47714f1b82c2 Pulling fs layer 
+ 8e5860b895ab Pulling fs layer 
+ b9f6a8f632b2 Pulling fs layer 
+ dada3b93fb98 Download complete 
+ 98e9a0326760 Download complete 
+ 881fc932939e Download complete 
+ 6cedc56424d1 Download complete 
+ 47714f1b82c2 Download complete 
+ 8e5860b895ab Download complete 
+ 02682a6b40e8 Download complete 
+ 59b353deb50e Download complete 
+ 7a36a4ed4172 Download complete 
+ cc382d912eb7 Download complete 
+ 576cb8ef4643 Downloading [==>                                                ]  5.243MB/111.5MB
+ b9f6a8f632b2 Download complete 
+ 881fc932939e Extracting 1 s
+ 576cb8ef4643 Downloading [=======>                                           ]  16.78MB/111.5MB
+ 881fc932939e Pull complete 
+ 6cedc56424d1 Pull complete 
+ 59b353deb50e Pull complete 
+ 7a36a4ed4172 Pull complete 
+ cc382d912eb7 Pull complete 
+ 576cb8ef4643 Downloading [===========>                                       ]  26.21MB/111.5MB
+ 576cb8ef4643 Downloading [===============>                                   ]   34.6MB/111.5MB
+ 576cb8ef4643 Downloading [====================>                              ]  46.14MB/111.5MB
+ 576cb8ef4643 Downloading [=========================>                         ]  56.62MB/111.5MB
+ 576cb8ef4643 Downloading [=============================>                     ]  66.06MB/111.5MB
+ 576cb8ef4643 Downloading [==================================>                ]  76.55MB/111.5MB
+ 576cb8ef4643 Downloading [======================================>            ]  85.98MB/111.5MB
+ 576cb8ef4643 Downloading [===========================================>       ]  96.47MB/111.5MB
+ 576cb8ef4643 Downloading [===============================================>   ]  105.9MB/111.5MB
+ 576cb8ef4643 Download complete 
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 1 s
+ 576cb8ef4643 Extracting 2 s
+ 576cb8ef4643 Extracting 2 s
+ 576cb8ef4643 Extracting 2 s
+ 98e9a0326760 Pull complete 
+ 47714f1b82c2 Pull complete 
+ 8e5860b895ab Pull complete 
+ b9f6a8f632b2 Pull complete 
+ 576cb8ef4643 Pull complete 
+ db Pulled 
+time="2026-11-19T03:21:47Z" level=warning msg="Docker Compose is configured to build using Bake, but buildx isn't installed"
+#0 building with "default" instance using docker driver
+
+#1 [agent internal] load build definition from Dockerfile
+#1 transferring dockerfile: 617B done
+#1 DONE 0.0s
+
+#2 [agent] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.4s
+
+#3 [agent] docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e done
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 13.63MB / 14.28MB 0.2s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 14.28MB / 14.28MB 0.2s done
+#3 extracting sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 0.1s done
+#3 DONE 0.3s
+
+#4 [agent internal] load metadata for docker.io/library/node:24-bookworm-slim
+#4 DONE 0.4s
+
+#5 [agent internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [agent internal] load build context
+#6 transferring context: 40.06kB done
+#6 DONE 0.0s
+
+#7 [agent 1/8] FROM docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#7 resolve docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 done
+#7 sha256:c34f02d00fde0767e1607c15d336cb71414e607acb0b4e63680a37c007b76204 448B / 448B 0.0s done
+#7 sha256:22a7c5e442cd30f0c37eb73f2f6d91be1c6b63bd1c4278641b042fe77b260f33 3.31kB / 3.31kB 0.1s done
+#7 sha256:e727da478d47d626146e734dd426cad789beb1fe49c55a06a175621d30f31064 1.71MB / 1.71MB 0.1s done
+#7 sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114 10.49MB / 51.10MB 0.2s
+#7 sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 13.40MB / 28.25MB 0.2s
+#7 sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114 25.17MB / 51.10MB 0.3s
+#7 sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114 39.85MB / 51.10MB 0.5s
+#7 sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 28.25MB / 28.25MB 0.3s done
+#7 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3
+#7 sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114 51.10MB / 51.10MB 0.6s done
+#7 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 0.5s done
+#7 DONE 0.9s
+
+#7 [agent 1/8] FROM docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#7 extracting sha256:22a7c5e442cd30f0c37eb73f2f6d91be1c6b63bd1c4278641b042fe77b260f33 done
+#7 extracting sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114
+#7 extracting sha256:5030a48eb5b08bea228f0db8440fed216cf91b5ca4d999bc2a692c2eb0a60114 0.7s done
+#7 DONE 1.6s
+
+#7 [agent 1/8] FROM docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#7 extracting sha256:e727da478d47d626146e734dd426cad789beb1fe49c55a06a175621d30f31064 0.0s done
+#7 extracting sha256:c34f02d00fde0767e1607c15d336cb71414e607acb0b4e63680a37c007b76204 done
+#7 DONE 1.6s
+
+#8 [agent 2/8] WORKDIR /app
+#8 DONE 0.2s
+
+#9 [agent 3/8] COPY package.json package-lock.json ./
+#9 DONE 0.0s
+
+#10 [agent 4/8] RUN npm install --no-audit --no-fund
+#10 1.985 
+#10 1.985 added 24 packages in 2s
+#10 1.986 npm notice
+#10 1.986 npm notice New major version of npm available! 11.19.1 -> 12.2.3
+#10 1.986 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#10 1.986 npm notice To update run: npm install -g npm@12.2.3
+#10 1.986 npm notice
+#10 DONE 2.2s
+
+#11 [agent 5/8] COPY agent ./agent
+#11 DONE 0.0s
+
+#12 [agent 6/8] COPY lib ./lib
+#12 DONE 0.0s
+
+#13 [agent 7/8] COPY tsconfig.json ./
+#13 DONE 0.0s
+
+#14 [agent 8/8] RUN npx eve build
+#14 1.430 eve: initializing 1 sandbox template...
+#14 1.433 eve: sandbox template "root" (default): DefaultSandbox has no sandbox provider for this build: it did not run on Vercel, no Docker daemon was reachable, and production builds do not fall back to just-bash. Start Docker and rebuild, deploy to Vercel, or select a provider explicitly in your sandbox module, such as agent/sandbox/sandbox.ts.
+#14 1.434 eve: initialized 1 sandbox template.
+#14 1.449 [nitro] ✔ Generated public .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/public
+#14 1.464 [nitro] ℹ Building server (builder: rolldown, preset: node-server, compatibility date: 2026-11-03)
+#14 2.181 ℹ Generated .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/nitro.json
+#14 2.182 [nitro] ✔ Server built in 719ms
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_chunks/compiled-artifacts-instrumentation.mjs (423 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_chunks/node-server.mjs (400 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_.mjs (637 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_10.mjs (346 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_11.mjs (72 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_12.mjs (80 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_13.mjs (59 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_14.mjs (146 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_15.mjs (55 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_16.mjs (70 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_17.mjs (69 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_18.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_19.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_2.mjs (105 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_20.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_21.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_22.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_23.mjs (70 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_24.mjs (65 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_25.mjs (65 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_26.mjs (65 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_27.mjs (70 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_28.mjs (70 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_29.mjs (70 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_3.mjs (78 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_30.mjs (52 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_31.mjs (59 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_32.mjs (48 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_33.mjs (76 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_34.mjs (175 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_35.mjs (50 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_36.mjs (57 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_37.mjs (67 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_38.mjs (64 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_39.mjs (72 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_4.mjs (71 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_40.mjs (55 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_41.mjs (48 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_42.mjs (56 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_43.mjs (93 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_44.mjs (137 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_45.mjs (62 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_46.mjs (111 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_47.mjs (111 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_5.mjs (96 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_6.mjs (47 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_7.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_8.mjs (44 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/_9.mjs (91 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/@ai-sdk/gateway+[...].mjs (453 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/ai.mjs (2.22 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/ai+zod.mjs (869 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve.mjs (11 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve10.mjs (1.22 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve100.mjs (343 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve101.mjs (11 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve102.mjs (161 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve103.mjs (26.4 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve104.mjs (231 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve105.mjs (13.4 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve106.mjs (2.9 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve107.mjs (808 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve108.mjs (243 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve109.mjs (9.6 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve11.mjs (6.44 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve110.mjs (59.8 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve111.mjs (8.35 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve112.mjs (93 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve113.mjs (28.3 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve114.mjs (1.64 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve115.mjs (5.83 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve116.mjs (1.09 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve117.mjs (757 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve118.mjs (928 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve119.mjs (10.2 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve12.mjs (36.4 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve120.mjs (1.2 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve121.mjs (3.58 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve122.mjs (100 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve123.mjs (11.3 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve124.mjs (1.4 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve125.mjs (6.84 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve126.mjs (16.5 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve127.mjs (4.31 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve128.mjs (1.29 MB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve13.mjs (1.51 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve14.mjs (137 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve15.mjs (784 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve16.mjs (8.54 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve17.mjs (475 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve18.mjs (25.3 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve19.mjs (109 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve2.mjs (6.52 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve20.mjs (1.79 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve21.mjs (932 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve22.mjs (12 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve23.mjs (27.8 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve24.mjs (354 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve25.mjs (2.82 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve26.mjs (325 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve27.mjs (2.36 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve28.mjs (668 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve29.mjs (5.61 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve3.mjs (648 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve30.mjs (2.09 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve31.mjs (24.6 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve32.mjs (447 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve33.mjs (19.1 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve34.mjs (5.58 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve35.mjs (605 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve36.mjs (1.69 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve37.mjs (1.49 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve38.mjs (86.3 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve39.mjs (31.9 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve4.mjs (1.34 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve40.mjs (230 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve41.mjs (214 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve42.mjs (284 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve43.mjs (217 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve44.mjs (11 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve45.mjs (55.8 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve46.mjs (96.7 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve47.mjs (101 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve48.mjs (1.91 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve49.mjs (34.6 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve5.mjs (19.2 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve50.mjs (164 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve51.mjs (3.76 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve52.mjs (75.7 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve53.mjs (2.47 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve54.mjs (33 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve55.mjs (129 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve56.mjs (19.1 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve57.mjs (286 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve58.mjs (128 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve59.mjs (33 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve6.mjs (252 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve60.mjs (144 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve61.mjs (36.4 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve62.mjs (411 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve63.mjs (800 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve64.mjs (778 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve65.mjs (646 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve66.mjs (484 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve67.mjs (898 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve68.mjs (33 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve69.mjs (1.82 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve7.mjs (7.83 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve70.mjs (1.74 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve71.mjs (145 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve72.mjs (1.82 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve73.mjs (112 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve74.mjs (112 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve75.mjs (112 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve76.mjs (59.7 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve77.mjs (19.5 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve78.mjs (659 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve79.mjs (726 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve8.mjs (114 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve80.mjs (46.8 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve81.mjs (23.7 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve82.mjs (4.44 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve83.mjs (9.07 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve84.mjs (21.5 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve85.mjs (2.52 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve86.mjs (11 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve87.mjs (10.7 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve88.mjs (777 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve89.mjs (494 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve9.mjs (60.6 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve90.mjs (33.2 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve91.mjs (5.67 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve92.mjs (3.84 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve93.mjs (1.07 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve94.mjs (175 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve95.mjs (1.22 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve96.mjs (461 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve97.mjs (247 B)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve98.mjs (1.72 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/eve99.mjs (1.85 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/undici.mjs (1.23 MB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/vercel__oidc.mjs (18.8 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_libs/vercel__oidc2.mjs (2.58 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/_runtime.mjs (1.6 kB)
+#14 2.202   ├─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/assets/windows-DpVyGf8j.ps1 (7.15 kB)
+#14 2.202   └─ .eve/builds/mwmzhpj9-b40b2cf9-2a38-4a8c-950b-519eba9bdc43/output/server/index.mjs (219 B)
+#14 2.202 Σ Total size: 9.29 MB
+#14 2.202 [nitro] ✔ You can preview this build using npx nitro preview
+#14 2.232 [BUILD] built output at /app/.output
+#14 DONE 2.3s
+
+#15 [agent] exporting to image
+#15 exporting layers
+#15 exporting layers 3.9s done
+#15 exporting manifest sha256:131562a52dfb78b472042775785496e03fd43f50c5f49e9f68fb0ee8b5124454 done
+#15 exporting config sha256:d078cf0e75b1dfc25428450ce6dcefc68a86975249e018c901d74c618bfe4110 done
+#15 exporting attestation manifest sha256:4a305ac93f08ad02d2ca4b5a0be75840beba4ad8be674a5216f90cd0ae071181 done
+#15 exporting manifest list sha256:9916b8b4c82f063e3adb254d3ae9378282212643890d1eb2bde9cce462487894 done
+#15 naming to docker.io/library/hamster-agent:latest done
+#15 unpacking to docker.io/library/hamster-agent:latest
+#15 unpacking to docker.io/library/hamster-agent:latest 0.9s done
+#15 DONE 4.8s
+
+#16 [agent] resolving provenance for metadata file
+#16 DONE 0.0s
+
+#17 [api internal] load build definition from Dockerfile
+#17 transferring dockerfile: 392B done
+#17 DONE 0.0s
+
+#2 [api] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.5s
+
+#3 [api] docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [api internal] load metadata for docker.io/library/node:24-bookworm-slim
+#4 DONE 0.4s
+
+#18 [api internal] load .dockerignore
+#18 transferring context: 67B done
+#18 DONE 0.0s
+
+#19 [api internal] load build context
+#19 transferring context: 65.62kB done
+#19 DONE 0.0s
+
+#7 [api deps 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#7 resolve docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 done
+#7 DONE 1.6s
+
+#8 [api deps 2/4] WORKDIR /app
+#8 CACHED
+
+#20 [api deps 3/4] COPY package.json ./
+#20 DONE 0.0s
+
+#21 [api deps 4/4] RUN npm install --omit=dev --no-audit --no-fund
+#21 2.420 
+#21 2.420 added 85 packages in 2s
+#21 2.421 npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+#21 2.421 npm warn install-scripts   @openuidev/lang-core@1.1.1 (postinstall: node ./postinstall.cjs)
+#21 2.421 npm warn install-scripts
+#21 2.421 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#21 2.422 npm notice
+#21 2.422 npm notice New major version of npm available! 11.19.1 -> 12.2.3
+#21 2.422 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#21 2.422 npm notice To update run: npm install -g npm@12.2.3
+#21 2.422 npm notice
+#21 DONE 2.5s
+
+#22 [api stage-1 3/5] COPY --from=deps /app/node_modules ./node_modules
+#22 DONE 0.1s
+
+#23 [api stage-1 4/5] COPY package.json index.js ./
+#23 DONE 0.0s
+
+#24 [api stage-1 5/5] COPY src ./src
+#24 DONE 0.0s
+
+#25 [api] exporting to image
+#25 exporting layers 0.3s done
+#25 exporting manifest sha256:e0e3633caf0ce22dead18cbde9a5a2c42772576b9c125430e22bc82d775e0b78 done
+#25 exporting config sha256:8bfeed65620b0038c10924cba6a62a35f796ba23228519e6c7312ded399a701c done
+#25 exporting attestation manifest sha256:da55c250f1d5e61c64f0d70c87fbd7ac644d5359a34c0d660365acab8418adb3 done
+#25 exporting manifest list sha256:f2a89239edbd51ccd2cb13d7e80d40f26bdb61f849dfe6501a20ee7d4ef84e76 done
+#25 naming to docker.io/library/hamster-api:latest done
+#25 unpacking to docker.io/library/hamster-api:latest 0.1s done
+#25 DONE 0.5s
+
+#26 [api] resolving provenance for metadata file
+#26 DONE 0.0s
+
+#27 [client internal] load build definition from Dockerfile
+#27 transferring dockerfile: 468B done
+#27 DONE 0.0s
+
+#2 [client] resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.6s
+
+#3 [client] docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e done
+#3 CACHED
+
+#4 [client internal] load metadata for docker.io/library/node:24-bookworm-slim
+#4 DONE 0.5s
+
+#28 [client internal] load .dockerignore
+#28 transferring context: 2B done
+#28 DONE 0.0s
+
+#7 [client build 1/6] FROM docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+#7 resolve docker.io/library/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 done
+#7 DONE 1.6s
+
+#8 [client build 2/6] WORKDIR /app
+#8 CACHED
+
+#29 [client internal] load build context
+#29 transferring context: 146.62kB 0.0s done
+#29 DONE 0.0s
+
+#30 [client build 3/6] COPY package.json package-lock.json ./
+#30 DONE 0.0s
+
+#31 [client build 4/6] RUN npm ci --no-audit --no-fund
+#31 ...
+
+#32 [client stage-1 3/4] RUN npm install -g serve@14
+#32 1.609 
+#32 1.609 added 67 packages in 1s
+#32 1.609 
+#32 1.609 20 packages are looking for funding
+#32 1.609   run `npm fund` for details
+#32 1.610 npm notice
+#32 1.610 npm notice New major version of npm available! 11.19.1 -> 12.2.3
+#32 1.610 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#32 1.610 npm notice To update run: npm install -g npm@12.2.3
+#32 1.610 npm notice
+#32 DONE 1.8s
+
+#31 [client build 4/6] RUN npm ci --no-audit --no-fund
+#31 3.302 
+#31 3.302 added 62 packages in 3s
+#31 3.303 npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+#31 3.303 npm warn install-scripts   @openuidev/lang-core@1.1.1 (postinstall: node ./postinstall.cjs)
+#31 3.303 npm warn install-scripts
+#31 3.303 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#31 3.304 npm notice
+#31 3.304 npm notice New major version of npm available! 11.19.1 -> 12.2.3
+#31 3.304 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#31 3.304 npm notice To update run: npm install -g npm@12.2.3
+#31 3.304 npm notice
+#31 DONE 3.5s
+
+#33 [client build 5/6] COPY . .
+#33 DONE 0.1s
+
+#34 [client build 6/6] RUN npm run build
+#34 0.185 
+#34 0.185 > hamster-client@0.0.0 build
+#34 0.185 > tsc -b && vite build
+#34 0.185 
+#34 1.857 vite v8.3.8 building client environment for production...
+#34 1.869 transforming...
+#34 1.975 ✓ 148 modules transformed.
+#34 2.013 rendering chunks...
+#34 2.089 computing gzip size...
+#34 2.098 dist/index.html                   0.83 kB │ gzip:   0.46 kB
+#34 2.098 dist/assets/index-BajuzGFa.css   21.59 kB │ gzip:   5.09 kB
+#34 2.098 dist/assets/index-CQZU_SbW.js   518.15 kB │ gzip: 161.50 kB
+#34 2.098 
+#34 2.098 [plugin builtin:vite-reporter] 
+#34 2.098 (!) Some chunks are larger than 500 kB after minification. Consider:
+#34 2.098 - Using dynamic import() to code-split the application
+#34 2.098 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+#34 2.098 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#34 2.099 ✓ built in 241ms
+#34 DONE 2.1s
+
+#35 [client stage-1 4/4] COPY --from=build /app/dist ./dist
+#35 DONE 0.0s
+
+#36 [client] exporting to image
+#36 exporting layers
+#36 exporting layers 0.3s done
+#36 exporting manifest sha256:7b073c76b23bf0697278c2e0059de35c1c133aad5c7fc3000bb4a797d741016c done
+#36 exporting config sha256:81b183f3c58eceb49c743d139da55780c2494eb783f7c39b56ee8d7c46e0fcc8 done
+#36 exporting attestation manifest sha256:2608beca9278af145723a2a6e25eb2b1e2e02712f4d5f7cfc1a035d61d4ec777 done
+#36 exporting manifest list sha256:ee77f369add31378c7e62d4b2e6db897a5b836eb9ec6c79598e21c1bced6f23c done
+#36 naming to docker.io/library/hamster-client:latest done
+#36 unpacking to docker.io/library/hamster-client:latest
+#36 unpacking to docker.io/library/hamster-client:latest 0.2s done
+#36 DONE 0.5s
+
+#37 [client] resolving provenance for metadata file
+#37 DONE 0.0s
+ agent  Built
+ api  Built
+ client  Built
+ Network hamster_default  Creating
+ Network hamster_default  Created
+ Volume hamster_pg_data  Creating
+ Volume hamster_pg_data  Created
+ Volume hamster_eve_data  Creating
+ Volume hamster_eve_data  Created
+ Container hamster-db-1  Creating
+ Container hamster-agent-1  Creating
+ Container hamster-db-1  Created
+ Container hamster-agent-1  Created
+ Container hamster-api-1  Creating
+ Container hamster-api-1  Created
+ Container hamster-client-1  Creating
+ Container hamster-client-1  Created
+ Container hamster-agent-1  Starting
+ Container hamster-db-1  Starting
+ Container hamster-agent-1  Started
+ Container hamster-db-1  Started
+ Container hamster-db-1  Waiting
+ Container hamster-db-1  Healthy
+ Container hamster-api-1  Starting
+ Container hamster-api-1  Started
+ Container hamster-client-1  Starting
+ Container hamster-client-1  Started

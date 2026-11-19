@@ -142,6 +142,33 @@ export function approvalStatusLabel(status: keyof typeof APPROVAL_STATUS, locale
   return APPROVAL_STATUS[status][locale]
 }
 
+/**
+ * Design-table closed-state decision copy for an approval ticket, in the
+ * active locale. Exact pairs only (no synonyms):
+ * - Approved for this action only / 仅批准此次动作
+ * - Denied / 已拒绝
+ * - Expired — not approved, so it did not run / 已过期，未获批准，动作未执行
+ * - Invalidated — approve again / 已失效，请重新审批
+ * Returns null for pending / unknown states (no decision sentence yet).
+ */
+export function approvalDecisionCopy(
+  status: keyof typeof APPROVAL_STATUS,
+  locale: Locale,
+): string | null {
+  switch (status) {
+    case 'approved':
+      return APPROVAL_STATUS.approved[locale]
+    case 'denied':
+      return APPROVAL_STATUS.denied[locale]
+    case 'expired':
+      return APPROVAL_STATUS.expired[locale]
+    case 'invalidated':
+      return APPROVAL_STATUS.invalidated[locale]
+    default:
+      return null
+  }
+}
+
 export function freshnessLabel(
   freshness: 'fresh' | 'stale' | 'refresh_failed',
   lastSuccessAt: string | null,

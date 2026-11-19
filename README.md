@@ -18,9 +18,13 @@ P0 checks whether a self-hosted control plane, a React web client, independent t
 
 Requirements: Docker with Compose v2 for the scripted demo path.
 
+On this verification host, passwordless `sudo docker` works (the `docker` CLI as the
+`box` user cannot reach the docker socket). A user without docker.sock access needs to
+run Compose with sudo or be in the docker group.
+
 ```bash
 cp .env.example .env   # optional overrides; defaults are placeholders only
-docker compose up --build
+sudo docker compose up --build
 ```
 
 Then open `http://localhost:3000` (API at `http://localhost:8080` via `VITE_API_BASE_URL`).

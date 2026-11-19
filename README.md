@@ -96,11 +96,11 @@ cd client && npm install && npm run build && npm run preview -- --port 3000
 cd electron && npm install && npx electron .
 ```
 
-- Default window is about 1200×800 with the sidebar visible side-by-side (min 820×560); below the
-  existing `md` / 768 breakpoint the shell reuses the Menu drawer.
+- Default window is about 1200×800 with the sidebar visible side-by-side (`minWidth: 480` so the
+  window can shrink below the existing `md` / 768 breakpoint); the shell then reuses the Menu drawer.
 - Minimal native menu: Hamster / Edit / View / Window. Product navigation stays in the app shell.
 - If the window is not loaded same-origin with the control plane, a quiet connect gate (address +
-  Connect, remembers the last good address) is shown.
+  Connect) shows alone and remembers only a last health-tested successful address.
 
 ## Installable PWA from the self-hosted origin (P1 slice)
 

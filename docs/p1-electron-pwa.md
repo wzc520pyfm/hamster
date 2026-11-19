@@ -24,7 +24,7 @@ table verbatim (see `/workspace/hamster-electron-pwa-direction-2026-11-19.md` an
 | 4 | Pending approval visible when narrow/PWA Menu closed; same ticket when opened; Electron background → notification (if allowed) + dock/taskbar badge back to same ticket; no permission → badge + shell entry, fail closed | Done in `Shell.tsx` (badge on Menu toggle, menu closed), `electron/main.js` (activity IPC → notify + dock badge, notification click → focus approvals). |
 | 5 | Disconnect uses `Can't reach this Hamster` / `无法连接` + Retry; Dashboard keeps last good layout (main line B); only refresh-failed adds Refresh failed + Retry | Done in `App.tsx`, `ConversationPage.tsx`, `DashboardView.tsx`, `ApprovalsPage.tsx` via `isNetworkError` (fetch-level TypeError) → `t.connect` + `t.retry`. |
 | 6 | PWA installable standalone from self-hosted origin; safe area; keyboard; long Chinese copy wraps; Retry on first screen; cache never exposes restricted data after revocation; standalone Back to conversation reachable | Done via `client/public/manifest.webmanifest` (`display: standalone`, `start_url: "/"`, icons), `client/public/sw.js` (shell cache only, never `/api` / `/internal`), `client/index.css` safe-area + `ConversationPage.tsx` visualViewport handling, `InstallPrompt.tsx` (quiet, dismissible, never blocks), i18n long-copy. |
-| 7 | Icons only temporary typographic marks, placeholder labeled, no paused logo | Done: `client/public/icons/icon-192.png`, `icon-512.png`, `electron/build/icon.png` (generated typographic marks, labeled placeholder in docs). |
+| 7 | Icons only temporary typographic marks, placeholder labeled, no paused logo | Done: `client/public/icons/icon-192.png`, `icon-512.png`, `electron/build/icon.png` (generated typographic marks, labeled placeholder in docs). Manifest icon types are `image/png`. |
 
 Minimum demonstrable screens, as captured on this host (fixture path):
 
@@ -52,11 +52,16 @@ cd ../electron && npm install && npx electron .
 ```
 
 - `electron/main.js` defaults: `HAMSTER_CONTROL_ORIGIN` (default `http://localhost:3000`),
-  `HAMSTER_CONTROL_BASE_URL` (default same). Window default `1200×800`, min `820×560`, sidebar visible
+  `HAMSTER_CONTROL_BASE_URL` (default same). Window default `1200×800`, min `480×560`, sidebar visible
   side-by-side at default size; below the `md`/768 breakpoint the shell reuses the Menu drawer.
 - Minimal native menu: Hamster / Edit / View / Window; product navigation stays in the app shell.
+- Preload bridge: `window.hamster` (container + controlBaseUrl) injected by `electron/preload.js`; container
+  identity must not come from `executeJavaScript` injection. Window shows on `ready-to-show` instead of
+  `did-start-load`; `minWidth` is `480` (was `820`); `sandbox: true` with `contextBridge` surface.
 - If the Electron window is not loaded same-origin with the control plane, the quiet ConnectGate
-  (address + Connect) shows; it remembers the last successful address (`hamster.controlBase`).
+  (address + Connect) shows, rendered by `shouldShowConnectGate()`; it remembers only a health-checked
+  successful address via `hamsterEnv.ts` bridge (`window.hamster`); the disconnect screen never stacks
+  underneath it. Empty ConnectGate validation uses `t.error`, not disconnect copy.
 
 Honest host result (2026-11-19): `npx electron --version` → `36.9.5`; main process launched under
 Xvfb and stayed up through the window lifetime (no crash) with the client preview serving

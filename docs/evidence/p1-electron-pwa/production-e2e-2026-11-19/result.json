@@ -1,0 +1,120 @@
+{
+  "testedSha": "33d861acbb3cf98b24ad839954a763e7cb817b60",
+  "fixture": true,
+  "steps": [
+    {
+      "step": "boot-A",
+      "boot": {
+        "href": "http://127.0.0.1:36287/",
+        "origin": "http://127.0.0.1:36287",
+        "hasGate": false,
+        "hasConversation": true,
+        "container": "electron",
+        "sessionOrigin": "http://127.0.0.1:36287",
+        "controlBase": "http://127.0.0.1:36287"
+      }
+    },
+    {
+      "step": "connect-gate-A-to-B",
+      "attempted": false,
+      "skipped": true,
+      "pass": false,
+      "reason": "ConnectGate not shown after REAL main.js load of HAMSTER_CONTROL_ORIGIN (same-origin session). isSameOriginControlBase() is true when sessionOrigin matches page. No legitimate in-app control re-opens the gate without product change. Cannot perform ConnectGate input+click A→B; 33d861a remains unverified by production ConnectGate UI."
+    },
+    {
+      "step": "ui-routes",
+      "assetUrl": "http://127.0.0.1:36287/assets/asset_e2e_dashboard_1",
+      "approvalVisible": true,
+      "beforeCloseUrl": "http://127.0.0.1:36287/assets/asset_e2e_dashboard_1",
+      "assetBodyHasFixture": true,
+      "assetBodySnippet": "Hamster Private preview Conversation E2E fixture conversation Dashboards Approvals 1 EN 中文 Back to conversation E2E fixture dashboard assetId: asset_e2e_dashboard_1 Source: e2e_fixture layout v1 Last succeeded at Nov 19, 2026, 12:02 PM Nov ",
+      "ids": {
+        "conversationId": "conv_e2e_prod_1",
+        "taskId": "task_e2e_1",
+        "runtimeSessionId": "rt_e2e_1",
+        "assetId": "asset_e2e_dashboard_1",
+        "approvalId": "appr_e2e_1"
+      }
+    },
+    {
+      "step": "closed-electron-process",
+      "bridgeBefore": {
+        "href": "http://127.0.0.1:36287/assets/asset_e2e_dashboard_1",
+        "container": "electron",
+        "sessionOrigin": "http://127.0.0.1:36287"
+      }
+    }
+  ],
+  "origins": {
+    "originA": "http://127.0.0.1:36287",
+    "originB": "http://127.0.0.1:39491",
+    "apiPort": 40533
+  },
+  "sessionBeforeClose": [
+    {
+      "path": "/tmp/hamster-prod-e2e-APMexL/hamster-session.json",
+      "body": {
+        "trustedOrigins": [
+          "http://127.0.0.1:36287"
+        ],
+        "lastOrigin": "http://127.0.0.1:36287",
+        "lastPath": "/assets/asset_e2e_dashboard_1",
+        "lastSearch": "",
+        "lastHash": ""
+      }
+    }
+  ],
+  "reopen": {
+    "afterReopen": {
+      "href": "http://127.0.0.1:36287/assets/asset_e2e_dashboard_1",
+      "origin": "http://127.0.0.1:36287",
+      "pathname": "/assets/asset_e2e_dashboard_1",
+      "container": "electron",
+      "sessionOrigin": "http://127.0.0.1:36287",
+      "hasGate": false,
+      "bodySnippet": "Hamster Private preview Conversation E2E fixture conversation Dashboards Approvals 1 EN 中文 Back to conversation E2E fixture dashboard assetId: asset_e2e_dashboard_1 Source: e2e_fixture layout v1 Last succeeded at Nov 19, 2026, 12:02 PM Nov "
+    },
+    "restoredAsset": true,
+    "restoredVisible": true,
+    "expectedPath": "/assets/asset_e2e_dashboard_1",
+    "ids": {
+      "conversationId": "conv_e2e_prod_1",
+      "taskId": "task_e2e_1",
+      "runtimeSessionId": "rt_e2e_1",
+      "assetId": "asset_e2e_dashboard_1",
+      "approvalId": "appr_e2e_1"
+    },
+    "approvalStillPending": true,
+    "surpriseMutations": [],
+    "requestsAfterReopen": [
+      {
+        "t": "2026-11-19T17:22:59.247Z",
+        "method": "GET",
+        "path": "/api/assets/asset_e2e_dashboard_1",
+        "host": "127.0.0.1:40533"
+      },
+      {
+        "t": "2026-11-19T17:22:59.249Z",
+        "method": "GET",
+        "path": "/api/conversations/current",
+        "host": "127.0.0.1:40533"
+      },
+      {
+        "t": "2026-11-19T17:22:59.256Z",
+        "method": "GET",
+        "path": "/api/approvals",
+        "host": "127.0.0.1:40533"
+      }
+    ]
+  },
+  "pass": {
+    "realMainJs": true,
+    "bridgeElectron": true,
+    "connectGateUiAb": false,
+    "connectGateBoundary": true,
+    "reopenAsset": true,
+    "reopenVisible": true,
+    "noApproveDenyCancelOnReopen": true,
+    "pendingUnchanged": true
+  }
+}

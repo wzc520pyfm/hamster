@@ -112,20 +112,38 @@ Repo copy: `docs/evidence/p1-electron-pwa/approval-summary-2026-11-19/`.
 | bake / CORS / proxy / hitfix bbox logs | retained; see that dir `INDEX.md` |
 | `p1-narrow-install-affordance-bbox.png` | prior visibility fix (superseded for Approve-in-dock route) |
 
-### Electron diagnostic (post-`687af52`)
+### Electron diagnostic (post-`687af52`) — corrected scope
 
 Raw: `/opt/cursor/artifacts/p1-electron-diagnostic-evidence/` (hypothesis first, then controls).
+Corrected operator report: `/opt/cursor/artifacts/hamster-p1-electron-diagnostic-report.md`.
 
-- dbus/GPU stderr: **incidental** (same-URL Electron load PASS while those lines still print).
-- Production client + `window.hamster` preload: **PASS** on live `DISPLAY=:1`.
-- A→B ConnectGate: invoke deadlock from `await loadURL` inside `hamster:request-connect` — **fixed**
-  by returning the invoke result then scheduling navigate (`setImmediate`). Re-check PASS.
-- Historical reopen smoke `ERR_FAILED` remains harness history; do not treat Node sessionStore as window proof.
+- Minimal same-URL Electron control **PASS** while dbus/GPU warnings still print ⇒ those warnings are
+  **not proven fatal for that control**. This does **not** by itself root-cause the **old reopen smoke**
+  `ERR_FAILED` (different harness). Historical reopen smoke remains **FAILED** until production reopen
+  evidence supersedes it.
+- `run-ab-connect-check.mjs` used a **mirrored** IPC handler (no full nav guards; empty route/approval
+  stubs; `executeJavaScript` `requestConnect`) — **not** production ConnectGate E2E.
+- `33d861a` (`setImmediate` navigate after invoke return) is a proposed production fix still
+  **pending real production E2E** (real `electron/main.js` + ConnectGate UI).
+- Node `sessionStore` tests are not BrowserWindow substitutes.
+
+### Production Electron E2E (real `main.js`)
+
+Raw: `/opt/cursor/artifacts/p1-electron-production-e2e-evidence/`  
+Script: `scripts/p1-electron-production-e2e.mjs` (Playwright `_electron` driver only).
+
+| Claim | State |
+| --- | --- |
+| Boot production client + `window.hamster` via **real** main/preload/guards | PASS |
+| ConnectGate **UI** input+click A→B | **BOUNDARY** — gate hidden when sessionOrigin matches loaded CLIENT_ORIGIN; `33d861a` still unverified by ConnectGate UI |
+| UI asset + pending approval (fixture IDs) | PASS |
+| Close whole process; reopen same `--user-data-dir`; restore asset route; no auto approve/deny/cancel | PASS (supersedes historical ephemeral reopen-smoke for **production asset restore** only) |
 
 ### Inherited / unverified
 
 - Fixture six PNGs from earlier free-CLI capture.
 - Physical notification/dock hardware; packaging polish.
+- ConnectGate UI A→B / production proof of `33d861a`.
 
 ---
 
@@ -133,4 +151,5 @@ Raw: `/opt/cursor/artifacts/p1-electron-diagnostic-evidence/` (hypothesis first,
 
 - Physical-device PWA install / keyboard / safe-area.
 - Real notification/dock hardware.
+- ConnectGate UI path when already same-origin (no in-app re-open without product change).
 - ProductBot re-review — **stop without PR**.

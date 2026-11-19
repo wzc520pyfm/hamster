@@ -139,6 +139,15 @@ export interface AssetDetail extends AssetSummary {
   }
 }
 
+/**
+ * True when the failure came from a fetch-level network error (no HTTP response was
+ * received). The design-table wording for that disconnected state is `Can't reach this
+ * Hamster` / `无法连接` (see i18n `connect`). HTTP error responses keep their status.
+ */
+export function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError
+}
+
 export const api = {
   health: () => request<{ status: string }>('/api/health'),
   currentConversation: () =>

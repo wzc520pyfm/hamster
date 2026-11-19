@@ -4,7 +4,7 @@ import { Renderer, type OpenUIError } from '@openuidev/react-lang'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { freshnessLabel, getCopy, type Locale } from '@/i18n/messages'
-import { api, type AssetDetail, type Freshness } from '@/lib/api'
+import { api, isNetworkError, type AssetDetail, type Freshness } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 import { hamsterOpenUiLibrary, RefreshTokenContext } from '@/openui/library'
 
@@ -30,6 +30,7 @@ export function DashboardView({
   const [freshness, setFreshness] = useState<Freshness>('fresh')
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -54,7 +55,11 @@ export function DashboardView({
         await loadMeta()
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
+          if (isNetworkError(err)) {
+            setConnectionError(true)
+          } else {
+            setError(err instanceof Error ? err.message : String(err))
+          }
           setLoading(false)
         }
       }
@@ -115,6 +120,7 @@ export function DashboardView({
       // Bump $rev inside the mounted Renderer so Query rebinds data in place.
       setRefreshToken((n) => n + 1)
       if (result.ok) {
+        setConnectionError(false)
         setFreshness('fresh')
         setLastSuccessAt(detail.lastSuccessAt)
       } else {
@@ -122,11 +128,35 @@ export function DashboardView({
         setError(result.error ?? 'refresh failed')
       }
     } catch (err) {
+      if (isNetworkError(err)) {
+        // Connection lost: keep the last successful snapshot in place and surface the
+        // design-table disconnect copy with Retry. Not `Refresh failed` — the control
+        // plane was unreachable, not merely the refresh.
+        setConnectionError(true)
+        return
+      }
       setFreshness('refresh_failed')
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setRefreshing(false)
     }
+  }
+
+  async function retryConnection() {
+    setConnectionError(false)
+    await refresh()
+  }
+
+  if (connectionError && !asset) {
+    // Control plane unreachable before anything succeeded: honest disconnect copy + Retry.
+    return (
+      <div className="rounded-lg border border-[#e2c4c4] bg-[#f8ecec] p-4">
+        <p className="text-sm text-[var(--color-destructive)]">{t.connect}</p>
+        <Button className="mt-3" size="sm" variant="outline" onClick={() => void retryConnection()}>
+          {t.retry}
+        </Button>
+      </div>
+    )
   }
 
   if (loading && !mountedOnce.current) {
@@ -147,6 +177,16 @@ export function DashboardView({
 
   return (
     <div className="flex h-[calc(100vh-2rem)] flex-col gap-3">
+      {connectionError ? (
+        <div className="safe-area-bottom shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
+          {t.connect}
+          <div className="mt-2">
+            <Button size="sm" variant="outline" onClick={() => void retryConnection()}>
+              {t.retry}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 p-4 backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div className="min-w-0">

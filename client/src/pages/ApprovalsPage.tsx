@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApprovalCard } from '@/components/ApprovalCard'
+import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { api, type Approval } from '@/lib/api'
+import { api, isNetworkError, type Approval } from '@/lib/api'
 
 export function ApprovalsPage({
   locale,
@@ -13,23 +14,35 @@ export function ApprovalsPage({
   const t = getCopy(locale)
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
 
   const refresh = useCallback(async () => {
     const list = await api.listApprovals()
     setApprovals(list)
   }, [])
 
+  const retryConnection = useCallback(async () => {
+    setConnectionError(false)
+    await refresh()
+  }, [refresh])
+
   useEffect(() => {
     let cancelled = false
+    setConnectionError(false)
     ;(async () => {
       try {
         await refresh()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) {
+          if (isNetworkError(err)) setConnectionError(true)
+          else setError(err instanceof Error ? err.message : String(err))
+        }
       }
     })()
     const timer = setInterval(() => {
-      void refresh().catch(() => undefined)
+      void refresh().catch((err) => {
+        if (isNetworkError(err)) setConnectionError(true)
+      })
     }, 3000)
     return () => {
       cancelled = true
@@ -45,7 +58,18 @@ export function ApprovalsPage({
         </h1>
       </header>
 
-      {error ? <p className="text-sm text-[var(--color-destructive)]">{error}</p> : null}
+      {connectionError ? (
+        <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
+          {t.connect}
+          <div className="mt-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
+              {t.retry}
+            </Button>
+          </div>
+        </div>
+      ) : error ? (
+        <p className="text-sm text-[var(--color-destructive)]">{error}</p>
+      ) : null}
 
       {approvals.length === 0 ? (
         <p className="text-sm text-[var(--color-muted-foreground)]">{t.noApprovals}</p>

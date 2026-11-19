@@ -3,7 +3,7 @@ import { ApprovalCard } from '@/components/ApprovalCard'
 import { TaskCard } from '@/components/TaskCard'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { api, type Timeline, type TimelineMessage } from '@/lib/api'
+import { api, isNetworkError, type Timeline, type TimelineMessage } from '@/lib/api'
 
 export function ConversationPage({
   locale,
@@ -19,6 +19,8 @@ export function ConversationPage({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
+  const [kbHeight, setKbHeight] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
 
@@ -28,23 +30,48 @@ export function ConversationPage({
     setTimeline(next)
   }, [conversationId])
 
+  const retryConnection = useCallback(async () => {
+    setConnectionError(false)
+    await refresh()
+  }, [refresh])
+
   useEffect(() => {
     let cancelled = false
+    setConnectionError(false)
     ;(async () => {
       try {
         await refresh()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) {
+          if (isNetworkError(err)) setConnectionError(true)
+          else setError(err instanceof Error ? err.message : String(err))
+        }
       }
     })()
     const timer = setInterval(() => {
-      void refresh().catch(() => undefined)
+      void refresh().catch((err) => {
+        if (isNetworkError(err)) setConnectionError(true)
+      })
     }, 2500)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
   }, [refresh])
+
+  // Keyboard rise (mobile virtual keyboard): shrink the composer column to the live
+  // visual viewport so the composer and approval buttons stay usable.
+  useEffect(() => {
+    const vv = window.visualViewport ?? null
+    if (!vv) return
+    const update = () => {
+      const height = vv.height
+      setKbHeight(height > 0 && height < window.innerHeight - 1 ? Math.round(height) : null)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
     if (stickToBottom.current) {
@@ -72,7 +99,8 @@ export function ConversationPage({
       await refresh()
       onApprovalsChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (isNetworkError(err)) setConnectionError(true)
+      else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSending(false)
     }
@@ -80,7 +108,12 @@ export function ConversationPage({
 
   return (
     // Narrow shell has a sticky top bar; keep the composer in the first viewport.
-    <div className="flex h-[calc(100dvh-5.75rem)] min-h-0 flex-col gap-3 md:h-[calc(100vh-2rem)]">
+    // Keyboard-open state (mobile visual viewport) shrinks this column so the composer
+    // and approval buttons stay usable instead of being pushed off-screen.
+    <div
+      className="flex h-[calc(100dvh-5.75rem)] min-h-0 flex-col gap-3 md:h-[calc(100vh-2rem)]"
+      style={kbHeight ? { height: `calc(${kbHeight}px - 5.75rem)` } : undefined}
+    >
       <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
         <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
           {t.mainConversation}
@@ -142,14 +175,23 @@ export function ConversationPage({
         <div ref={bottomRef} />
       </div>
 
-      {error ? (
+      {connectionError ? (
+        <div className="shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
+          {t.connect}
+          <div className="mt-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => void retryConnection()}>
+              {t.retry}
+            </Button>
+          </div>
+        </div>
+      ) : error ? (
         <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
           {error}
         </div>
       ) : null}
 
       <form
-        className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
+        className="safe-area-bottom shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
         onSubmit={(e) => {
           e.preventDefault()
           void send(text)

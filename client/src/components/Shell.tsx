@@ -1,6 +1,9 @@
 import { useEffect, useId, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { useLocale } from '@/i18n/LocaleContext'
+import { InstallPrompt } from '@/components/InstallPrompt'
+import { isStandaloneDisplay } from '@/lib/hamsterEnv'
 import { cn } from '@/lib/utils'
 
 export function Shell({
@@ -14,6 +17,7 @@ export function Shell({
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const panelId = useId()
+  const standalone = isStandaloneDisplay()
 
   // Close the narrow drawer after navigation so the main column stays full-width.
   useEffect(() => {
@@ -108,7 +112,7 @@ export function Shell({
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-0 md:flex-row md:gap-4 md:p-4">
       {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
+      <header className="safe-area-top sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
         <div className="min-w-0">
           <div className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight">
             {t.brand}
@@ -155,6 +159,14 @@ export function Shell({
             onClick={() => setMenuOpen((open) => !open)}
           >
             {menuOpen ? t.closeMenu : t.openMenu}
+            {pendingApprovals > 0 ? (
+              <span
+                data-testid="shell-pending-badge"
+                className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
+              >
+                {pendingApprovals}
+              </span>
+            ) : null}
           </button>
         </div>
       </header>
@@ -190,8 +202,17 @@ export function Shell({
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 md:px-0 md:py-0">
+        {standalone && location.pathname !== '/' ? (
+          <div className="shrink-0 pb-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/">{t.backToConversation}</Link>
+            </Button>
+          </div>
+        ) : null}
         <Outlet />
       </main>
+
+      <InstallPrompt />
 
       <style>{`
         @keyframes shell-in {

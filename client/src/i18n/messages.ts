@@ -80,6 +80,13 @@ const copy = {
     failureReason: 'Failure reason',
     openMenu: 'Menu',
     closeMenu: 'Close menu',
+    connect: "Can't reach this Hamster",
+    connectAction: 'Connect',
+    connectAddressLabel: 'Control plane address',
+    installTitle: 'Install Hamster',
+    installBody: 'Add Hamster to your home screen for full-screen use.',
+    installAction: 'Install',
+    dismissInstall: 'Dismiss',
   },
   zh: {
     brand: 'Hamster',
@@ -119,6 +126,13 @@ const copy = {
     failureReason: '失败原因',
     openMenu: '菜单',
     closeMenu: '关闭菜单',
+    connect: '无法连接',
+    connectAction: '连接',
+    connectAddressLabel: '控制面地址',
+    installTitle: '安装 Hamster',
+    installBody: '把 Hamster 加到主屏幕以使用全屏模式。',
+    installAction: '安装',
+    dismissInstall: '关闭',
   },
 } as const
 

@@ -38,16 +38,26 @@ Default placeholder env values (overridable; not real secrets):
 
 No Vercel project, no hosted eve service, and no OpenUI commercial Dashboard/Gateway are required.
 
+For the optional live-model path, the agent service alone receives `HAMSTER_MODEL_ID`, `HAMSTER_MODEL_PROVIDER`, `ANTHROPIC_API_KEY`, and `OPENAI_API_KEY` from the host `.env`; the api, client, and db services do not receive provider secrets.
+
 ### Model keys
 
 If no model provider key is configured, the agent uses eve's deterministic fixture model (`mockModel`). It drives the demo tool sequence and does not invent task progress or approvals. Typed `progress` is answered by the control plane from persisted events.
 
+To use a live (direct vendor) model later, set the **native** model id and the matching direct provider key:
+
 ```bash
-# optional live model later
-HAMSTER_MODEL_ID=anthropic/claude-…   # plus provider credentials
+# optional live model later — native model id, no provider prefix
+HAMSTER_MODEL_ID=claude-sonnet-5
+HAMSTER_MODEL_PROVIDER=anthropic   # or "openai"
+ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY=sk-... for openai
 ```
 
-Leave `HAMSTER_MODEL_ID` empty for the fixture path.
+- `HAMSTER_MODEL_ID` must be a **native** provider model id (e.g. `claude-sonnet-5`, the eve helper default for Anthropic). Provider-qualified strings such as `anthropic/claude-…` are not part of this path.
+- With `HAMSTER_MODEL_PROVIDER` unset, the agent selects the provider from the first matching key: `ANTHROPIC_API_KEY` → Anthropic, `OPENAI_API_KEY` → OpenAI.
+- The agent passes the resolved model instance through eve's official direct callers (`import { anthropic } from "eve/models/anthropic"` / `import { openai } from "eve/models/openai"`), which call the provider directly and do **not** go through the Vercel AI Gateway.
+- If `HAMSTER_MODEL_ID` is set but no provider can be determined, the agent fails with a clear error instead of falling back to the Gateway.
+- Leave `HAMSTER_MODEL_ID` empty for the fixture path.
 
 ### Demo loop
 

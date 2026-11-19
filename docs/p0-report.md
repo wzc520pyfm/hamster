@@ -60,18 +60,20 @@ Per-card recaptures on the Compose client (2026-11-19). See `docs/evidence/ui-sm
 
 ---
 
-## Model keys missing — runnable skeleton + hard-cut
+## Model keys missing — runnable skeleton + direct vendor hard-cut
 
-**Current runnable skeleton (no keys):** leave `HAMSTER_MODEL_ID` empty. `agent/agent/agent.ts` selects `mockModel({… scriptedRespond …})`. That path is what Compose + `verify-p0.sh` exercised. It must not be described as a live-model pass.
+**Current runnable skeleton (no keys):** leave `HAMSTER_MODEL_ID` empty. `agent/agent/agent.ts` selects `mockModel({… scriptedRespond …})` via the pure resolver in `agent/lib/model.ts` (`planHamsterModel`). That path is what Compose + `verify-p0.sh` exercised. It must not be described as a live-model pass.
 
 **Exact hard-cut to a live model (when credentials exist):**
 
-1. Put provider credentials in the environment the **agent** process/container can read (never commit them; keep `.env` gitignored).
-2. Set `HAMSTER_MODEL_ID` to a real provider model id (see `.env.example` / README).
+1. Put provider credentials in the environment the **agent** process/container can read (never commit them; keep `.env` gitignored; `docker-compose.yml` forwards `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `HAMSTER_MODEL_PROVIDER` to the **agent** service only).
+2. Set `HAMSTER_MODEL_ID` to a real **native** provider model id (e.g. `claude-sonnet-5`; no `anthropic/` prefix) and set `HAMSTER_MODEL_PROVIDER` to `anthropic` or `openai` (or leave it unset and set the matching key).
 3. `sudo docker compose up --build -d agent` (or rebuild the whole stack).
 4. Confirm agent logs show the configured model id, **not** `hamster-scripted` / fixture provider.
 5. Re-run `./scripts/verify-p0.sh` (with Compose `DB_CMD` if applicable). Treat failures as failures; do **not** invent model completions or paste fixture evidence as live-model evidence.
 6. Until step 5 is green on a live model, keep the fixture NOTE and do not announce an eve freeze or P0 product pass.
+
+**Direct vendor path implemented on this branch:** when `HAMSTER_MODEL_ID` is set, `agent/agent/agent.ts` plans a live model via the pure resolver (`agent/lib/model.ts`) and passes the resolved model instance into `defineAgent` through eve's official direct callers — `import { anthropic } from "eve/models/anthropic"` or `import { openai } from "eve/models/openai"`, chosen by `HAMSTER_MODEL_PROVIDER` (or by the first matching key when unset). The instance bypasses the Vercel AI Gateway; a bare model-id string is never passed into `defineAgent`. If the provider cannot be determined, the agent fails with a clear error and does not fall back to the Gateway. `HAMSTER_MODEL_ID` accepts native ids only; a legacy `anthropic/` or `openai/` prefix is stripped. No real key was written and no live-model call was run on this branch.
 
 ---
 

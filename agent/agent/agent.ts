@@ -1,5 +1,8 @@
 import { defineAgent } from "eve";
 import { mockModel } from "eve/evals";
+import { anthropic } from "eve/models/anthropic";
+import { openai } from "eve/models/openai";
+import { planHamsterModel, type HamsterLiveProvider } from "../lib/model.js";
 
 // Hamster P0 agent.
 //
@@ -8,9 +11,49 @@ import { mockModel } from "eve/evals";
 //   There is NO model provider key in the environment, and P0 must not fake results.
 //   The fixture replays a fixed, honest tool sequence for worker sessions and returns
 //   plainly-labeled templated text for chat. It never invents task progress or approvals.
-// - With HAMSTER_MODEL_ID set (e.g. "anthropic/claude-opus-5.5" through the AI Gateway,
-//   or another provider string/instance), that model is used instead. See README.
-const modelId = process.env.HAMSTER_MODEL_ID;
+// - With HAMSTER_MODEL_ID set, the resolver plans a DIRECT provider model and the agent
+//   passes that model instance into defineAgent via eve's official helper for the chosen
+//   provider (`anthropic` from "eve/models/anthropic" or `openai` from "eve/models/openai").
+//   The instance goes provider-direct (no Vercel AI Gateway). HAMSTER_MODEL_ID is a NATIVE
+//   model id (e.g. "claude-sonnet-5"); provider-qualified strings such as "anthropic/claude-…"
+//   are stripped to the native id, and documentation shows native ids only.
+// - With HAMSTER_MODEL_ID set but no provider determinable, the agent fails clearly and
+//   explicitly instead of silently falling back to the AI Gateway.
+const agentModelPlan = planHamsterModel({
+  modelId: process.env.HAMSTER_MODEL_ID,
+  provider: process.env.HAMSTER_MODEL_PROVIDER,
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY,
+});
+
+const FIXTURE_MODEL_ID = "hamster-scripted";
+const FIXTURE_PROVIDER = "hamster-fixture";
+
+function fixtureSelection() {
+  return {
+    model: mockModel({
+      modelId: FIXTURE_MODEL_ID,
+      provider: FIXTURE_PROVIDER,
+      respond: (request) => scriptedRespond(request as unknown as ScriptedRequest),
+    }),
+    reasoning: "low" as const,
+  };
+}
+
+function liveSelection(provider: HamsterLiveProvider, modelId: string) {
+  const model = provider === "anthropic" ? anthropic(modelId) : openai(modelId);
+  return { model, reasoning: "low" as const };
+}
+
+function agentModelSelection() {
+  if (agentModelPlan.kind === "fixture") {
+    return fixtureSelection();
+  }
+  if (agentModelPlan.kind === "live") {
+    return liveSelection(agentModelPlan.provider, agentModelPlan.modelId);
+  }
+  throw new Error(agentModelPlan.message);
+}
 
 interface ToolResultLike {
   name: string;
@@ -183,18 +226,4 @@ function scriptedRespond(request: ScriptedRequest) {
   };
 }
 
-export default defineAgent(
-  modelId
-    ? {
-        model: modelId,
-        reasoning: "low",
-      }
-    : {
-        model: mockModel({
-          modelId: "hamster-scripted",
-          provider: "hamster-fixture",
-          respond: (request) => scriptedRespond(request as unknown as ScriptedRequest),
-        }),
-        reasoning: "low",
-      },
-);
+export default defineAgent(agentModelSelection());

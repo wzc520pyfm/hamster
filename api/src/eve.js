@@ -3,6 +3,10 @@
 // Thin client for a self-hosted eve instance (eve build && eve start).
 // No Vercel dependency, no hosted eve service.
 // Control-plane and isolated-desktop workers use distinct base URLs (must-fix 3).
+//
+// Real Eve health is `{ ok, status, workflowId }` and session POST rejects unknown
+// body fields. Isolated identity is bound via x-hamster-* headers enforced by the
+// isolated-identity gateway that wraps Eve inside the allowlisted desktop image.
 
 const isolation = require('./isolation');
 
@@ -12,6 +16,10 @@ const AGENT_PASSWORD = process.env.HAMSTER_AGENT_PASSWORD;
 const BASIC_AUTH = AGENT_PASSWORD
   ? 'Basic ' + Buffer.from(`${AGENT_USER}:${AGENT_PASSWORD}`).toString('base64')
   : null;
+
+const INSTANCE_HEADER = 'x-hamster-instance-id';
+const TARGET_HEADER = 'x-hamster-target-id';
+const IMAGE_HEADER = 'x-hamster-image-id';
 
 function controlPlaneEveUrl() {
   return process.env.EVE_API_URL ?? 'http://localhost:8081';
@@ -33,7 +41,16 @@ function baseUrlForTarget(targetId) {
   return controlPlaneEveUrl();
 }
 
-async function eveFetch(path, { method = 'GET', body, baseUrl } = {}) {
+function identityHeaders(identity) {
+  if (!identity || typeof identity !== 'object') return {};
+  const headers = {};
+  if (identity.instanceId) headers[INSTANCE_HEADER] = String(identity.instanceId);
+  if (identity.targetId) headers[TARGET_HEADER] = String(identity.targetId);
+  if (identity.imageId) headers[IMAGE_HEADER] = String(identity.imageId);
+  return headers;
+}
+
+async function eveFetch(path, { method = 'GET', body, baseUrl, headers: extraHeaders } = {}) {
   const root = baseUrl || controlPlaneEveUrl();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -43,6 +60,7 @@ async function eveFetch(path, { method = 'GET', body, baseUrl } = {}) {
       headers: {
         ...(body ? { 'content-type': 'application/json' } : {}),
         ...(BASIC_AUTH ? { authorization: BASIC_AUTH } : {}),
+        ...(extraHeaders || {}),
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
@@ -67,14 +85,32 @@ async function eveFetch(path, { method = 'GET', body, baseUrl } = {}) {
 }
 
 const health = (opts = {}) =>
-  eveFetch('/eve/v1/health', { baseUrl: baseUrlForTarget(opts.targetId) });
+  eveFetch('/eve/v1/health', {
+    baseUrl: baseUrlForTarget(opts.targetId),
+    headers: identityHeaders(opts.identity),
+  });
 
+/**
+ * Create a session. For isolated targets, opts.identity MUST be the frozen
+ * start/managed identity; headers are enforced by the worker gateway.
+ * Body stays Eve-legal (message only) — no unknown top-level fields.
+ */
 async function createSession(message, opts = {}) {
   const body = message === undefined ? {} : { message };
+  const targetId = opts.targetId;
+  const identity = opts.identity || null;
+  if (isolation.isIsolatedDesktopTarget(targetId)) {
+    if (!identity?.instanceId || !identity?.targetId || !identity?.imageId) {
+      const err = new Error('isolated_session_identity_required');
+      err.status = 409;
+      throw err;
+    }
+  }
   const res = await eveFetch('/eve/v1/session', {
     method: 'POST',
     body,
-    baseUrl: baseUrlForTarget(opts.targetId),
+    baseUrl: baseUrlForTarget(targetId),
+    headers: identityHeaders(identity),
   });
   return { sessionId: res.sessionId, deliveryId: res.deliveryId };
 }
@@ -84,6 +120,7 @@ const sendMessage = (sessionId, message, opts = {}) =>
     method: 'POST',
     body: { message },
     baseUrl: baseUrlForTarget(opts.targetId),
+    headers: identityHeaders(opts.identity),
   });
 
 const answerInteraction = (sessionId, interactionId, optionId, text, opts = {}) =>
@@ -91,6 +128,7 @@ const answerInteraction = (sessionId, interactionId, optionId, text, opts = {}) 
     method: 'POST',
     body: { answers: [{ interactionId, optionId, ...(text ? { text } : {}) }] },
     baseUrl: baseUrlForTarget(opts.targetId),
+    headers: identityHeaders(opts.identity),
   });
 
 const cancelSession = (sessionId, opts = {}) =>
@@ -98,6 +136,7 @@ const cancelSession = (sessionId, opts = {}) =>
     method: 'POST',
     body: {},
     baseUrl: baseUrlForTarget(opts.targetId),
+    headers: identityHeaders(opts.identity),
   });
 
 module.exports = {
@@ -107,6 +146,10 @@ module.exports = {
   answerInteraction,
   cancelSession,
   eveFetch,
+  identityHeaders,
+  INSTANCE_HEADER,
+  TARGET_HEADER,
+  IMAGE_HEADER,
   get EVE_URL() {
     return controlPlaneEveUrl();
   },

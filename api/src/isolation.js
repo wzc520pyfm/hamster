@@ -51,12 +51,24 @@ function containerIdsEqual(a, b) {
   return x.startsWith(y) || y.startsWith(x);
 }
 
-function imageIsAllowlisted(probe, allowlistedImage = ALLOWLISTED_IMAGE) {
-  const cfg = typeof probe?.configImage === 'string' ? probe.configImage.trim() : '';
-  if (cfg && cfg === allowlistedImage) return true;
-  // Some brokers report the allowlisted ref on `.image` when digests are unavailable.
-  const img = typeof probe?.image === 'string' ? probe.image.trim() : '';
-  return Boolean(img && img === allowlistedImage);
+/**
+ * Digest-only allowlist check. Tag/name match alone is NEVER sufficient:
+ * a container can keep Config.Image=allowlisted:tag while Image id points at evil.
+ *
+ * @param {object|null|undefined} probe
+ * @param {{ expectedImageId?: string|null, allowlistedImageId?: string|null }} [opts]
+ */
+function imageIsAllowlisted(probe, opts = {}) {
+  const actualId =
+    typeof probe?.imageId === 'string' && probe.imageId.trim() ? probe.imageId.trim() : null;
+  if (!actualId) return false;
+  const expectedId =
+    (typeof opts.expectedImageId === 'string' && opts.expectedImageId.trim()) ||
+    (typeof opts.allowlistedImageId === 'string' && opts.allowlistedImageId.trim()) ||
+    (typeof probe?.allowlistedImageId === 'string' && probe.allowlistedImageId.trim()) ||
+    null;
+  if (!expectedId) return false;
+  return containerIdsEqual(actualId, expectedId);
 }
 
 /**
@@ -73,20 +85,73 @@ function freezeIsolatedIdentity({ probe, health, managed } = {}) {
   };
 }
 
+/**
+ * Fail closed: every required expected field must be present on actual and match.
+ * identitiesMatch(fullExpected, {}) === false.
+ */
 function identitiesMatch(expected, actual) {
-  if (!expected || !actual) return false;
-  if (expected.targetId && actual.targetId && expected.targetId !== actual.targetId) return false;
-  if (expected.instanceId && actual.instanceId && expected.instanceId !== actual.instanceId) {
+  if (!expected || !actual || typeof expected !== 'object' || typeof actual !== 'object') {
     return false;
   }
-  if (expected.containerId && actual.containerId) {
-    if (!containerIdsEqual(expected.containerId, actual.containerId)) return false;
-  }
-  if (expected.imageId && actual.imageId && expected.imageId !== actual.imageId) return false;
-  if (expected.configImage && actual.configImage && expected.configImage !== actual.configImage) {
-    return false;
+  const required = ['targetId', 'instanceId', 'containerId', 'imageId'];
+  for (const key of required) {
+    const exp = expected[key];
+    const act = actual[key];
+    if (exp == null || exp === '' || act == null || act === '') return false;
+    if (key === 'containerId' || key === 'imageId') {
+      if (!containerIdsEqual(String(exp), String(act))) return false;
+    } else if (String(exp) !== String(act)) {
+      return false;
+    }
   }
   return true;
+}
+
+/**
+ * Decide create vs restart identity for an approve→start without docker rm/stop of foreign.
+ * @returns {{ ok: true, mode: 'create'|'restart', instanceId: string, managed?: object }
+ *   | { ok: false, reason: string }}
+ */
+function resolveIsolatedStartIdentity({ managed, probe } = {}) {
+  const hasContainer = Boolean(probe?.containerId);
+  const probeManaged =
+    probe?.managed === MANAGED_LABEL_VALUE &&
+    probe?.instanceId &&
+    probe?.targetId === ISOLATED_DESKTOP_TARGET_ID;
+
+  if (!hasContainer) {
+    return { ok: true, mode: 'create', instanceId: null }; // caller mints new id
+  }
+
+  // Stopped or running named container present.
+  if (
+    managed &&
+    probeManaged &&
+    managed.instanceId === probe.instanceId &&
+    containerIdsEqual(managed.containerId, probe.containerId)
+  ) {
+    // Prior Hamster-managed instance (incl. stopped): coherent restart, same instanceId.
+    return { ok: true, mode: 'restart', instanceId: managed.instanceId, managed };
+  }
+
+  // Foreign / unmanaged same-name — fail closed; never auto stop/rm.
+  return {
+    ok: false,
+    reason: 'unmanaged_or_foreign_container_present',
+    containerId: probe.containerId,
+    instanceId: probe.instanceId || null,
+  };
+}
+
+/** Fill missing identity fields only; never overwrite start()-returned values. */
+function mergeIdentityFillMissing(primary, secondary) {
+  const out = { ...primary };
+  if (!out.containerId && secondary?.containerId) out.containerId = secondary.containerId;
+  if (!out.imageId && secondary?.imageId) out.imageId = secondary.imageId;
+  if (!out.configImage && secondary?.configImage) out.configImage = secondary.configImage;
+  if (!out.instanceId && secondary?.instanceId) out.instanceId = secondary.instanceId;
+  if (!out.targetId && secondary?.targetId) out.targetId = secondary.targetId;
+  return out;
 }
 
 const { execFile } = require('child_process');
@@ -180,10 +245,20 @@ function createDockerIsolationBroker(opts = {}) {
       if (!instanceId || typeof instanceId !== 'string') {
         return { ok: false, reason: 'instance_id_required' };
       }
+      let allowlistedImageId;
       try {
-        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', allowlistedImage]);
+        allowlistedImageId = await dockerRun([
+          'image',
+          'inspect',
+          '--format',
+          '{{.Id}}',
+          allowlistedImage,
+        ]);
       } catch (err) {
         return { ok: false, reason: `image_unavailable:${String(err?.message ?? err)}` };
+      }
+      if (!allowlistedImageId) {
+        return { ok: false, reason: 'image_digest_unavailable' };
       }
 
       let existing = null;
@@ -196,14 +271,15 @@ function createDockerIsolationBroker(opts = {}) {
       if (existing?.containerId) {
         // Fail closed: do not silently adopt / replace an unmanaged or foreign instance.
         // Never docker rm/stop here — live desktop must not be replaced by this path.
+        const digestOk = imageIsAllowlisted(
+          { imageId: existing.imageId, allowlistedImageId },
+          { expectedImageId: allowlistedImageId },
+        );
         if (
           existing.managed !== MANAGED_LABEL_VALUE ||
           existing.instanceId !== instanceId ||
           existing.targetId !== ISOLATED_DESKTOP_TARGET_ID ||
-          !imageIsAllowlisted(
-            { configImage: existing.configImage, image: existing.configImage },
-            allowlistedImage,
-          )
+          !digestOk
         ) {
           return {
             ok: false,
@@ -220,9 +296,12 @@ function createDockerIsolationBroker(opts = {}) {
           imageId: after.imageId,
           configImage: after.configImage,
           instanceId: after.instanceId,
+          allowlistedImageId,
         };
       }
 
+      // Isolated image CMD override: identity gateway wraps real `eve start`.
+      // Plain `npx eve start` has no targetId/instanceId health bind / session check.
       const containerId = await dockerRun([
         'create',
         '--name',
@@ -241,8 +320,11 @@ function createDockerIsolationBroker(opts = {}) {
         ...isolatedWorkerEnvArgs({
           HAMSTER_ISOLATED_INSTANCE_ID: instanceId,
           HAMSTER_ISOLATED_TARGET_ID: ISOLATED_DESKTOP_TARGET_ID,
+          HAMSTER_ISOLATED_IMAGE_ID: allowlistedImageId,
         }),
         allowlistedImage,
+        'node',
+        '/app/lib/isolatedIdentityGateway.mjs',
       ]);
       await dockerRun(['start', containerId || ISOLATED_CONTAINER_NAME]);
       let afterCreate;
@@ -251,7 +333,7 @@ function createDockerIsolationBroker(opts = {}) {
       } catch {
         afterCreate = {
           containerId: containerId || null,
-          imageId: null,
+          imageId: allowlistedImageId,
           configImage: allowlistedImage,
           instanceId,
         };
@@ -259,14 +341,22 @@ function createDockerIsolationBroker(opts = {}) {
       return {
         ok: true,
         containerId: afterCreate.containerId || containerId,
-        imageId: afterCreate.imageId,
+        imageId: afterCreate.imageId || allowlistedImageId,
         configImage: afterCreate.configImage || allowlistedImage,
         instanceId: afterCreate.instanceId || instanceId,
+        allowlistedImageId,
       };
     },
     status: async () => {
+      let allowlistedImageId = null;
       try {
-        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', allowlistedImage]);
+        allowlistedImageId = await dockerRun([
+          'image',
+          'inspect',
+          '--format',
+          '{{.Id}}',
+          allowlistedImage,
+        ]);
       } catch (err) {
         return {
           ok: false,
@@ -277,32 +367,26 @@ function createDockerIsolationBroker(opts = {}) {
       }
       try {
         const info = await inspectNamed();
-        if (info.running) {
-          return {
-            ok: true,
-            running: true,
-            state: 'ok',
-            containerId: info.containerId,
-            imageId: info.imageId,
-            configImage: info.configImage,
-            instanceId: info.instanceId,
-            managed: info.managed,
-            targetId: info.targetId || ISOLATED_DESKTOP_TARGET_ID,
-          };
-        }
-        return {
-          ok: false,
-          running: false,
-          state: 'not_started',
+        const base = {
           containerId: info.containerId,
           imageId: info.imageId,
           configImage: info.configImage,
           instanceId: info.instanceId,
           managed: info.managed,
           targetId: info.targetId || ISOLATED_DESKTOP_TARGET_ID,
+          allowlistedImageId,
         };
+        if (info.running) {
+          return { ok: true, running: true, state: 'ok', ...base };
+        }
+        return { ok: false, running: false, state: 'not_started', ...base };
       } catch {
-        return { ok: false, running: false, state: 'not_started' };
+        return {
+          ok: false,
+          running: false,
+          state: 'not_started',
+          allowlistedImageId,
+        };
       }
     },
   };
@@ -444,10 +528,25 @@ async function probeIsolatedDesktop({ broker } = {}) {
         ...identity,
       };
     }
+    const allowlistedImageId = status?.allowlistedImageId ?? null;
     if (state === 'ok') {
-      return { ok: true, available: true, state: 'ok', reason: null, ...identity };
+      return {
+        ok: true,
+        available: true,
+        state: 'ok',
+        reason: null,
+        allowlistedImageId,
+        ...identity,
+      };
     }
-    return { ok: true, available: true, state: 'not_started', reason: null, ...identity };
+    return {
+      ok: true,
+      available: true,
+      state: 'not_started',
+      reason: null,
+      allowlistedImageId,
+      ...identity,
+    };
   } catch (err) {
     return {
       ok: false,
@@ -492,14 +591,14 @@ function shouldSkipCreateIsolatedDesktopApproval(evidence = {}) {
   if (evidence.probe.managed && evidence.probe.managed !== MANAGED_LABEL_VALUE) {
     return { skip: false, reason: 'probe_not_managed' };
   }
-  if (!imageIsAllowlisted(evidence.probe)) {
-    return { skip: false, reason: 'image_not_allowlisted' };
-  }
-  if (managed.configImage && evidence.probe.configImage && managed.configImage !== evidence.probe.configImage) {
-    return { skip: false, reason: 'config_image_mismatch' };
-  }
-  if (managed.imageId && evidence.probe.imageId && managed.imageId !== evidence.probe.imageId) {
-    return { skip: false, reason: 'image_id_mismatch' };
+  // Digest compare only — tag match with wrong imageId must fail.
+  if (
+    !imageIsAllowlisted(evidence.probe, {
+      expectedImageId: managed.imageId,
+      allowlistedImageId: evidence.probe.allowlistedImageId || managed.imageId,
+    })
+  ) {
+    return { skip: false, reason: 'image_digest_mismatch' };
   }
 
   if (evidence.health?.ok !== true) {
@@ -605,8 +704,13 @@ async function recheckManagedIsolatedIdentity(opts = {}) {
   if (!identitiesMatch(expected, probe)) {
     return { ok: false, reason: 'identity_swapped', probe, health: null };
   }
-  if (!imageIsAllowlisted(probe)) {
-    return { ok: false, reason: 'image_not_allowlisted', probe, health: null };
+  if (
+    !imageIsAllowlisted(probe, {
+      expectedImageId: expected.imageId,
+      allowlistedImageId: probe.allowlistedImageId || expected.imageId,
+    })
+  ) {
+    return { ok: false, reason: 'image_digest_mismatch', probe, health: null };
   }
 
   const getManaged =
@@ -689,5 +793,7 @@ module.exports = {
   imageIsAllowlisted,
   containerIdsEqual,
   parseInspectStatusLine,
+  resolveIsolatedStartIdentity,
+  mergeIdentityFillMissing,
 };
 

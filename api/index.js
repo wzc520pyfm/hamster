@@ -245,7 +245,7 @@ async function createTask(conversationId, title, goal, targetId) {
           });
           const { sessionId } = await eve.createSession(
             `[hamster-worker taskId=${taskId} conversationId=${conversationId} targetId=${target} title=${title}] ${goal}`,
-            { targetId: target }
+            { targetId: target, identity: guard.identity }
           );
           await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
             sessionId,
@@ -936,7 +936,29 @@ async function decideApproval(req, res, outcome) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(409).json({ error: 'target_mismatch', status: 'invalidated' });
     }
-    const instanceId = `inst_${crypto.randomUUID()}`;
+    // Lifecycle: restart prior managed/stopped SAME instanceId; mint new only for create.
+    // Foreign same-name → fail closed (no automatic stop/rm).
+    const priorManaged = await getManagedIsolatedDesktop(ticketTargetId);
+    const preProbe = await isolation.probeIsolatedDesktop({ broker: BROKER });
+    const startPlan = isolation.resolveIsolatedStartIdentity({
+      managed: priorManaged,
+      probe: preProbe,
+    });
+    if (!startPlan.ok) {
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_start_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: startPlan.reason,
+        status: 'invalidated',
+        state: 'start_failed',
+      });
+    }
+    const instanceId =
+      startPlan.mode === 'restart'
+        ? startPlan.instanceId
+        : `inst_${crypto.randomUUID()}`;
     const start = await isolation.startIsolatedDesktop({
       targetId: ticketTargetId,
       broker: BROKER,
@@ -954,7 +976,7 @@ async function decideApproval(req, res, outcome) {
         state: 'start_failed',
       });
     }
-    // Prefer broker status identity when available (full imageId after inspect).
+    // Freeze identity from start() — never overwrite with a later status swap.
     let startedIdentity = {
       targetId: ticketTargetId,
       instanceId: start.instanceId || instanceId,
@@ -964,17 +986,26 @@ async function decideApproval(req, res, outcome) {
     };
     try {
       const status = await BROKER.status({ targetId: ticketTargetId });
-      if (status?.containerId) {
-        startedIdentity = {
-          targetId: ticketTargetId,
-          instanceId: status.instanceId || startedIdentity.instanceId,
-          containerId: status.containerId,
-          imageId: status.imageId || startedIdentity.imageId,
-          configImage: status.configImage || startedIdentity.configImage,
-        };
-      }
+      startedIdentity = isolation.mergeIdentityFillMissing(startedIdentity, {
+        containerId: status?.containerId,
+        imageId: status?.imageId,
+        configImage: status?.configImage,
+        instanceId: status?.instanceId,
+        targetId: ticketTargetId,
+      });
     } catch {
       // Keep start() identity; readiness / session guards still fail closed if unbound.
+    }
+    if (!startedIdentity.imageId || !startedIdentity.containerId || !startedIdentity.instanceId) {
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_start_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: 'started_identity_incomplete',
+        status: 'invalidated',
+        state: 'start_failed',
+      });
     }
     // Wait until isolated health binds targetId + instanceId before createSession.
     const ready = await readiness.waitForIsolatedDesktopReady({
@@ -1001,8 +1032,16 @@ async function decideApproval(req, res, outcome) {
     const probeBeforeSession = await isolation.probeIsolatedDesktop({ broker: BROKER });
     if (
       probeBeforeSession.state !== 'ok' ||
-      !isolation.identitiesMatch(startedIdentity, probeBeforeSession) ||
-      !isolation.imageIsAllowlisted(probeBeforeSession)
+      !isolation.identitiesMatch(startedIdentity, {
+        targetId: probeBeforeSession.targetId || ticketTargetId,
+        instanceId: probeBeforeSession.instanceId,
+        containerId: probeBeforeSession.containerId,
+        imageId: probeBeforeSession.imageId,
+      }) ||
+      !isolation.imageIsAllowlisted(probeBeforeSession, {
+        expectedImageId: startedIdentity.imageId,
+        allowlistedImageId: probeBeforeSession.allowlistedImageId || startedIdentity.imageId,
+      })
     ) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(502).json({
@@ -1034,7 +1073,8 @@ async function decideApproval(req, res, outcome) {
       });
     }
     try {
-      await startTaskSession(ticket.task_id);
+      // Frozen start identity rides on the session request; worker gateway re-verifies.
+      await startTaskSession(ticket.task_id, { identity: startedIdentity });
     } catch (err) {
       // createSession / attach failed: ticket must not remain Approved for this action only.
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
@@ -1092,17 +1132,21 @@ async function markIsolatedStartFailed(ticketId, taskId) {
   await events.audit('isolation_start_failed', { approvalId: ticketId, taskId });
 }
 
-async function startTaskSession(taskId) {
+async function startTaskSession(taskId, opts = {}) {
   const task = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
   const t = task.rows[0];
   if (!t || t.eve_session_id) return t?.eve_session_id ?? null;
   const targetId = t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
   // Route the worker to the runtime that belongs to this targetId (must-fix 3).
   // Control-plane tasks hit EVE_API_URL (agent); isolated tasks hit EVE_ISOLATED_API_URL (desktop).
-  // Header keeps taskId / conversationId / targetId / title as separate fields (title last).
+  // Isolated: freeze identity into session headers; gateway enforces worker-side match.
+  let identity = opts.identity || null;
+  if (isolation.isIsolatedDesktopTarget(targetId) && !identity) {
+    identity = await getManagedIsolatedDesktop(targetId);
+  }
   const { sessionId } = await eve.createSession(
     `[hamster-worker taskId=${t.id} conversationId=${t.conversation_id} targetId=${targetId} title=${t.title}] ${t.goal ?? ''}`,
-    { targetId }
+    { targetId, identity }
   );
   await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
     sessionId,

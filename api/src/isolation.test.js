@@ -229,9 +229,10 @@ test('probe: running container is ok / available', async () => {
   assert.equal(probe.available, true);
 });
 
-test('broker start args: allowlisted image, named desktop, hamster_p2, labels, no docker.sock mount', async () => {
+test('broker start args: allowlisted image, named desktop, hamster_p2, labels, gateway CMD, no docker.sock', async () => {
   const calls = [];
   let created = false;
+  const digest = 'sha256:allowlisted_img_digest';
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
@@ -246,7 +247,7 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, labels, n
         }
         return [
           'ctr_abc',
-          'sha256:img',
+          digest,
           isolation.ALLOWLISTED_IMAGE,
           'true',
           'inst_broker_test',
@@ -254,7 +255,7 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, labels, n
           ISOLATED,
         ].join('\t');
       }
-      if (args[0] === 'image') return 'ok';
+      if (args[0] === 'image') return digest;
       return '';
     },
   });
@@ -265,6 +266,7 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, labels, n
   });
   assert.equal(result.ok, true);
   assert.equal(result.instanceId, 'inst_broker_test');
+  assert.equal(result.imageId, digest);
   const create = calls.find((a) => a[0] === 'create');
   assert.ok(create, 'expected docker create');
   assert.ok(create.includes('--name'));
@@ -274,6 +276,7 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, labels, n
   assert.ok(create.includes(isolation.ALLOWLISTED_IMAGE));
   assert.ok(create.includes(`${isolation.LABEL_INSTANCE}=inst_broker_test`));
   assert.ok(create.includes(`${isolation.LABEL_MANAGED}=${isolation.MANAGED_LABEL_VALUE}`));
+  assert.ok(create.some((a) => String(a).includes('isolatedIdentityGateway.mjs')));
   const joined = create.join(' ');
   assert.equal(joined.includes('docker.sock'), false);
   assert.equal(joined.includes('--privileged'), false);

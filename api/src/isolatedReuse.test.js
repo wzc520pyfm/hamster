@@ -23,7 +23,7 @@ const MANAGED = {
   targetId: ISOLATED,
   instanceId: 'inst_abc',
   containerId: 'ctr_abc123',
-  imageId: 'sha256:img1',
+  imageId: 'sha256:img1digest',
   configImage: isolation.ALLOWLISTED_IMAGE,
   approvalId: 'appr_prior',
 };
@@ -38,6 +38,7 @@ function healthyProbe(overrides = {}) {
     instanceId: MANAGED.instanceId,
     managed: isolation.MANAGED_LABEL_VALUE,
     targetId: ISOLATED,
+    allowlistedImageId: MANAGED.imageId,
     ...overrides,
   };
 }
@@ -84,14 +85,67 @@ test('shouldSkip: probe ok + health 2xx without managed provenance => fail close
   assert.equal(d.reason, 'unmanaged_instance');
 });
 
-test('shouldSkip: wrong image / container / health spoof / not_started', () => {
+test('imageIsAllowlisted: tag match + wrong digest fails closed', () => {
+  assert.equal(
+    isolation.imageIsAllowlisted(
+      {
+        configImage: isolation.ALLOWLISTED_IMAGE,
+        imageId: 'sha256:evil_other_digest',
+      },
+      { expectedImageId: 'sha256:good_digest' },
+    ),
+    false,
+  );
+  assert.equal(
+    isolation.imageIsAllowlisted(
+      { configImage: isolation.ALLOWLISTED_IMAGE },
+      { expectedImageId: 'sha256:good_digest' },
+    ),
+    false,
+    'missing imageId must fail',
+  );
+  assert.equal(
+    isolation.imageIsAllowlisted(
+      { imageId: 'sha256:good_digest', configImage: 'totally/different:tag' },
+      { expectedImageId: 'sha256:good_digest' },
+    ),
+    true,
+    'digest match wins; tag alone never required',
+  );
+});
+
+test('identitiesMatch: missing fields fail closed (fullExpected vs {})', () => {
+  const full = {
+    targetId: ISOLATED,
+    instanceId: 'inst_abc',
+    containerId: 'ctr_abc',
+    imageId: 'sha256:img',
+  };
+  assert.equal(isolation.identitiesMatch(full, {}), false);
+  assert.equal(isolation.identitiesMatch(full, null), false);
+  assert.equal(isolation.identitiesMatch(full, { targetId: ISOLATED }), false);
+  assert.equal(
+    isolation.identitiesMatch(full, {
+      targetId: ISOLATED,
+      instanceId: 'inst_abc',
+      containerId: 'ctr_abc',
+      imageId: 'sha256:img',
+    }),
+    true,
+  );
+});
+
+test('shouldSkip: wrong digest / container / health spoof / not_started', () => {
   assert.equal(
     isolation.shouldSkipCreateIsolatedDesktopApproval({
-      probe: healthyProbe({ configImage: 'evil/other:latest' }),
+      probe: healthyProbe({
+        configImage: isolation.ALLOWLISTED_IMAGE,
+        imageId: 'sha256:evil_digest',
+      }),
       health: healthyHealth(),
       managed: MANAGED,
     }).reason,
-    'image_not_allowlisted',
+    'image_digest_mismatch',
   );
   assert.equal(
     isolation.shouldSkipCreateIsolatedDesktopApproval({
@@ -135,6 +189,41 @@ test('shouldSkip: wrong image / container / health spoof / not_started', () => {
   );
 });
 
+test('resolveIsolatedStartIdentity: restart same managed stopped; foreign rejected', () => {
+  const restart = isolation.resolveIsolatedStartIdentity({
+    managed: MANAGED,
+    probe: {
+      containerId: MANAGED.containerId,
+      instanceId: MANAGED.instanceId,
+      managed: isolation.MANAGED_LABEL_VALUE,
+      targetId: ISOLATED,
+      state: 'not_started',
+    },
+  });
+  assert.equal(restart.ok, true);
+  assert.equal(restart.mode, 'restart');
+  assert.equal(restart.instanceId, MANAGED.instanceId);
+
+  const create = isolation.resolveIsolatedStartIdentity({
+    managed: null,
+    probe: { state: 'not_started' },
+  });
+  assert.equal(create.ok, true);
+  assert.equal(create.mode, 'create');
+
+  const foreign = isolation.resolveIsolatedStartIdentity({
+    managed: MANAGED,
+    probe: {
+      containerId: 'ctr_foreign',
+      instanceId: 'inst_other',
+      managed: null,
+      targetId: ISOLATED,
+    },
+  });
+  assert.equal(foreign.ok, false);
+  assert.equal(foreign.reason, 'unmanaged_or_foreign_container_present');
+});
+
 test('verifyHealthyIsolatedDesktopForReuse: managed + probe + health => reuse + identity', async () => {
   const broker = {
     status: async () => ({
@@ -147,6 +236,7 @@ test('verifyHealthyIsolatedDesktopForReuse: managed + probe + health => reuse + 
       instanceId: MANAGED.instanceId,
       managed: isolation.MANAGED_LABEL_VALUE,
       targetId: ISOLATED,
+      allowlistedImageId: MANAGED.imageId,
     }),
     start: async () => {
       throw new Error('start must not be called on reuse path');
@@ -279,7 +369,7 @@ test('planIsolatedCreateTask: not_started / unmanaged => mint ticket', () => {
     'unmanaged_instance',
     'health_instance_mismatch',
     'identity_swapped',
-    'image_not_allowlisted',
+    'image_digest_mismatch',
   ]) {
     const plan = isolation.planIsolatedCreateTask({
       reuse: { reuse: false, reason },
@@ -377,11 +467,11 @@ test('broker start refuses unmanaged same-name container (never rm/stop)', async
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
-      if (args[0] === 'image') return 'sha256:allow';
+      if (args[0] === 'image') return 'sha256:allowlisted_digest';
       if (args[0] === 'inspect') {
         return [
           'ctr_foreign',
-          'sha256:img',
+          'sha256:allowlisted_digest',
           isolation.ALLOWLISTED_IMAGE,
           'true',
           '',
@@ -400,4 +490,44 @@ test('broker start refuses unmanaged same-name container (never rm/stop)', async
   assert.equal(start.ok, false);
   assert.equal(start.reason, 'unmanaged_or_foreign_container_present');
   assert.ok(!calls.some((a) => a[0] === 'rm' || a[0] === 'stop'));
+});
+
+test('broker create overrides CMD to isolatedIdentityGateway (not bare eve start)', async () => {
+  const calls = [];
+  let created = false;
+  const digest = 'sha256:allowlisted_digest';
+  const broker = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      calls.push(args);
+      if (args[0] === 'image') return digest;
+      if (args[0] === 'create') {
+        created = true;
+        return 'ctr_new';
+      }
+      if (args[0] === 'start') return 'ctr_new';
+      if (args[0] === 'inspect') {
+        if (!created) throw new Error('No such object');
+        return [
+          'ctr_new',
+          digest,
+          isolation.ALLOWLISTED_IMAGE,
+          'true',
+          'inst_gw',
+          isolation.MANAGED_LABEL_VALUE,
+          ISOLATED,
+        ].join('\t');
+      }
+      return '';
+    },
+  });
+  const start = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_gw',
+    approvalId: 'appr_gw',
+  });
+  assert.equal(start.ok, true);
+  const create = calls.find((a) => a[0] === 'create');
+  assert.ok(create.includes('node'));
+  assert.ok(create.some((a) => String(a).includes('isolatedIdentityGateway.mjs')));
+  assert.ok(create.includes(`HAMSTER_ISOLATED_IMAGE_ID=${digest}`) || create.join(' ').includes(digest));
 });

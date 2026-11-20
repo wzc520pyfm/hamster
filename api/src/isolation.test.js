@@ -232,7 +232,7 @@ test('probe: running container is ok / available', async () => {
 test('broker start args: allowlisted image, named desktop, hamster_p2, labels, gateway CMD, no docker.sock', async () => {
   const calls = [];
   let created = false;
-  const digest = 'sha256:allowlisted_img_digest';
+  const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
@@ -273,7 +273,9 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, labels, g
   assert.equal(create[create.indexOf('--name') + 1], 'desktop');
   assert.ok(create.includes('--network'));
   assert.equal(create[create.indexOf('--network') + 1], 'hamster_p2');
-  assert.ok(create.includes(isolation.ALLOWLISTED_IMAGE));
+  // Create must use complete immutable digest — never mutable tag alone.
+  assert.ok(create.includes(digest));
+  assert.equal(create.includes(isolation.ALLOWLISTED_IMAGE), false);
   assert.ok(create.includes(`${isolation.LABEL_INSTANCE}=inst_broker_test`));
   assert.ok(create.includes(`${isolation.LABEL_MANAGED}=${isolation.MANAGED_LABEL_VALUE}`));
   assert.ok(create.some((a) => String(a).includes('isolatedIdentityGateway.mjs')));

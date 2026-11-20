@@ -1,0 +1,97 @@
+{
+  "at": "2026-11-20T16:05:18.968Z",
+  "kind": "real_eve_gateway_bootstrap",
+  "notFetchUpstreamStub": true,
+  "fixtureOnly": true,
+  "steps": [
+    {
+      "step": "spawn_real_eve",
+      "executable": "/home/ubuntu/.nvm/versions/node/v24.22.3/bin/node",
+      "nodeVersion": "v24.22.3",
+      "eveVersion": "1.0.2",
+      "eveEngines": {
+        "node": ">=24"
+      },
+      "command": "/home/ubuntu/.nvm/versions/node/v24.22.3/bin/node /agent/repos/hamster/agent/node_modules/eve/bin/eve.js start --host 127.0.0.1 --port 37697",
+      "upstreamPort": 37697,
+      "cwd": "/agent/repos/hamster/agent",
+      "ok": true,
+      "at": "2026-11-20T16:05:19.002Z"
+    },
+    {
+      "step": "real_eve_health_raw",
+      "pid": 19230,
+      "port": 37697,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "status": "ready",
+        "workflowId": "workflow//eve//workflowEntry"
+      },
+      "hasTargetId": false,
+      "hasInstanceId": false,
+      "ok": true,
+      "at": "2026-11-20T16:05:19.942Z"
+    },
+    {
+      "step": "gateway_augmented_health",
+      "gatewayPid": 19256,
+      "gatewayPort": 40599,
+      "upstreamPid": 19230,
+      "upstreamPort": 37697,
+      "status": 200,
+      "body": {
+        "ok": true,
+        "status": "ready",
+        "workflowId": "workflow//eve//workflowEntry",
+        "targetId": "target_isolated_desktop",
+        "instanceId": "inst_real_boot_1",
+        "imageId": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "ok": true,
+      "at": "2026-11-20T16:05:20.277Z"
+    },
+    {
+      "step": "session_unauthenticated_rejected",
+      "status": 409,
+      "body": {
+        "ok": false,
+        "error": "instance_id_mismatch",
+        "expected": "inst_real_boot_1",
+        "got": null
+      },
+      "ok": true,
+      "at": "2026-11-20T16:05:20.281Z"
+    },
+    {
+      "step": "session_with_identity",
+      "status": 202,
+      "body": {
+        "ok": true,
+        "sessionId": "wrun_01M7WV91S228TCA5EA6X9F5E8X",
+        "deliveryId": "a8f49944-472e-4a66-9ba0-a1375f3a27e5"
+      },
+      "auth": "httpBasic hamster channel defaults (no paid keys)",
+      "ok": true,
+      "at": "2026-11-20T16:05:20.351Z"
+    },
+    {
+      "step": "session_existing_unauthenticated_rejected",
+      "status": 409,
+      "ok": true,
+      "at": "2026-11-20T16:05:20.352Z"
+    }
+  ],
+  "blocker": null,
+  "pass": true,
+  "summary": {
+    "eveExecutable": "/agent/repos/hamster/agent/node_modules/eve/bin/eve.js",
+    "eveVersion": "1.0.2",
+    "nodeExecutable": "/home/ubuntu/.nvm/versions/node/v24.22.3/bin/node",
+    "nodeVersion": "v24.22.3",
+    "evePid": 19230,
+    "evePort": 37697,
+    "gatewayPid": 19256,
+    "gatewayPort": 40599
+  }
+}

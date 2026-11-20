@@ -95,17 +95,25 @@ const health = (opts = {}) =>
  * start/managed identity; headers are enforced by the worker gateway.
  * Body stays Eve-legal (message only) — no unknown top-level fields.
  */
+function requireIsolatedIdentity(targetId, identity, op) {
+  if (!isolation.isIsolatedDesktopTarget(targetId)) return;
+  if (!identity?.instanceId || !identity?.targetId || !identity?.imageId) {
+    const err = new Error(`isolated_session_identity_required:${op || 'op'}`);
+    err.status = 409;
+    throw err;
+  }
+  if (!isolation.isCompleteImageDigest(identity.imageId)) {
+    const err = new Error(`isolated_session_image_digest_incomplete:${op || 'op'}`);
+    err.status = 409;
+    throw err;
+  }
+}
+
 async function createSession(message, opts = {}) {
   const body = message === undefined ? {} : { message };
   const targetId = opts.targetId;
   const identity = opts.identity || null;
-  if (isolation.isIsolatedDesktopTarget(targetId)) {
-    if (!identity?.instanceId || !identity?.targetId || !identity?.imageId) {
-      const err = new Error('isolated_session_identity_required');
-      err.status = 409;
-      throw err;
-    }
-  }
+  requireIsolatedIdentity(targetId, identity, 'createSession');
   const res = await eveFetch('/eve/v1/session', {
     method: 'POST',
     body,
@@ -115,29 +123,35 @@ async function createSession(message, opts = {}) {
   return { sessionId: res.sessionId, deliveryId: res.deliveryId };
 }
 
-const sendMessage = (sessionId, message, opts = {}) =>
-  eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
+const sendMessage = (sessionId, message, opts = {}) => {
+  requireIsolatedIdentity(opts.targetId, opts.identity, 'sendMessage');
+  return eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     body: { message },
     baseUrl: baseUrlForTarget(opts.targetId),
     headers: identityHeaders(opts.identity),
   });
+};
 
-const answerInteraction = (sessionId, interactionId, optionId, text, opts = {}) =>
-  eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
+const answerInteraction = (sessionId, interactionId, optionId, text, opts = {}) => {
+  requireIsolatedIdentity(opts.targetId, opts.identity, 'answerInteraction');
+  return eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     body: { answers: [{ interactionId, optionId, ...(text ? { text } : {}) }] },
     baseUrl: baseUrlForTarget(opts.targetId),
     headers: identityHeaders(opts.identity),
   });
+};
 
-const cancelSession = (sessionId, opts = {}) =>
-  eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}/cancel`, {
+const cancelSession = (sessionId, opts = {}) => {
+  requireIsolatedIdentity(opts.targetId, opts.identity, 'cancelSession');
+  return eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}/cancel`, {
     method: 'POST',
     body: {},
     baseUrl: baseUrlForTarget(opts.targetId),
     headers: identityHeaders(opts.identity),
   });
+};
 
 module.exports = {
   health,
@@ -167,10 +181,13 @@ module.exports = {
  * Follow a session stream forever (until aborted). Lines are parsed as NDJSON.
  * onFact(fact, at) is called for every entry of facts[].
  */
-async function* streamLines(url, signal) {
+async function* streamLines(url, signal, extraHeaders = {}) {
   const res = await fetch(url, {
     signal,
-    headers: BASIC_AUTH ? { authorization: BASIC_AUTH } : undefined,
+    headers: {
+      ...(BASIC_AUTH ? { authorization: BASIC_AUTH } : {}),
+      ...extraHeaders,
+    },
   });
   if (!res.ok || !res.body) {
     throw new Error(`stream -> HTTP ${res.status}`);
@@ -203,6 +220,17 @@ function attachFollower(key, sessionId, onFact, opts = {}) {
   const controller = new AbortController();
   followers.set(key, controller);
   const base = baseUrlForTarget(opts.targetId);
+  const identity = opts.identity || null;
+  if (isolation.isIsolatedDesktopTarget(opts.targetId)) {
+    try {
+      requireIsolatedIdentity(opts.targetId, identity, 'attachFollower');
+    } catch (err) {
+      console.error(`[eve-follow:${key}] refusing stream without identity`, err.message);
+      followers.delete(key);
+      return;
+    }
+  }
+  const idHeaders = identityHeaders(identity);
 
   const run = async () => {
     let attempt = 0;
@@ -210,7 +238,8 @@ function attachFollower(key, sessionId, onFact, opts = {}) {
       try {
         for await (const line of streamLines(
           `${base}/eve/v1/session/${encodeURIComponent(sessionId)}/stream`,
-          controller.signal
+          controller.signal,
+          idHeaders,
         )) {
           attempt = 0;
           if (Array.isArray(line.facts)) {

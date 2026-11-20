@@ -23,7 +23,7 @@ const MANAGED = {
   targetId: ISOLATED,
   instanceId: 'inst_abc',
   containerId: 'ctr_abc123',
-  imageId: 'sha256:img1digest',
+  imageId: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   configImage: isolation.ALLOWLISTED_IMAGE,
   approvalId: 'appr_prior',
 };
@@ -90,24 +90,24 @@ test('imageIsAllowlisted: tag match + wrong digest fails closed', () => {
     isolation.imageIsAllowlisted(
       {
         configImage: isolation.ALLOWLISTED_IMAGE,
-        imageId: 'sha256:evil_other_digest',
+        imageId: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
       },
-      { expectedImageId: 'sha256:good_digest' },
+      { expectedImageId: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' },
     ),
     false,
   );
   assert.equal(
     isolation.imageIsAllowlisted(
       { configImage: isolation.ALLOWLISTED_IMAGE },
-      { expectedImageId: 'sha256:good_digest' },
+      { expectedImageId: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' },
     ),
     false,
     'missing imageId must fail',
   );
   assert.equal(
     isolation.imageIsAllowlisted(
-      { imageId: 'sha256:good_digest', configImage: 'totally/different:tag' },
-      { expectedImageId: 'sha256:good_digest' },
+      { imageId: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', configImage: 'totally/different:tag' },
+      { expectedImageId: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' },
     ),
     true,
     'digest match wins; tag alone never required',
@@ -119,7 +119,7 @@ test('identitiesMatch: missing fields fail closed (fullExpected vs {})', () => {
     targetId: ISOLATED,
     instanceId: 'inst_abc',
     containerId: 'ctr_abc',
-    imageId: 'sha256:img',
+    imageId: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   };
   assert.equal(isolation.identitiesMatch(full, {}), false);
   assert.equal(isolation.identitiesMatch(full, null), false);
@@ -129,9 +129,17 @@ test('identitiesMatch: missing fields fail closed (fullExpected vs {})', () => {
       targetId: ISOLATED,
       instanceId: 'inst_abc',
       containerId: 'ctr_abc',
-      imageId: 'sha256:img',
+      imageId: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     }),
     true,
+  );
+  assert.equal(
+    isolation.identitiesMatch(full, {
+      ...full,
+      imageId: 'sha256:',
+    }),
+    false,
+    'truncated digest must not match',
   );
 });
 
@@ -140,7 +148,7 @@ test('shouldSkip: wrong digest / container / health spoof / not_started', () => 
     isolation.shouldSkipCreateIsolatedDesktopApproval({
       probe: healthyProbe({
         configImage: isolation.ALLOWLISTED_IMAGE,
-        imageId: 'sha256:evil_digest',
+        imageId: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
       }),
       health: healthyHealth(),
       managed: MANAGED,
@@ -195,6 +203,7 @@ test('resolveIsolatedStartIdentity: restart same managed stopped; foreign reject
     probe: {
       containerId: MANAGED.containerId,
       instanceId: MANAGED.instanceId,
+      imageId: MANAGED.imageId,
       managed: isolation.MANAGED_LABEL_VALUE,
       targetId: ISOLATED,
       state: 'not_started',
@@ -260,7 +269,7 @@ test('verify: same-name healthy without managed => no reuse', async () => {
         running: true,
         state: 'ok',
         containerId: 'ctr_external',
-        imageId: 'sha256:x',
+        imageId: 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
         configImage: isolation.ALLOWLISTED_IMAGE,
         instanceId: null,
         managed: null,
@@ -467,11 +476,11 @@ test('broker start refuses unmanaged same-name container (never rm/stop)', async
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
-      if (args[0] === 'image') return 'sha256:allowlisted_digest';
+      if (args[0] === 'image') return 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       if (args[0] === 'inspect') {
         return [
           'ctr_foreign',
-          'sha256:allowlisted_digest',
+          'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           isolation.ALLOWLISTED_IMAGE,
           'true',
           '',
@@ -492,19 +501,28 @@ test('broker start refuses unmanaged same-name container (never rm/stop)', async
   assert.ok(!calls.some((a) => a[0] === 'rm' || a[0] === 'stop'));
 });
 
-test('broker create overrides CMD to isolatedIdentityGateway (not bare eve start)', async () => {
+test('broker create uses complete immutable digest (not mutable tag) + verifies before start', async () => {
   const calls = [];
   let created = false;
-  const digest = 'sha256:allowlisted_digest';
+  let started = false;
+  const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
       if (args[0] === 'image') return digest;
       if (args[0] === 'create') {
         created = true;
+        // Image ref must be digest — never ALLOWLISTED_IMAGE tag.
+        const imgIdx = args.indexOf(digest);
+        assert.ok(imgIdx > 0, 'create must use immutable digest as image');
+        assert.equal(args.includes(isolation.ALLOWLISTED_IMAGE), false);
         return 'ctr_new';
       }
-      if (args[0] === 'start') return 'ctr_new';
+      if (args[0] === 'start') {
+        assert.equal(created, true, 'must inspect/verify before start');
+        started = true;
+        return 'ctr_new';
+      }
       if (args[0] === 'inspect') {
         if (!created) throw new Error('No such object');
         return [
@@ -526,8 +544,86 @@ test('broker create overrides CMD to isolatedIdentityGateway (not bare eve start
     approvalId: 'appr_gw',
   });
   assert.equal(start.ok, true);
+  assert.equal(started, true);
   const create = calls.find((a) => a[0] === 'create');
   assert.ok(create.includes('node'));
   assert.ok(create.some((a) => String(a).includes('isolatedIdentityGateway.mjs')));
-  assert.ok(create.includes(`HAMSTER_ISOLATED_IMAGE_ID=${digest}`) || create.join(' ').includes(digest));
+  assert.ok(create.includes(digest));
+  // inspect happens before start
+  const inspectIdx = calls.findIndex((a) => a[0] === 'inspect');
+  const startIdx = calls.findIndex((a) => a[0] === 'start');
+  assert.ok(inspectIdx >= 0 && startIdx > inspectIdx);
+});
+
+test('digestsEqual / isCompleteImageDigest: reject truncated and prefix-only', () => {
+  const full = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  assert.equal(isolation.isCompleteImageDigest(full), true);
+  assert.equal(isolation.isCompleteImageDigest('sha256:'), false);
+  assert.equal(isolation.isCompleteImageDigest('sha256:aaaa'), false);
+  assert.equal(isolation.isCompleteImageDigest(full.slice(0, 20)), false);
+  assert.equal(isolation.digestsEqual(full, full), true);
+  assert.equal(isolation.digestsEqual(full, 'sha256:'), false);
+  assert.equal(
+    isolation.digestsEqual(full, full.slice(0, full.length - 1)),
+    false,
+    'truncated must not match via prefix',
+  );
+  assert.equal(
+    isolation.digestsEqual(
+      full,
+      'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    ),
+    false,
+  );
+});
+
+test('resolveIsolatedStartIdentity: managed digestA pinned; probe digestB requires approval', () => {
+  const digestA = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const digestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const managed = {
+    instanceId: 'inst_a',
+    containerId: 'ctr_a',
+    imageId: digestA,
+  };
+  const same = isolation.resolveIsolatedStartIdentity({
+    managed,
+    probe: {
+      containerId: 'ctr_a',
+      instanceId: 'inst_a',
+      imageId: digestA,
+      managed: isolation.MANAGED_LABEL_VALUE,
+      targetId: ISOLATED,
+    },
+  });
+  assert.equal(same.ok, true);
+  assert.equal(same.mode, 'restart');
+
+  const retarget = isolation.resolveIsolatedStartIdentity({
+    managed,
+    probe: {
+      containerId: 'ctr_a',
+      instanceId: 'inst_a',
+      imageId: digestB,
+      managed: isolation.MANAGED_LABEL_VALUE,
+      targetId: ISOLATED,
+    },
+  });
+  assert.equal(retarget.ok, false);
+  assert.equal(retarget.reason, 'managed_image_digest_changed_requires_approval');
+});
+
+test('broker create refuses incomplete digest from image inspect', async () => {
+  const broker = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      if (args[0] === 'image') return 'sha256:'; // truncated — must refuse
+      throw new Error(`unexpected ${args.join(' ')}`);
+    },
+  });
+  const start = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_bad',
+    approvalId: 'appr_bad',
+  });
+  assert.equal(start.ok, false);
+  assert.equal(start.reason, 'image_digest_incomplete');
 });

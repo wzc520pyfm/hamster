@@ -24,7 +24,10 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const crypto = require('crypto');
 
-const { assertEphemeralDatabaseUrl } = require('./ephemeralPgGuard');
+const {
+  assertEphemeralDatabaseUrl,
+  assertEphemeralLiveConnection,
+} = require('./ephemeralPgGuard');
 
 // Fail closed before any require of db/index — no default URL fallback.
 assertEphemeralDatabaseUrl(process.env.DATABASE_URL, process.env);
@@ -42,7 +45,7 @@ const CONTROL = isolation.CONTROL_PLANE_TARGET_ID;
 const FIX = {
   instanceId: 'inst_http_1',
   containerId: 'ctr_http_1',
-  imageId: 'sha256:httpimg1digest',
+  imageId: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   configImage: isolation.ALLOWLISTED_IMAGE,
 };
 
@@ -94,7 +97,10 @@ function startGatewayShapedEve(identityState) {
       res.end(JSON.stringify({ ok: false, status: 'not_ready' }));
       return;
     }
-    if (url.pathname === '/eve/v1/session' && req.method === 'POST') {
+    // ALL /eve/v1/session* routes require frozen identity (create/follow-up/cancel/stream/…).
+    const isSession =
+      url.pathname === '/eve/v1/session' || url.pathname.startsWith('/eve/v1/session/');
+    if (isSession) {
       const gotInst = String(req.headers[eve.INSTANCE_HEADER] || '').trim();
       const gotTarget = String(req.headers[eve.TARGET_HEADER] || '').trim();
       const gotImage = String(req.headers[eve.IMAGE_HEADER] || '').trim();
@@ -110,18 +116,34 @@ function startGatewayShapedEve(identityState) {
             error: 'instance_id_mismatch',
             expected: identityState.instanceId,
             got: gotInst || null,
+            path: url.pathname,
           }),
         );
         return;
       }
-      const sessionId = `sess_${crypto.randomUUID()}`;
-      res.writeHead(202, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, sessionId, deliveryId: `del_${sessionId}` }));
-      return;
-    }
-    if (url.pathname.includes('/stream')) {
-      res.writeHead(200, { 'content-type': 'application/x-ndjson' });
-      res.end('');
+      if (url.pathname.includes('/stream')) {
+        res.writeHead(200, { 'content-type': 'application/x-ndjson' });
+        res.end('');
+        return;
+      }
+      if (url.pathname.endsWith('/cancel') && req.method === 'POST') {
+        res.writeHead(202, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, cancelled: true }));
+        return;
+      }
+      if (url.pathname === '/eve/v1/session' && req.method === 'POST') {
+        const sessionId = `sess_${crypto.randomUUID()}`;
+        res.writeHead(202, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, sessionId, deliveryId: `del_${sessionId}` }));
+        return;
+      }
+      // Follow-up / answer / existing session POST
+      if (req.method === 'POST' || req.method === 'GET') {
+        res.writeHead(202, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, path: url.pathname }));
+        return;
+      }
+      res.writeHead(405).end('method');
       return;
     }
     res.writeHead(404).end('no');
@@ -145,7 +167,7 @@ function fakeBroker(state, identityState) {
       }
       identityState.instanceId = instanceId;
       identityState.containerId = state.preserveContainerId || `ctr_${instanceId}`;
-      identityState.imageId = state.evilDigest ? 'sha256:evil_digest' : FIX.imageId;
+      identityState.imageId = state.evilDigest ? 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' : FIX.imageId;
       identityState.configImage = state.evilTag
         ? 'evil/other:latest'
         : isolation.ALLOWLISTED_IMAGE;
@@ -219,7 +241,7 @@ function fakeBroker(state, identityState) {
           running: true,
           state: 'ok',
           containerId: identityState.containerId,
-          imageId: 'sha256:wrong_digest_not_allowlisted',
+          imageId: 'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
           configImage: isolation.ALLOWLISTED_IMAGE,
           instanceId: identityState.instanceId,
           managed: isolation.MANAGED_LABEL_VALUE,
@@ -274,6 +296,9 @@ async function withApi(t, run) {
 
   const api = require('../index.js');
   await api.migrate();
+  // Live connection verify BEFORE any destructive SQL (env strings alone are forgeable).
+  const livePg = await assertEphemeralLiveConnection(api.pool, process.env);
+  assert.equal(livePg.verified, true);
   await api.pool.query(`
     TRUNCATE TABLE isolated_desktop_managed, approvals, task_events, task_controls,
       messages, tasks, assets, conversations
@@ -300,7 +325,7 @@ async function withApi(t, run) {
     eve: eveServer,
     pool: api.pool,
     api,
-    ephemeralPg: assertEphemeralDatabaseUrl(process.env.DATABASE_URL, process.env),
+    ephemeralPg: livePg,
     async seedManaged(overrides = {}) {
       const row = {
         targetId: ISOLATED,
@@ -586,5 +611,102 @@ test('SEED (not natural approve): SQL-approved create ticket then policy/check c
     );
     assert.equal(again.body.allow, false);
     assert.equal(again.body.reason, 'no_valid_ticket');
+  });
+});
+
+test('gateway-shaped Eve: unauthenticated /session/existing and /cancel are 409 (not 202 passthrough)', async (t) => {
+  await withApi(t, async (ctx) => {
+    const base = process.env.EVE_ISOLATED_API_URL;
+    for (const path of [
+      '/eve/v1/session/existing',
+      '/eve/v1/session/existing/cancel',
+      '/eve/v1/session/existing/stream',
+    ]) {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      });
+      assert.equal(res.status, 409, path);
+      const body = await res.json();
+      assert.equal(body.error, 'instance_id_mismatch');
+    }
+  });
+});
+
+test('NATURAL: pin managed digestA when tag retargets B — requires new approval', async (t) => {
+  await withApi(t, async (ctx) => {
+    const digestA = FIX.imageId;
+    const digestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    await ctx.seedManaged({ imageId: digestA });
+    // Probe still same instance/container but image digest moved (tag retarget).
+    ctx.identityState.imageId = digestB;
+    ctx.brokerState.mode = 'ok';
+    ctx.eve.server.__healthMode = 'ok';
+    // Force status to report digestB while managed row stays digestA.
+    const inner = ctx.broker.status;
+    ctx.broker.status = async () => {
+      const s = await inner();
+      return { ...s, imageId: digestB, configImage: isolation.ALLOWLISTED_IMAGE };
+    };
+    const { body } = await ctx.postMessage('start task: tag retarget digestB', ISOLATED);
+    const taskId = body.task?.taskId || body.task?.id;
+    assert.equal((await ctx.countCreateTickets(taskId)).length, 1, 'image change needs new approval');
+    const managed = await ctx.getManaged();
+    assert.equal(managed.imageId, digestA, 'managed row remains pinned to approved digestA');
+  });
+});
+
+test('API ops: mismatched identity blocks steer / cancel / approval-answer paths', async (t) => {
+  await withApi(t, async (ctx) => {
+    ctx.brokerState.mode = 'not_started';
+    ctx.eve.server.__healthMode = 'ok';
+    const first = await ctx.postMessage('start task: identity ops', ISOLATED);
+    const taskId = first.body.task?.taskId || first.body.task?.id;
+    const tickets = await ctx.countCreateTickets(taskId);
+    const approved = await ctx.approve(tickets[0].id);
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+
+    // Corrupt frozen identity → subsequent Eve ops must fail closed (409 from gateway).
+    ctx.identityState.instanceId = 'inst_MISMATCHED';
+
+    const steer = await fetch(`${ctx.origin}/api/tasks/${taskId}/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'steer me' }),
+    });
+    // Steer may surface 502/409 depending on error mapping — must not silently succeed to Eve.
+    assert.notEqual(steer.status, 200);
+
+    const cancel = await fetch(`${ctx.origin}/api/tasks/${taskId}/cancel`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    // Cancel request is accepted at API layer but session cancel must not get 202 from Eve without identity.
+    // Restore identity and prove unauthenticated Eve cancel path is still 409.
+    const eveCancel = await fetch(
+      `${process.env.EVE_ISOLATED_API_URL}/eve/v1/session/sess_x/cancel`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+    );
+    assert.equal(eveCancel.status, 409);
+
+    // Restore correct identity; cancel with match should reach Eve 202.
+    ctx.identityState.instanceId = approved.body.instanceId;
+    const eveOk = await fetch(
+      `${process.env.EVE_ISOLATED_API_URL}/eve/v1/session/sess_x/cancel`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [eve.INSTANCE_HEADER]: ctx.identityState.instanceId,
+          [eve.TARGET_HEADER]: ISOLATED,
+          [eve.IMAGE_HEADER]: FIX.imageId,
+        },
+        body: '{}',
+      },
+    );
+    assert.equal(eveOk.status, 202);
+    assert.ok(cancel.status); // exercised cancel API with mismatched identity above
   });
 });

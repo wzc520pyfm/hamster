@@ -1,0 +1,8 @@
+156b95ad8db31025f5bbb8a55d8676b09da01f752cdbff2ae9667772b640b442  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/bootstrap.json
+93756614ebe4f3c127c932a43dbc3405bc21917acc45926386213044914d02e9  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/ephemeral-pg.json
+b6b68fa05256588f07ba067456f25fb2cec261995d1127c91acafdd0e31dbd1b  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/http-ephemeral-pg.txt
+0c13865485204461aaf1322cc1e7d1112172266fb79979b086d29f26b56a3ebd  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/unit-gateway.txt
+0c374381b97fd7a11417f3980edd43063787f87d91b03e635b81829d5de600e6  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/unit-isolation.txt
+0c374381b97fd7a11417f3980edd43063787f87d91b03e635b81829d5de600e6  /opt/cursor/artifacts/p2-identity-mustfix-20261120b/unit-isolation.txt
+156b95ad8db31025f5bbb8a55d8676b09da01f752cdbff2ae9667772b640b442  /opt/cursor/artifacts/p2-real-eve-bootstrap-20261120b/bootstrap.json
+820e63dfd00b7735d151437a3968beafe5081b6690fa10c20f521d25aaa959d4  /opt/cursor/artifacts/p2-real-eve-bootstrap-20261120b/NOTES.md

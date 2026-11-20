@@ -3,22 +3,15 @@
  * Isolated-desktop identity gateway (Hamster P2).
  *
  * Real Eve (`npx eve start`) health is `{ ok, status, workflowId }` and
- * `POST /eve/v1/session` rejects unknown body fields. Injected env alone does
- * not bind instance identity. This gateway:
+ * session routes reject unknown body fields. This gateway:
  *   - proxies to a local Eve process
  *   - augments GET /eve/v1/health with targetId + instanceId (+ imageId)
- *   - requires matching x-hamster-* headers on POST /eve/v1/session before
- *     forwarding a clean Eve-legal body (worker-side replacement defense)
+ *   - requires matching x-hamster-* headers on ALL /eve/v1/session* routes
+ *     (create, follow-up, cancel, stream, compact, clear, end, stubs, …)
+ *   - fails closed on other non-health paths (no unsafe passthrough)
  *
  * Control-plane agent keeps plain `eve start`. Broker create for the
  * allowlisted isolated image overrides CMD to run this gateway.
- *
- * Env:
- *   HAMSTER_ISOLATED_INSTANCE_ID (required)
- *   HAMSTER_ISOLATED_TARGET_ID   (default target_isolated_desktop)
- *   HAMSTER_ISOLATED_IMAGE_ID    (optional immutable digest)
- *   PORT                         (public listen, default 8081)
- *   HAMSTER_EVE_UPSTREAM_PORT    (Eve bind, default 18081)
  */
 
 import http from 'node:http';
@@ -36,16 +29,29 @@ const targetId = String(
 ).trim();
 const imageId = String(process.env.HAMSTER_ISOLATED_IMAGE_ID || '').trim() || null;
 const publicPort = Number(process.env.PORT || 8081);
-const upstreamPort = Number(process.env.HAMSTER_EVE_UPSTREAM_PORT || 18081);
-const upstreamHost = process.env.HAMSTER_EVE_UPSTREAM_HOST || '127.0.0.1';
-// Note: instanceId required only when running as main (see main()). Tests import
-// createIsolatedIdentityGatewayServer with explicit opts and must not process.exit.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const agentRoot = path.join(__dirname, '..');
 
+/** Read at call time so bootstrap can set env before first proxy hop. */
+function upstreamHostPort() {
+  return {
+    host: process.env.HAMSTER_EVE_UPSTREAM_HOST || '127.0.0.1',
+    port: Number(process.env.HAMSTER_EVE_UPSTREAM_PORT || 18081),
+  };
+}
+
 function upstreamUrl(urlPath) {
-  return `http://${upstreamHost}:${upstreamPort}${urlPath}`;
+  const { host, port } = upstreamHostPort();
+  return `http://${host}:${port}${urlPath}`;
+}
+
+function isSessionRoute(pathname) {
+  return pathname === '/eve/v1/session' || pathname.startsWith('/eve/v1/session/');
+}
+
+function isHealthRoute(pathname) {
+  return pathname === '/eve/v1/health';
 }
 
 async function readBody(req) {
@@ -55,12 +61,13 @@ async function readBody(req) {
 }
 
 function spawnEve() {
+  const { host, port } = upstreamHostPort();
   const child = spawn(
     'npx',
-    ['eve', 'start', '--host', upstreamHost, '--port', String(upstreamPort)],
+    ['eve', 'start', '--host', host, '--port', String(port)],
     {
       cwd: agentRoot,
-      env: { ...process.env, PORT: String(upstreamPort) },
+      env: { ...process.env, PORT: String(port) },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
@@ -90,27 +97,27 @@ async function waitUpstreamHealthy(timeoutMs = 120000) {
   throw new Error(`eve upstream not ready: ${last}`);
 }
 
-function identityMismatch(req) {
+function checkIdentity(req, self) {
   const gotInstance = String(req.headers[INSTANCE_HEADER] || '').trim();
   const gotTarget = String(req.headers[TARGET_HEADER] || '').trim();
   const gotImage = String(req.headers[IMAGE_HEADER] || '').trim();
-  if (!gotInstance || gotInstance !== instanceId) {
-    return { error: 'instance_id_mismatch', expected: instanceId, got: gotInstance || null };
+  if (!gotInstance || gotInstance !== self.instanceId) {
+    return { error: 'instance_id_mismatch', expected: self.instanceId, got: gotInstance || null };
   }
-  if (!gotTarget || gotTarget !== targetId) {
-    return { error: 'target_id_mismatch', expected: targetId, got: gotTarget || null };
+  if (!gotTarget || gotTarget !== self.targetId) {
+    return { error: 'target_id_mismatch', expected: self.targetId, got: gotTarget || null };
   }
-  if (imageId) {
-    if (!gotImage || gotImage !== imageId) {
-      return { error: 'image_id_mismatch', expected: imageId, got: gotImage || null };
+  if (self.imageId) {
+    if (!gotImage || gotImage !== self.imageId) {
+      return { error: 'image_id_mismatch', expected: self.imageId, got: gotImage || null };
     }
   }
   return null;
 }
 
-async function proxy(req, res, { mutateHealth = false, requireIdentity = false } = {}) {
+async function proxy(req, res, { mutateHealth = false, requireIdentity = false, self } = {}) {
   if (requireIdentity) {
-    const bad = identityMismatch(req);
+    const bad = checkIdentity(req, self);
     if (bad) {
       res.writeHead(409, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, ...bad }));
@@ -119,12 +126,11 @@ async function proxy(req, res, { mutateHealth = false, requireIdentity = false }
   }
 
   const bodyBuf = req.method === 'GET' || req.method === 'HEAD' ? null : await readBody(req);
-  const headers = { ...req.headers, host: `${upstreamHost}:${upstreamPort}` };
-  // Do not forward hamster identity headers into Eve (unknown to Eve; keep body Eve-legal).
+  const headers = { ...req.headers };
   delete headers[INSTANCE_HEADER];
   delete headers[TARGET_HEADER];
   delete headers[IMAGE_HEADER];
-  delete headers['host'];
+  delete headers.host;
 
   const upstream = await fetch(upstreamUrl(req.url || '/'), {
     method: req.method,
@@ -149,13 +155,12 @@ async function proxy(req, res, { mutateHealth = false, requireIdentity = false }
       res.end(text);
       return;
     }
-    // Preserve real Eve fields; add Hamster identity bind.
     const augmented = {
       ...parsed,
       ok: parsed.ok === true,
-      targetId,
-      instanceId,
-      ...(imageId ? { imageId } : {}),
+      targetId: self.targetId,
+      instanceId: self.instanceId,
+      ...(self.imageId ? { imageId: self.imageId } : {}),
     };
     const payload = Buffer.from(JSON.stringify(augmented));
     outHeaders['content-type'] = 'application/json';
@@ -177,12 +182,13 @@ export function createIsolatedIdentityGatewayServer(opts = {}) {
     targetId: opts.targetId || targetId,
     imageId: opts.imageId || imageId,
   };
-  // Allow tests to inject without process env mutation by closing over self.
+
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url || '/', 'http://127.0.0.1');
-      if (url.pathname === '/eve/v1/health' && req.method === 'GET') {
-        // Test/injected upstream via opts.fetchUpstream
+      const pathname = url.pathname;
+
+      if (isHealthRoute(pathname) && req.method === 'GET') {
         if (typeof opts.fetchUpstream === 'function') {
           const up = await opts.fetchUpstream('/eve/v1/health', { method: 'GET' });
           const parsed = typeof up.body === 'object' ? up.body : JSON.parse(up.body || '{}');
@@ -197,52 +203,44 @@ export function createIsolatedIdentityGatewayServer(opts = {}) {
           res.end(JSON.stringify(augmented));
           return;
         }
-        await proxy(req, res, { mutateHealth: true });
+        await proxy(req, res, { mutateHealth: true, self });
         return;
       }
-      if (url.pathname === '/eve/v1/session' && req.method === 'POST') {
+
+      if (isSessionRoute(pathname)) {
         if (typeof opts.fetchUpstream === 'function') {
-          const bad = (() => {
-            const gotInstance = String(req.headers[INSTANCE_HEADER] || '').trim();
-            const gotTarget = String(req.headers[TARGET_HEADER] || '').trim();
-            const gotImage = String(req.headers[IMAGE_HEADER] || '').trim();
-            if (!gotInstance || gotInstance !== self.instanceId) {
-              return { error: 'instance_id_mismatch', expected: self.instanceId, got: gotInstance || null };
-            }
-            if (!gotTarget || gotTarget !== self.targetId) {
-              return { error: 'target_id_mismatch', expected: self.targetId, got: gotTarget || null };
-            }
-            if (self.imageId && (!gotImage || gotImage !== self.imageId)) {
-              return { error: 'image_id_mismatch', expected: self.imageId, got: gotImage || null };
-            }
-            return null;
-          })();
+          const bad = checkIdentity(req, self);
           if (bad) {
             res.writeHead(409, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ ok: false, ...bad }));
             return;
           }
           const raw = await readBody(req);
-          const up = await opts.fetchUpstream('/eve/v1/session', {
-            method: 'POST',
+          const up = await opts.fetchUpstream(pathname + url.search, {
+            method: req.method,
             headers: { 'content-type': 'application/json' },
-            body: raw.length ? raw.toString('utf8') : '{}',
+            body: raw.length ? raw.toString('utf8') : undefined,
           });
           res.writeHead(up.status || 202, { 'content-type': 'application/json' });
-          res.end(typeof up.body === 'string' ? up.body : JSON.stringify(up.body));
+          res.end(typeof up.body === 'string' ? up.body : JSON.stringify(up.body ?? {}));
           return;
         }
-        await proxy(req, res, { requireIdentity: true });
+        await proxy(req, res, { requireIdentity: true, self });
         return;
       }
-      if (typeof opts.fetchUpstream === 'function') {
-        res.writeHead(404).end('not proxied in test mode');
-        return;
-      }
-      await proxy(req, res);
+
+      // No unsafe passthrough: unknown routes fail closed.
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'route_not_allowed_by_gateway' }));
     } catch (err) {
       res.writeHead(502, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, error: 'gateway_proxy_failed', detail: String(err?.message ?? err) }));
+      res.end(
+        JSON.stringify({
+          ok: false,
+          error: 'gateway_proxy_failed',
+          detail: String(err?.message ?? err),
+        }),
+      );
     }
   });
   return server;
@@ -254,13 +252,16 @@ export const IDENTITY_HEADERS = {
   IMAGE: IMAGE_HEADER,
 };
 
+export { isSessionRoute, isHealthRoute, checkIdentity };
+
 async function main() {
   if (!instanceId) {
     console.error('[isolated-identity-gateway] HAMSTER_ISOLATED_INSTANCE_ID is required');
     process.exit(1);
   }
+  const up = upstreamHostPort();
   console.log(
-    `[isolated-identity-gateway] starting eve on ${upstreamHost}:${upstreamPort}; public :${publicPort}`,
+    `[isolated-identity-gateway] starting eve on ${up.host}:${up.port}; public :${publicPort}`,
   );
   console.log(
     `[isolated-identity-gateway] identity instanceId=${instanceId} targetId=${targetId} imageId=${imageId || '(none)'}`,

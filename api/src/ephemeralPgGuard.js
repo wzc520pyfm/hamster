@@ -1,8 +1,9 @@
 'use strict';
 
 /**
- * Refuse shared/default/live Postgres URLs for P2 HTTP integration.
- * Requires an explicitly started ephemeral instance (see api/scripts/start-ephemeral-pg.sh).
+ * Refuse shared/default/live Postgres for P2 HTTP integration.
+ * Env strings alone are forgeable — before ANY destructive SQL, query the live
+ * connection's data_directory + instance marker and match the started cluster.
  */
 
 const FORBIDDEN_HOSTS = new Set(['db', 'postgres', 'postgresql']);
@@ -23,6 +24,9 @@ function assertEphemeralDatabaseUrl(url, env = process.env) {
   }
   if (!env.HAMSTER_P2_PG_PORT || String(env.HAMSTER_P2_PG_PORT) === '5432') {
     throw new Error('HAMSTER_P2_PG_PORT must be non-5432 ephemeral port');
+  }
+  if (!env.HAMSTER_P2_PG_INSTANCE_TOKEN || String(env.HAMSTER_P2_PG_INSTANCE_TOKEN).length < 16) {
+    throw new Error('HAMSTER_P2_PG_INSTANCE_TOKEN required (from start-ephemeral-pg.sh marker)');
   }
 
   let parsed;
@@ -66,7 +70,68 @@ function assertEphemeralDatabaseUrl(url, env = process.env) {
     dataDir: env.HAMSTER_P2_PG_DATADIR,
     pid: env.HAMSTER_P2_PG_PID || null,
     version: env.HAMSTER_P2_PG_VERSION || null,
+    instanceToken: env.HAMSTER_P2_PG_INSTANCE_TOKEN,
   };
 }
 
-module.exports = { assertEphemeralDatabaseUrl, FORBIDDEN_PORTS, FORBIDDEN_HOSTS };
+/**
+ * Live connection verification — must run before TRUNCATE / destructive SQL.
+ * Queries SHOW data_directory and hamster_ephemeral_marker token.
+ */
+async function assertEphemeralLiveConnection(clientOrPool, env = process.env) {
+  const urlInfo = assertEphemeralDatabaseUrl(env.DATABASE_URL, env);
+  const expectedDir = String(env.HAMSTER_P2_PG_DATADIR);
+  const expectedToken = String(env.HAMSTER_P2_PG_INSTANCE_TOKEN);
+
+  const dirRes = await clientOrPool.query('SHOW data_directory');
+  const liveDir = String(dirRes.rows[0]?.data_directory || dirRes.rows[0]?.show || '').trim();
+  if (!liveDir) {
+    throw new Error('SHOW data_directory returned empty — refusing destructive SQL');
+  }
+  // Normalize trailing slashes
+  const norm = (p) => p.replace(/\/+$/, '');
+  if (norm(liveDir) !== norm(expectedDir)) {
+    throw new Error(
+      `Live data_directory '${liveDir}' !== expected ephemeral '${expectedDir}' — refusing`,
+    );
+  }
+  if (!liveDir.includes('hamster-p2-ephemeral-pg-')) {
+    throw new Error(`Live data_directory '${liveDir}' is not an ephemeral cluster path`);
+  }
+
+  let marker;
+  try {
+    marker = await clientOrPool.query(
+      'SELECT token, data_directory FROM hamster_ephemeral_marker LIMIT 1',
+    );
+  } catch (err) {
+    throw new Error(
+      `hamster_ephemeral_marker missing/unreadable — refusing destructive SQL (${err.message})`,
+    );
+  }
+  const row = marker.rows[0];
+  if (!row || row.token !== expectedToken) {
+    throw new Error(
+      `Instance marker mismatch (got '${row?.token || null}', expected '${expectedToken}') — refusing`,
+    );
+  }
+  if (row.data_directory && norm(String(row.data_directory)) !== norm(liveDir)) {
+    throw new Error(
+      `Marker data_directory '${row.data_directory}' !== live '${liveDir}' — refusing`,
+    );
+  }
+
+  return {
+    ...urlInfo,
+    liveDataDirectory: liveDir,
+    markerToken: row.token,
+    verified: true,
+  };
+}
+
+module.exports = {
+  assertEphemeralDatabaseUrl,
+  assertEphemeralLiveConnection,
+  FORBIDDEN_PORTS,
+  FORBIDDEN_HOSTS,
+};

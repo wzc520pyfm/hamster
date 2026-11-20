@@ -43,6 +43,12 @@ async function getManagedIsolatedDesktop(targetId = isolation.ISOLATED_DESKTOP_T
   };
 }
 
+/** Frozen identity for isolated Eve calls (steer/cancel/answer/stream). Null for control plane. */
+async function identityForTarget(targetId) {
+  if (!isolation.isIsolatedDesktopTarget(targetId)) return null;
+  return getManagedIsolatedDesktop(targetId);
+}
+
 async function upsertManagedIsolatedDesktop(record) {
   await query(
     `INSERT INTO isolated_desktop_managed
@@ -252,7 +258,10 @@ async function createTask(conversationId, title, goal, targetId) {
             'running',
             taskId,
           ]);
-          events.attach(`task:${taskId}`, sessionId, { targetId: target });
+          events.attach(`task:${taskId}`, sessionId, {
+            targetId: target,
+            identity: guard.identity,
+          });
           return { task: await taskDetail(taskId) };
         }
         // Identity swap / TOCTOU fail closed → mint create/start ticket.
@@ -436,6 +445,7 @@ async function steerTask(req, res, taskId, message) {
     [taskId]
   );
   const taskTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+  const taskIdentity = await identityForTarget(taskTargetId);
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
@@ -444,7 +454,7 @@ async function steerTask(req, res, taskId, message) {
           inv.eve_interaction_id,
           'deny',
           'Invalidated — approve again',
-          { targetId: taskTargetId }
+          { targetId: taskTargetId, identity: taskIdentity }
         );
       } catch (err) {
         console.warn('[steer] failed to deny invalidated interaction', err.message);
@@ -457,7 +467,7 @@ async function steerTask(req, res, taskId, message) {
       await eve.sendMessage(
         task.eve_session_id,
         `[hamster-control] CONTROL-STEER taskId=${taskId} controlSeq=${controlSeq} message=${message}`,
-        { targetId: taskTargetId }
+        { targetId: taskTargetId, identity: taskIdentity }
       );
       delivered = true;
     } catch (err) {
@@ -514,6 +524,7 @@ async function cancelTask(req, res, taskId) {
     [taskId]
   );
   const cancelTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+  const cancelIdentity = await identityForTarget(cancelTargetId);
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
@@ -522,7 +533,7 @@ async function cancelTask(req, res, taskId) {
           inv.eve_interaction_id,
           'deny',
           'Task cancelled',
-          { targetId: cancelTargetId }
+          { targetId: cancelTargetId, identity: cancelIdentity }
         );
       } catch (err) {
         console.warn('[cancel] failed to deny interaction', err.message);
@@ -532,7 +543,10 @@ async function cancelTask(req, res, taskId) {
   let sessionCancel = 'not-attempted';
   if (task.eve_session_id) {
     try {
-      await eve.cancelSession(task.eve_session_id, { targetId: cancelTargetId });
+      await eve.cancelSession(task.eve_session_id, {
+        targetId: cancelTargetId,
+        identity: cancelIdentity,
+      });
       sessionCancel = 'requested';
     } catch (err) {
       sessionCancel = `failed: ${String(err.message ?? err)}`;
@@ -600,12 +614,13 @@ async function invalidateOutstandingTickets(taskId) {
   for (const inv of rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
+        const tid = inv.target_id || isolation.CONTROL_PLANE_TARGET_ID;
         await eve.answerInteraction(
           inv.eve_session_id,
           inv.eve_interaction_id,
           'deny',
           isolation.INVALIDATED_NOTE,
-          { targetId: inv.target_id || isolation.CONTROL_PLANE_TARGET_ID }
+          { targetId: tid, identity: await identityForTarget(tid) }
         );
       } catch (err) {
         console.warn('[approvals] invalidate deny not delivered', err.message);
@@ -896,6 +911,7 @@ async function decideApproval(req, res, outcome) {
     }
   }
   const eveTargetId = ticketTargetId || taskRow?.target_id || isolation.CONTROL_PLANE_TARGET_ID;
+  const eveIdentity = await identityForTarget(eveTargetId);
   if (ticket.eve_interaction_id && ticket.eve_session_id) {
     try {
       await eve.answerInteraction(
@@ -903,7 +919,7 @@ async function decideApproval(req, res, outcome) {
         ticket.eve_interaction_id,
         optionId,
         note ?? isolation.APPROVED_ONCE_NOTE,
-        { targetId: eveTargetId }
+        { targetId: eveTargetId, identity: eveIdentity }
       );
     } catch (err) {
       // Fail closed: if the agent cannot be told, the action must not proceed.
@@ -1153,7 +1169,7 @@ async function startTaskSession(taskId, opts = {}) {
     'running',
     taskId,
   ]);
-  events.attach(`task:${taskId}`, sessionId, { targetId });
+  events.attach(`task:${taskId}`, sessionId, { targetId, identity });
   return sessionId;
 }
 
@@ -1173,6 +1189,7 @@ async function expireTicket(ticket) {
         isolation.CONTROL_PLANE_TARGET_ID;
       await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, 'deny', note, {
         targetId,
+        identity: await identityForTarget(targetId),
       });
     } catch (err) {
       console.warn('[approvals] expiry deny not delivered', err.message);
@@ -1206,7 +1223,7 @@ async function sweepExpired() {
             ticket.eve_interaction_id,
             'deny',
             events.EXPIRY_NOTE,
-            { targetId }
+            { targetId, identity: await identityForTarget(targetId) }
           );
         } catch (err) {
           console.warn('[approvals] expiry deny not delivered', err.message);
@@ -1332,8 +1349,10 @@ async function reattachFollowers() {
     query('SELECT id, eve_session_id FROM conversations WHERE eve_session_id IS NOT NULL'),
   ]);
   for (const t of tasks.rows) {
+    const tid = t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
     events.attach(`task:${t.id}`, t.eve_session_id, {
-      targetId: t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID,
+      targetId: tid,
+      identity: await identityForTarget(tid),
     });
   }
   for (const c of convs.rows) {

@@ -47,13 +47,28 @@ function containerIdsEqual(a, b) {
   const x = a.trim().toLowerCase();
   const y = b.trim().toLowerCase();
   if (x === y) return true;
-  // Docker may report full vs short ids.
+  // Docker may report full vs short container ids — NOT used for image digests.
   return x.startsWith(y) || y.startsWith(x);
 }
 
+/** Complete Docker image digest: sha256: + exactly 64 hex chars. Truncation fails. */
+const IMAGE_DIGEST_RE = /^sha256:[a-f0-9]{64}$/i;
+
+function isCompleteImageDigest(id) {
+  return typeof id === 'string' && IMAGE_DIGEST_RE.test(id.trim());
+}
+
 /**
- * Digest-only allowlist check. Tag/name match alone is NEVER sufficient:
- * a container can keep Config.Image=allowlisted:tag while Image id points at evil.
+ * Strict digest equality — no prefix match (rejects imageId='sha256:' and truncations).
+ */
+function digestsEqual(a, b) {
+  if (!isCompleteImageDigest(a) || !isCompleteImageDigest(b)) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/**
+ * Digest-only allowlist check. Tag/name match alone is NEVER sufficient.
+ * Prefers opts.expectedImageId (pinned managed/approved digest) over current tag resolve.
  *
  * @param {object|null|undefined} probe
  * @param {{ expectedImageId?: string|null, allowlistedImageId?: string|null }} [opts]
@@ -61,14 +76,15 @@ function containerIdsEqual(a, b) {
 function imageIsAllowlisted(probe, opts = {}) {
   const actualId =
     typeof probe?.imageId === 'string' && probe.imageId.trim() ? probe.imageId.trim() : null;
-  if (!actualId) return false;
+  if (!isCompleteImageDigest(actualId)) return false;
+  // Pin to expected (managed) digest when provided — tag retarget must not override.
   const expectedId =
     (typeof opts.expectedImageId === 'string' && opts.expectedImageId.trim()) ||
     (typeof opts.allowlistedImageId === 'string' && opts.allowlistedImageId.trim()) ||
     (typeof probe?.allowlistedImageId === 'string' && probe.allowlistedImageId.trim()) ||
     null;
-  if (!expectedId) return false;
-  return containerIdsEqual(actualId, expectedId);
+  if (!isCompleteImageDigest(expectedId)) return false;
+  return digestsEqual(actualId, expectedId);
 }
 
 /**
@@ -98,7 +114,9 @@ function identitiesMatch(expected, actual) {
     const exp = expected[key];
     const act = actual[key];
     if (exp == null || exp === '' || act == null || act === '') return false;
-    if (key === 'containerId' || key === 'imageId') {
+    if (key === 'imageId') {
+      if (!digestsEqual(String(exp), String(act))) return false;
+    } else if (key === 'containerId') {
       if (!containerIdsEqual(String(exp), String(act))) return false;
     } else if (String(exp) !== String(act)) {
       return false;
@@ -128,10 +146,24 @@ function resolveIsolatedStartIdentity({ managed, probe } = {}) {
     managed &&
     probeManaged &&
     managed.instanceId === probe.instanceId &&
-    containerIdsEqual(managed.containerId, probe.containerId)
+    containerIdsEqual(managed.containerId, probe.containerId) &&
+    isCompleteImageDigest(managed.imageId) &&
+    digestsEqual(managed.imageId, probe.imageId)
   ) {
     // Prior Hamster-managed instance (incl. stopped): coherent restart, same instanceId.
+    // Digest remains pinned to approved immutable A (tag retarget does not change this).
     return { ok: true, mode: 'restart', instanceId: managed.instanceId, managed };
+  }
+  // Managed row exists but probe digest differs (tag retarget / replaced image) → new approval.
+  if (managed && hasContainer && probeManaged && managed.instanceId === probe.instanceId) {
+    if (!digestsEqual(managed.imageId, probe.imageId)) {
+      return {
+        ok: false,
+        reason: 'managed_image_digest_changed_requires_approval',
+        containerId: probe.containerId,
+        instanceId: probe.instanceId,
+      };
+    }
   }
 
   // Foreign / unmanaged same-name — fail closed; never auto stop/rm.
@@ -257,8 +289,12 @@ function createDockerIsolationBroker(opts = {}) {
       } catch (err) {
         return { ok: false, reason: `image_unavailable:${String(err?.message ?? err)}` };
       }
-      if (!allowlistedImageId) {
-        return { ok: false, reason: 'image_digest_unavailable' };
+      if (!isCompleteImageDigest(allowlistedImageId)) {
+        return {
+          ok: false,
+          reason: 'image_digest_incomplete',
+          detail: allowlistedImageId || null,
+        };
       }
 
       let existing = null;
@@ -271,10 +307,8 @@ function createDockerIsolationBroker(opts = {}) {
       if (existing?.containerId) {
         // Fail closed: do not silently adopt / replace an unmanaged or foreign instance.
         // Never docker rm/stop here — live desktop must not be replaced by this path.
-        const digestOk = imageIsAllowlisted(
-          { imageId: existing.imageId, allowlistedImageId },
-          { expectedImageId: allowlistedImageId },
-        );
+        // Restart requires container digest === complete allowlisted digest (or caller-pinned).
+        const digestOk = digestsEqual(existing.imageId, allowlistedImageId);
         if (
           existing.managed !== MANAGED_LABEL_VALUE ||
           existing.instanceId !== instanceId ||
@@ -290,6 +324,14 @@ function createDockerIsolationBroker(opts = {}) {
         }
         await dockerRun(['start', existing.containerId]);
         const after = await inspectNamed();
+        if (!digestsEqual(after.imageId, allowlistedImageId)) {
+          return {
+            ok: false,
+            reason: 'image_digest_mismatch_after_start',
+            imageId: after.imageId,
+            expectedImageId: allowlistedImageId,
+          };
+        }
         return {
           ok: true,
           containerId: after.containerId,
@@ -300,8 +342,8 @@ function createDockerIsolationBroker(opts = {}) {
         };
       }
 
+      // Create with COMPLETE immutable digest — never the mutable tag ref.
       // Isolated image CMD override: identity gateway wraps real `eve start`.
-      // Plain `npx eve start` has no targetId/instanceId health bind / session check.
       const containerId = await dockerRun([
         'create',
         '--name',
@@ -322,10 +364,28 @@ function createDockerIsolationBroker(opts = {}) {
           HAMSTER_ISOLATED_TARGET_ID: ISOLATED_DESKTOP_TARGET_ID,
           HAMSTER_ISOLATED_IMAGE_ID: allowlistedImageId,
         }),
-        allowlistedImage,
+        allowlistedImageId,
         'node',
         '/app/lib/isolatedIdentityGateway.mjs',
       ]);
+      // Verify inspect digest before start — refuse mutable-tag drift / wrong image.
+      let beforeStart;
+      try {
+        beforeStart = await inspectNamed();
+      } catch (err) {
+        return {
+          ok: false,
+          reason: `inspect_before_start_failed:${String(err?.message ?? err)}`,
+        };
+      }
+      if (!digestsEqual(beforeStart.imageId, allowlistedImageId)) {
+        return {
+          ok: false,
+          reason: 'image_digest_mismatch_before_start',
+          imageId: beforeStart.imageId,
+          expectedImageId: allowlistedImageId,
+        };
+      }
       await dockerRun(['start', containerId || ISOLATED_CONTAINER_NAME]);
       let afterCreate;
       try {
@@ -334,15 +394,23 @@ function createDockerIsolationBroker(opts = {}) {
         afterCreate = {
           containerId: containerId || null,
           imageId: allowlistedImageId,
-          configImage: allowlistedImage,
+          configImage: allowlistedImageId,
           instanceId,
+        };
+      }
+      if (!digestsEqual(afterCreate.imageId, allowlistedImageId)) {
+        return {
+          ok: false,
+          reason: 'image_digest_mismatch_after_start',
+          imageId: afterCreate.imageId,
+          expectedImageId: allowlistedImageId,
         };
       }
       return {
         ok: true,
         containerId: afterCreate.containerId || containerId,
         imageId: afterCreate.imageId || allowlistedImageId,
-        configImage: afterCreate.configImage || allowlistedImage,
+        configImage: afterCreate.configImage || allowlistedImageId,
         instanceId: afterCreate.instanceId || instanceId,
         allowlistedImageId,
       };
@@ -363,6 +431,14 @@ function createDockerIsolationBroker(opts = {}) {
           running: false,
           state: 'unavailable',
           reason: `image_unavailable:${String(err?.message ?? err)}`,
+        };
+      }
+      if (!isCompleteImageDigest(allowlistedImageId)) {
+        return {
+          ok: false,
+          running: false,
+          state: 'unavailable',
+          reason: 'image_digest_incomplete',
         };
       }
       try {
@@ -792,6 +868,9 @@ module.exports = {
   identitiesMatch,
   imageIsAllowlisted,
   containerIdsEqual,
+  digestsEqual,
+  isCompleteImageDigest,
+  IMAGE_DIGEST_RE,
   parseInspectStatusLine,
   resolveIsolatedStartIdentity,
   mergeIdentityFillMissing,

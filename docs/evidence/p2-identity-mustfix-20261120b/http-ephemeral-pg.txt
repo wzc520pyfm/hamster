@@ -1,0 +1,23 @@
+✔ guard: ephemeral PG evidence present (not shared :5432) (0.813906ms)
+✔ NATURAL: managed healthy reuse → 0 create tickets, 0 broker.start (187.736779ms)
+✔ NATURAL: bare Eve health without identity bind → mint ticket (fail closed) (36.208803ms)
+✔ NATURAL: foreign same-name 2xx without managed → mint ticket (31.153633ms)
+✔ NATURAL: not_started requires create/start approval; no silent start (26.146801ms)
+✔ NATURAL negative: tag allowlisted but wrong image digest → mint ticket (29.229189ms)
+✔ NATURAL negative: spoofed health instanceId → mint ticket (26.050939ms)
+✔ NATURAL negative: identity swap at session boundary → mint ticket (27.726059ms)
+✔ NATURAL authorize chain: postMessage→approve→consume→managed→reuse 0ticket 0start (46.376642ms)
+✔ NATURAL: restart prior stopped managed uses same instanceId (no foreign adopt) (36.258775ms)
+✔ SEED (not natural approve): SQL-approved create ticket then policy/check cross-action (36.235316ms)
+✔ gateway-shaped Eve: unauthenticated /session/existing and /cancel are 409 (not 202 passthrough) (25.266597ms)
+✔ NATURAL: pin managed digestA when tag retargets B — requires new approval (30.095164ms)
+[steer] failed to deliver steer to worker instance_id_mismatch
+✔ API ops: mismatched identity blocks steer / cancel / approval-answer paths (56.176457ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10658.654949

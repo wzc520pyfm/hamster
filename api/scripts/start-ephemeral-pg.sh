@@ -72,6 +72,27 @@ SQL
 PID="$("${PG_BIN}/pg_ctl" -D "${DATA_DIR}" status | sed -n 's/.*PID: \([0-9]*\).*/\1/p' | head -1)"
 VERSION="$("${PG_BIN}/postgres" --version)"
 URL="postgres://${DB_USER}:${DB_PASS}@127.0.0.1:${PORT}/${DB_NAME}"
+INSTANCE_TOKEN="$(openssl rand -hex 24 2>/dev/null || echo "tok_${RANDOM}_${RANDOM}_$$_ephemeral_pg")"
+
+# Unique instance marker — harness queries this live before any TRUNCATE.
+# Env strings alone are forgeable; live data_directory + token must match.
+"${PG_BIN}/psql" -h 127.0.0.1 -p "${PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 <<SQL >&2
+CREATE TABLE hamster_ephemeral_marker (
+  token text PRIMARY KEY,
+  data_directory text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO hamster_ephemeral_marker (token, data_directory)
+VALUES ('${INSTANCE_TOKEN}', '${DATA_DIR}');
+SQL
+
+# Prove live SHOW data_directory matches initdb path (evidence for harness).
+LIVE_DATA_DIR="$("${PG_BIN}/psql" -h 127.0.0.1 -p "${PORT}" -U "${DB_USER}" -d "${DB_NAME}" -Atc "SHOW data_directory")"
+echo "Live SHOW data_directory=${LIVE_DATA_DIR}" >&2
+if [[ "${LIVE_DATA_DIR}" != "${DATA_DIR}" && "${LIVE_DATA_DIR}" != "${DATA_DIR%/}" ]]; then
+  echo "error: live data_directory '${LIVE_DATA_DIR}' != expected '${DATA_DIR}'" >&2
+  exit 1
+fi
 
 EVIDENCE_DIR="${HAMSTER_P2_PG_EVIDENCE:-${ROOT}/evidence}"
 mkdir -p "${EVIDENCE_DIR}"
@@ -84,6 +105,8 @@ cat > "${EVIDENCE_DIR}/ephemeral-pg.json" <<JSON
   "pid": ${PID:-null},
   "port": ${PORT},
   "dataDir": "${DATA_DIR}",
+  "liveDataDirectory": "${LIVE_DATA_DIR}",
+  "instanceToken": "${INSTANCE_TOKEN}",
   "logFile": "${LOG_FILE}",
   "database": "${DB_NAME}",
   "user": "${DB_USER}",
@@ -93,7 +116,7 @@ cat > "${EVIDENCE_DIR}/ephemeral-pg.json" <<JSON
 }
 JSON
 
-echo "Ephemeral PG ready pid=${PID} port=${PORT} dataDir=${DATA_DIR}" >&2
+echo "Ephemeral PG ready pid=${PID} port=${PORT} dataDir=${DATA_DIR} token=${INSTANCE_TOKEN:0:8}…" >&2
 echo "Evidence: ${EVIDENCE_DIR}/ephemeral-pg.json" >&2
 
 # Shell exports for eval — ONLY these lines on stdout
@@ -107,5 +130,6 @@ export HAMSTER_P2_PG_VERSION="${VERSION}"
 export HAMSTER_P2_PG_LOG="${LOG_FILE}"
 export HAMSTER_P2_PG_EVIDENCE="${EVIDENCE_DIR}"
 export HAMSTER_P2_PG_ROOT="${ROOT}"
+export HAMSTER_P2_PG_INSTANCE_TOKEN="${INSTANCE_TOKEN}"
 export DATABASE_URL="${URL}"
 EOF

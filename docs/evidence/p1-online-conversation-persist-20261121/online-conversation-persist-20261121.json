@@ -1,0 +1,111 @@
+{
+  "at": "2026-11-20T17:01:36.266Z",
+  "kind": "p1_online_conversation_persist_real_api_ephemeral_pg",
+  "uniqueUserText": "P1-online-persist-1795194096265-bae29de2",
+  "modelResponseScope": "Paid model inference not used. Local fixture Eve acknowledges sessions/messages without generating assistant content. Proof is API/DB-owned conversationId + user message id/content persistence and online React refresh recovery.",
+  "productBoundaryOffline": "Offline empty history remains PRODUCT BOUNDARY — only hamster.locale / hamster.controlBase persist in React localStorage. Not claimed here.",
+  "steps": [
+    {
+      "step": "ephemeral_pg_live_data_directory_and_marker_match",
+      "live": {
+        "ok": true,
+        "host": "127.0.0.1",
+        "port": "55695",
+        "database": "hamster_p2_ephemeral_23978",
+        "dataDir": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data",
+        "pid": "24001",
+        "version": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "instanceToken": "625ca5eee63aadec932236f5978aaa7335b89ef37daa6e5c",
+        "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data",
+        "markerToken": "625ca5eee63aadec932236f5978aaa7335b89ef37daa6e5c",
+        "verified": true
+      },
+      "ok": true,
+      "at": "2026-11-20T17:01:37.358Z"
+    },
+    {
+      "step": "api_generated_conversation_visible_not_fixed_fixture_id",
+      "convBefore": {
+        "conversationIdVisible": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+        "sample": "Main conversation\nconversationId: conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38\n\nNo messages yet. Dispatch a task or ask a question.\n\nRun on\nControl plane · Default\nIsolated desktop\nSend"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:01:41.089Z"
+    },
+    {
+      "step": "db_owns_generated_ids_user_message_persisted",
+      "live2": {
+        "verified": true,
+        "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data"
+      },
+      "dbConversations": [
+        {
+          "id": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+          "title": "Main conversation",
+          "created_at": "2026-11-20T17:01:37.612Z"
+        }
+      ],
+      "userMessage": {
+        "id": "1",
+        "conversation_id": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+        "role": "user",
+        "content": "P1-online-persist-1795194096265-bae29de2",
+        "meta": {
+          "kind": "user-message"
+        }
+      },
+      "uiAfterSend": {
+        "conversationIdVisible": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+        "hasUserText": true,
+        "sample": "Main conversation\nconversationId: conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38\nUSER\nP1-online-persist-1795194096265-bae29de2\nRun on\nControl plane · Default\nIsolated desktop\nSend"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:01:41.193Z"
+    },
+    {
+      "step": "online_refresh_renders_same_conversation_and_user_message",
+      "uiAfterReload": {
+        "conversationIdVisible": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+        "hasUserText": true,
+        "sample": "Main conversation\nconversationId: conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38\nUSER\nP1-online-persist-1795194096265-bae29de2\nRun on\nControl plane · Default\nIsolated desktop\nSend"
+      },
+      "png": "online-persist-after-refresh-20261121.png",
+      "ok": true,
+      "at": "2026-11-20T17:01:42.061Z"
+    }
+  ],
+  "pass": true,
+  "ephemeralPgExports": {
+    "port": "55695",
+    "dataDir": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data",
+    "databaseUrlHost": "127.0.0.1",
+    "tokenPrefix": "625ca5ee"
+  },
+  "livePgGuard": {
+    "ok": true,
+    "host": "127.0.0.1",
+    "port": "55695",
+    "database": "hamster_p2_ephemeral_23978",
+    "dataDir": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data",
+    "pid": "24001",
+    "version": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+    "instanceToken": "625ca5eee63aadec932236f5978aaa7335b89ef37daa6e5c",
+    "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-2U7Fil/data",
+    "markerToken": "625ca5eee63aadec932236f5978aaa7335b89ef37daa6e5c",
+    "verified": true
+  },
+  "fixtureEve": {
+    "baseUrl": "http://127.0.0.1:43189",
+    "label": "local-fixture-eve-no-paid-inference"
+  },
+  "api": {
+    "port": 18514,
+    "logFile": "/opt/cursor/artifacts/p1-online-conversation-persist-20261121/api-server.log"
+  },
+  "origin": "http://127.0.0.1:34777",
+  "persisted": {
+    "conversationId": "conv_4ef408d1-e0f7-490d-94a7-00f3b8d1da38",
+    "messageId": "1",
+    "content": "P1-online-persist-1795194096265-bae29de2"
+  }
+}

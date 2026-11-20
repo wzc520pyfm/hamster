@@ -1,0 +1,162 @@
+{
+  "at": "2026-11-20T17:00:27.746Z",
+  "kind": "p1_timeout_retry_corrected",
+  "preservesPriorEvidence": "docs/evidence/p1-timeout-retry-continuity-20261121/",
+  "notBoxPhone": true,
+  "notLiveOrigin": true,
+  "engineeringInjection": {
+    "label": "ENGINEERING_INJECTION",
+    "preciseClaim": "Suppresses controllerchange NOTIFICATION to wrapped addEventListener listeners only. Does NOT delay/postpone/block actual service worker activation, SKIP_WAITING handling, or controller replacement. Production Reload posts SKIP_WAITING; activation proceeds on browser timeline. Instrumentation records actualControllerChangeAt via unwrapped origAdd.",
+    "notClaimed": [
+      "injection delayed activation",
+      "harness post-timeout SKIP_WAITING aided late activation"
+    ],
+    "appliedAt": "2026-11-20T17:00:34.597Z"
+  },
+  "steps": [
+    {
+      "step": "initial_document_stamped",
+      "doc0": {
+        "nonce": "0c33becf-37a6-4741-a576-b6f8f7c83600",
+        "stampedAt": 1795194033188,
+        "label": "same-document-probe"
+      },
+      "navAfterLoad": 2,
+      "ok": true,
+      "at": "2026-11-20T17:00:33.189Z"
+    },
+    {
+      "step": "banner_en_png",
+      "png": "corrected-banner-en-20261121.png",
+      "enText": "A new version of Hamster is available.\nNot now\nReload",
+      "ok": true,
+      "at": "2026-11-20T17:00:33.860Z"
+    },
+    {
+      "step": "banner_zh_png",
+      "png": "corrected-banner-zh-20261121.png",
+      "zhText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "ok": true,
+      "at": "2026-11-20T17:00:34.595Z"
+    },
+    {
+      "step": "timeout_same_document_retry_ui_activation_may_already_be_done",
+      "docAfterTimeout": {
+        "nonce": "0c33becf-37a6-4741-a576-b6f8f7c83600",
+        "stampedAt": 1795194033188,
+        "label": "same-document-probe"
+      },
+      "sameDocumentNonce": true,
+      "navCount": 2,
+      "navUnchangedSinceBaseline": true,
+      "navUnchangedSinceReloadClick": true,
+      "retryText": "更新未完成。当前页面已保留，可以再次尝试重新加载。\n暂不\n再次重新加载",
+      "injectionAfterTimeout": {
+        "label": "ENGINEERING_INJECTION",
+        "purpose": "suppress_controllerchange_NOTIFICATION_only_not_activation",
+        "preciseClaim": "Does not delay actual SW activation; only suppresses notification to wrapped listeners",
+        "blockNotifyUntil": 1795194040096,
+        "suppressedCount": 1,
+        "actualControllerChangeAt": 1795194034617,
+        "actualControllerChangeObserved": true,
+        "controllerScriptURLAtChange": "http://127.0.0.1:40959/sw.js",
+        "harnessExtraSkipWaiting": false
+      },
+      "swAfterTimeout": {
+        "hasWaiting": false,
+        "hasInstalling": false,
+        "controller": "http://127.0.0.1:40959/sw.js",
+        "active": "http://127.0.0.1:40959/sw.js",
+        "same": true
+      },
+      "png": "corrected-timeout-retry-state-zh-20261121.png",
+      "note": "Injection only suppressed notify; actualControllerChangeAt may be <= timeout wall clock while production wait timed out",
+      "ok": true,
+      "at": "2026-11-20T17:00:38.979Z"
+    },
+    {
+      "step": "activation_observed_unaided_no_harness_skip_waiting",
+      "swLate": {
+        "hasWaiting": false,
+        "hasInstalling": false,
+        "controller": "http://127.0.0.1:40959/sw.js",
+        "active": "http://127.0.0.1:40959/sw.js",
+        "same": true
+      },
+      "injectionLate": {
+        "label": "ENGINEERING_INJECTION",
+        "purpose": "suppress_controllerchange_NOTIFICATION_only_not_activation",
+        "preciseClaim": "Does not delay actual SW activation; only suppresses notification to wrapped listeners",
+        "blockNotifyUntil": 0,
+        "suppressedCount": 1,
+        "actualControllerChangeAt": 1795194034617,
+        "actualControllerChangeObserved": true,
+        "controllerScriptURLAtChange": "http://127.0.0.1:40959/sw.js",
+        "harnessExtraSkipWaiting": false,
+        "phase": "observe_only_no_harness_skip_waiting"
+      },
+      "docLate": {
+        "nonce": "0c33becf-37a6-4741-a576-b6f8f7c83600",
+        "stampedAt": 1795194033188,
+        "label": "same-document-probe"
+      },
+      "sameDocumentStill": true,
+      "navCount": 2,
+      "ok": true,
+      "note": "No extra reg.waiting.postMessage(SKIP_WAITING) from harness after timeout",
+      "at": "2026-11-20T17:00:39.190Z"
+    },
+    {
+      "step": "user_retry_one_navigation_new_bundle_B_executed",
+      "navBeforeRetry": 2,
+      "navAfterRetry": 3,
+      "navBaseline": 2,
+      "exactlyOneNewNav": true,
+      "docAfterRetry": null,
+      "documentNonceChanged": true,
+      "newDocument": true,
+      "bundleCheck": {
+        "previewHit": true,
+        "swBuild": "4ccc8515e66e",
+        "swBuildMatchesIdB": true,
+        "assetHit": true,
+        "assetUrl": "/assets/index-D27Z7P0n.js",
+        "controller": "http://127.0.0.1:40959/sw.js"
+      },
+      "storageAfterRetry": {
+        "hamster.controlBase": "http://127.0.0.1:40959",
+        "hamster.locale": "zh"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:00:39.821Z"
+    }
+  ],
+  "mainFrameNavigations": [
+    {
+      "at": "2026-11-20T17:00:32.243Z",
+      "url": "http://127.0.0.1:40959/"
+    },
+    {
+      "at": "2026-11-20T17:00:32.348Z",
+      "url": "http://127.0.0.1:40959/"
+    },
+    {
+      "at": "2026-11-20T17:00:39.219Z",
+      "url": "http://127.0.0.1:40959/"
+    }
+  ],
+  "pass": true,
+  "builds": {
+    "idA": "c51b2117c166",
+    "idB": "4ccc8515e66e",
+    "bundleBMarker": "bundle-B-evidence-20261121"
+  },
+  "origin": "http://127.0.0.1:40959",
+  "fixtureApi": "http://127.0.0.1:35757",
+  "navBaseline": 2,
+  "pngSha256": {
+    "corrected-banner-en-20261121.png": "204fbe03c618fb32f29346c07ca009bd7d70254dd7f12d70755fef23dc3b9870",
+    "corrected-banner-zh-20261121.png": "91a440906c3b9adba24fcadd3494098b292c8487c564cdd3837107420c563c60",
+    "corrected-timeout-retry-state-zh-20261121.png": "489cba31b326d8cd7d86460bc2d07f42d1b3d5573d3596961c53ee73ad3b438c"
+  }
+}

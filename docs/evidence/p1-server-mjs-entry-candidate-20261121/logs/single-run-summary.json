@@ -1,0 +1,44 @@
+{
+  "pass": true,
+  "uniqueUserText": "P1-persist-pwa-retry-1795195901858-55cfdcf1",
+  "conversationId": "conv_971b67b1-f25a-4178-8f35-6ae749f72b1b",
+  "navBaseline": 2,
+  "origin": "http://127.0.0.1:3298",
+  "productionEntry": "node server.mjs (default start:prod / proposed image CMD) \u2014 NOT docker image build",
+  "dockerImageClaim": false,
+  "steps": [
+    {
+      "step": "ephemeral_pg_live_data_directory_and_marker_match",
+      "ok": true
+    },
+    {
+      "step": "api_generated_conversation_visible",
+      "ok": true
+    },
+    {
+      "step": "composer_unique_user_message_persisted_in_pg",
+      "ok": true
+    },
+    {
+      "step": "document_stamped_nav_baseline",
+      "ok": true
+    },
+    {
+      "step": "timeout_relative_baseline_unchanged_retry_ui",
+      "ok": true
+    },
+    {
+      "step": "activation_observed_unaided_no_harness_skip_waiting",
+      "ok": true
+    },
+    {
+      "step": "user_retry_same_message_restored_bundle_B",
+      "ok": true
+    }
+  ],
+  "builds": {
+    "idA": "0467ed911aa2",
+    "idB": "3dcdd67bb9b6",
+    "bundleBMarker": "bundle-B-persist-retry-20261121"
+  }
+}

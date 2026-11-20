@@ -1,0 +1,77 @@
+{
+  "at": "2026-11-20T14:58:14.149Z",
+  "origin": "http://127.0.0.1:44697",
+  "steps": [
+    {
+      "step": "old_install",
+      "marker": "OLD_UI",
+      "ok": true
+    },
+    {
+      "step": "old_caches",
+      "cachesOld": {
+        "hamster-pwa-shell-v1": [
+          "/",
+          "/assets/index-DqKaLRWz.js"
+        ]
+      }
+    },
+    {
+      "step": "continuity_before",
+      "continuityBefore": {
+        "locale": "zh",
+        "controlBase": "http://127.0.0.1:44697",
+        "conversation": "{\"id\":\"conv-demo\",\"msgs\":2}"
+      }
+    },
+    {
+      "step": "update_banner_visible",
+      "ok": true
+    },
+    {
+      "step": "after_user_reload",
+      "marker": "NEW_UI",
+      "bundleText": "/assets/index-C3ESqCyk.js",
+      "hamsterBundle": "new",
+      "ok": true
+    },
+    {
+      "step": "continuity_preserved",
+      "continuityAfter": {
+        "locale": "zh",
+        "controlBase": "http://127.0.0.1:44697",
+        "conversation": "{\"id\":\"conv-demo\",\"msgs\":2}"
+      },
+      "ok": true
+    },
+    {
+      "step": "activate_cleanup",
+      "cachesNew": {
+        "names": [
+          "hamster-pwa-shell-v2"
+        ],
+        "detail": {
+          "hamster-pwa-shell-v2": [
+            "/",
+            "/assets/index-C3ESqCyk.js"
+          ]
+        }
+      },
+      "oldShellGone": true,
+      "newShellPresent": true,
+      "ok": true
+    },
+    {
+      "step": "offline_launch",
+      "marker": "NEW_UI",
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "marker": "NEW_UI",
+      "conversation": "{\"id\":\"conv-demo\",\"msgs\":2}",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

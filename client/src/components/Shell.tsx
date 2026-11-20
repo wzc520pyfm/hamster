@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useLocale } from '@/i18n/LocaleContext'
 import { InstallPrompt } from '@/components/InstallPrompt'
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
 import { isStandaloneDisplay } from '@/lib/hamsterEnv'
 import { cn } from '@/lib/utils'
 
@@ -236,7 +237,8 @@ export function Shell({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <Outlet />
         </div>
-        {/* In-flow install affordance: shrink-0 below the flex-1 conversation column (not fixed overlay). */}
+        {/* In-flow update + install: shrink-0 below the flex-1 conversation column (not fixed overlay). */}
+        <PwaUpdateBanner />
         <InstallPrompt />
       </main>
       </div>

@@ -5,16 +5,39 @@
  * - Control-plane API calls (`/api/...`, `/internal/...`) are NEVER cached, so a
  *   revoked permission can never leave restricted dashboard data in the cache.
  * - No task / conversation / approval payloads are cached.
+ *
+ * Update policy (keep in sync with client/src/lib/pwaShellCache.mjs):
+ * - SHELL_CACHE is versioned; activate deletes prior hamster-pwa-shell* buckets so a
+ *   new deploy does not keep serving old hashed JS from a fixed v1 cache.
+ * - SKIP_WAITING message lets the page finish a user-controlled reload.
  */
 
-const SHELL_CACHE = 'hamster-pwa-shell-v1';
+const SHELL_CACHE = 'hamster-pwa-shell-v2';
+const SHELL_CACHE_PREFIX = 'hamster-pwa-shell';
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+self.addEventListener('install', (event) => {
+  // Install immediately; clients opt in to reload via the update banner.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter((name) => name.startsWith(SHELL_CACHE_PREFIX) && name !== SHELL_CACHE)
+          .map((name) => caches.delete(name)),
+      );
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener('message', (event) => {
+  if (event?.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 function isControlPlanePath(url) {

@@ -37,6 +37,19 @@ function contentType(filePath) {
   return MIME[path.extname(filePath)] || 'application/octet-stream'
 }
 
+/**
+ * Cache-Control for static files. index.html and sw.js must not sit behind a long
+ * max-age — otherwise an installed PWA can keep an old service worker / shell for
+ * up to an hour after a new deploy (observed on box: rebuild invisible until SW
+ * unregister). Hashed assets under /assets/ may stay long-cached.
+ * Exported for unit tests.
+ */
+export function cacheControlForPath(urlPathOrFilePath) {
+  const base = path.basename(String(urlPathOrFilePath || ''))
+  if (base === 'index.html' || base === 'sw.js') return 'no-cache'
+  return 'public, max-age=3600'
+}
+
 function isProxyPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/')
 }
@@ -119,7 +132,7 @@ async function serveStatic(req, res) {
 
   res.writeHead(200, {
     'content-type': contentType(filePath),
-    'cache-control': filePath.endsWith('index.html') ? 'no-cache' : 'public, max-age=3600',
+    'cache-control': cacheControlForPath(filePath),
   })
   await pipeline(fs.createReadStream(filePath), res)
 }

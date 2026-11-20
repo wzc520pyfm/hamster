@@ -102,6 +102,9 @@ const copy = {
     isolatedDesktopStopped: 'The isolated desktop stopped',
     useControlPlaneInstead: 'Use the control plane instead',
     createIsolatedDesktopAction: 'Create or start the isolated desktop',
+    updateAvailable: 'A new version of Hamster is available.',
+    reloadToUpdate: 'Reload',
+    dismissUpdate: 'Not now',
   },
   zh: {
     brand: 'Hamster',
@@ -163,6 +166,9 @@ const copy = {
     isolatedDesktopStopped: '隔离桌面已停止',
     useControlPlaneInstead: '改用控制面',
     createIsolatedDesktopAction: '创建或启动隔离桌面',
+    updateAvailable: 'Hamster 有新版本可用。',
+    reloadToUpdate: '重新加载',
+    dismissUpdate: '暂不',
   },
 } as const
 

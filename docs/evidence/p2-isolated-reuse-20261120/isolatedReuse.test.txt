@@ -1,0 +1,103 @@
+TAP version 13
+# Subtest: shouldSkipCreateIsolatedDesktopApproval: healthy probe+health => skip ticket
+ok 1 - shouldSkipCreateIsolatedDesktopApproval: healthy probe+health => skip ticket
+  ---
+  duration_ms: 0.760348
+  type: 'test'
+  ...
+# Subtest: shouldSkipCreateIsolatedDesktopApproval: client running claim alone never skips
+ok 2 - shouldSkipCreateIsolatedDesktopApproval: client running claim alone never skips
+  ---
+  duration_ms: 0.14514
+  type: 'test'
+  ...
+# Subtest: shouldSkipCreateIsolatedDesktopApproval: not_started requires create/start ticket
+ok 3 - shouldSkipCreateIsolatedDesktopApproval: not_started requires create/start ticket
+  ---
+  duration_ms: 0.096274
+  type: 'test'
+  ...
+# Subtest: shouldSkipCreateIsolatedDesktopApproval: unavailable / unknown fail closed
+ok 4 - shouldSkipCreateIsolatedDesktopApproval: unavailable / unknown fail closed
+  ---
+  duration_ms: 0.794387
+  type: 'test'
+  ...
+# Subtest: verifyHealthyIsolatedDesktopForReuse: probe ok + health ok => reuse
+ok 5 - verifyHealthyIsolatedDesktopForReuse: probe ok + health ok => reuse
+  ---
+  duration_ms: 0.307662
+  type: 'test'
+  ...
+# Subtest: verifyHealthyIsolatedDesktopForReuse: not_started => no reuse, no docker start
+ok 6 - verifyHealthyIsolatedDesktopForReuse: not_started => no reuse, no docker start
+  ---
+  duration_ms: 0.113582
+  type: 'test'
+  ...
+# Subtest: verifyHealthyIsolatedDesktopForReuse: probe ok but health fail => no reuse (ticket still required)
+ok 7 - verifyHealthyIsolatedDesktopForReuse: probe ok but health fail => no reuse (ticket still required)
+  ---
+  duration_ms: 0.168153
+  type: 'test'
+  ...
+# Subtest: verifyHealthyIsolatedDesktopForReuse: unavailable broker fail closed
+ok 8 - verifyHealthyIsolatedDesktopForReuse: unavailable broker fail closed
+  ---
+  duration_ms: 0.182111
+  type: 'test'
+  ...
+# Subtest: createTaskDecision: healthy reuse => no create ticket; spawn session
+ok 9 - createTaskDecision: healthy reuse => no create ticket; spawn session
+  ---
+  duration_ms: 0.25988
+  type: 'test'
+  ...
+# Subtest: createTaskDecision: not_started => mint create ticket; no spawn; no start
+ok 10 - createTaskDecision: not_started => mint create ticket; no spawn; no start
+  ---
+  duration_ms: 0.251764
+  type: 'test'
+  ...
+# Subtest: createTaskDecision: unhealthy/unavailable => mint ticket (fail closed for reuse)
+ok 11 - createTaskDecision: unhealthy/unavailable => mint ticket (fail closed for reuse)
+  ---
+  duration_ms: 0.369324
+  type: 'test'
+  ...
+# Subtest: security: create_isolated_desktop ticket cannot authorize publish_dashboard (params/action)
+ok 12 - security: create_isolated_desktop ticket cannot authorize publish_dashboard (params/action)
+  ---
+  duration_ms: 0.627456
+  type: 'test'
+  ...
+# Subtest: security: cross-target high-risk binding rejected; missing targetId fail closed
+ok 13 - security: cross-target high-risk binding rejected; missing targetId fail closed
+  ---
+  duration_ms: 0.104638
+  type: 'test'
+  ...
+# Subtest: security: stale/startup create params must not match tool authorize hash
+ok 14 - security: stale/startup create params must not match tool authorize hash
+  ---
+  duration_ms: 0.08897
+  type: 'test'
+  ...
+# Subtest: security regression: electron main keeps sandbox/contextIsolation/nodeIntegration guards
+ok 15 - security regression: electron main keeps sandbox/contextIsolation/nodeIntegration guards
+  ---
+  duration_ms: 0.228811
+  type: 'test'
+  ...
+# Subtest: readiness one-shot health check fail closed when fetch fails
+ok 16 - readiness one-shot health check fail closed when fetch fails
+  ---
+  duration_ms: 0.364946
+  type: 'test'
+  ...
+# Subtest: readiness one-shot health check ok on 200
+ok 17 - readiness one-shot health check ok on 200
+  ---
+  duration_ms: 0.149699
+  type: 'test'
+  ...

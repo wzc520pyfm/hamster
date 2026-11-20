@@ -273,6 +273,93 @@ async function probeIsolatedDesktop({ broker } = {}) {
   }
 }
 
+/**
+ * Pure gate: may createTask skip minting create_isolated_desktop?
+ * Never trusts clientClaim (running bit / selector state). Fail closed unless
+ * server probe is `ok` AND HTTP health is positively ok.
+ * @param {{
+ *   probe?: { state?: string, ok?: boolean } | null,
+ *   health?: { ok?: boolean } | null,
+ *   clientClaim?: unknown,
+ * }} [evidence]
+ */
+function shouldSkipCreateIsolatedDesktopApproval(evidence = {}) {
+  // Explicitly ignore any client-supplied running/health claim.
+  void evidence.clientClaim;
+  const state = evidence.probe?.state;
+  if (state === 'not_started') {
+    return { skip: false, reason: 'not_started' };
+  }
+  if (state !== 'ok') {
+    return {
+      skip: false,
+      reason: state === 'unavailable' ? 'unavailable' : 'unavailable_or_unknown',
+    };
+  }
+  if (evidence.health?.ok !== true) {
+    return { skip: false, reason: 'health_not_ready' };
+  }
+  return { skip: true, reason: null };
+}
+
+/**
+ * Server-side verify for reuse: probe + one-shot (or injected) health.
+ * Never calls broker.start — create/start still requires an approval ticket.
+ * @param {{
+ *   broker?: { status: Function, start?: Function } | null,
+ *   waitReady?: (opts?: object) => Promise<{ ok: boolean, reason?: string }>,
+ *   baseUrl?: string,
+ *   clientClaim?: unknown,
+ * }} [opts]
+ */
+async function verifyHealthyIsolatedDesktopForReuse(opts = {}) {
+  void opts.clientClaim;
+  const probe = await probeIsolatedDesktop({ broker: opts.broker });
+  if (probe.state !== 'ok') {
+    return {
+      reuse: false,
+      probe,
+      health: null,
+      reason:
+        probe.state === 'not_started'
+          ? 'not_started'
+          : probe.reason || probe.state || 'unavailable',
+    };
+  }
+  const waitReady =
+    opts.waitReady ||
+    (async (readyOpts) => {
+      // Lazy require avoids a circular dependency with readiness helpers in tests.
+      const readiness = require('./readiness');
+      return readiness.checkIsolatedDesktopHealthOnce(readyOpts);
+    });
+  const health = await waitReady({
+    baseUrl: opts.baseUrl || process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+  });
+  const decision = shouldSkipCreateIsolatedDesktopApproval({
+    probe,
+    health,
+    clientClaim: opts.clientClaim,
+  });
+  return {
+    reuse: decision.skip,
+    reason: decision.reason,
+    probe,
+    health,
+  };
+}
+
+/**
+ * Plan isolated createTask / retry / target-switch after a reuse verify.
+ * mintCreateTicket when reuse is not positively established; never auto-start docker here.
+ */
+function planIsolatedCreateTask({ reuse } = {}) {
+  if (reuse?.reuse === true) {
+    return { mintCreateTicket: false, spawnSession: true, startDesktop: false };
+  }
+  return { mintCreateTicket: true, spawnSession: false, startDesktop: false };
+}
+
 module.exports = {
   CONTROL_PLANE_TARGET_ID,
   ISOLATED_DESKTOP_TARGET_ID,
@@ -291,4 +378,7 @@ module.exports = {
   taskExecutionState,
   startIsolatedDesktop,
   probeIsolatedDesktop,
+  shouldSkipCreateIsolatedDesktopApproval,
+  verifyHealthyIsolatedDesktopForReuse,
+  planIsolatedCreateTask,
 };

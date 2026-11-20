@@ -152,9 +152,33 @@ async function createTask(conversationId, title, goal, targetId) {
   );
   try {
     if (target === isolation.ISOLATED_DESKTOP_TARGET_ID) {
-      // Isolated desktop assignment: creating/starting the desktop is high-risk and is
-      // gated by an approval ticket bound to this task's targetId. The task stays Queued
-      // (assigned, not started); nothing dispatches to a not-ready container.
+      // Isolated desktop: create/start stays high-risk and ticket-gated unless the
+      // control plane independently verifies the named target is already running AND
+      // HTTP-healthy. Client "running" claims are ignored. Reuse never calls docker
+      // create/start and never authorizes in-container tools.
+      const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
+        broker: BROKER,
+        clientClaim: null,
+      });
+      const plan = isolation.planIsolatedCreateTask({ reuse: verified });
+      if (plan.spawnSession && !plan.mintCreateTicket) {
+        await events.audit('task_created_isolated_reuse_running', {
+          taskId,
+          targetId: target,
+          probe: verified.probe?.state,
+        });
+        const { sessionId } = await eve.createSession(
+          `[hamster-worker taskId=${taskId} conversationId=${conversationId} targetId=${target} title=${title}] ${goal}`,
+          { targetId: target }
+        );
+        await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
+          sessionId,
+          'running',
+          taskId,
+        ]);
+        events.attach(`task:${taskId}`, sessionId, { targetId: target });
+        return { task: await taskDetail(taskId) };
+      }
       // Selecting Isolated desktop is NOT approval — only this ticket authorizes create/start.
       const approvalId = `appr_${taskId}_create_${crypto.randomUUID()}`;
       const params = isolation.createIsolatedDesktopParams(taskId, target);
@@ -164,7 +188,12 @@ async function createTask(conversationId, title, goal, targetId) {
          VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
         [approvalId, taskId, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify(params), hash, target, String(APPROVAL_TTL_SECONDS)]
       );
-      await events.audit('task_created_isolated_pending_start', { taskId, approvalId, targetId: target });
+      await events.audit('task_created_isolated_pending_start', {
+        taskId,
+        approvalId,
+        targetId: target,
+        reuseDenied: verified.reason ?? null,
+      });
       return { task: await taskDetail(taskId) };
     }
     const { sessionId } = await eve.createSession(
@@ -517,6 +546,20 @@ app.post('/api/tasks/:id/retry', asyncRoute(async (req, res) => {
   }
   if (task.target_id === isolation.ISOLATED_DESKTOP_TARGET_ID) {
     await invalidateOutstandingTickets(task.id);
+    const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
+      broker: BROKER,
+      clientClaim: null,
+    });
+    const plan = isolation.planIsolatedCreateTask({ reuse: verified });
+    if (plan.spawnSession && !plan.mintCreateTicket) {
+      await startTaskSession(task.id);
+      await events.audit('task_retry_isolated_reuse_running', {
+        taskId: task.id,
+        targetId: task.target_id,
+        probe: verified.probe?.state,
+      });
+      return res.json({ taskId: task.id, status: 'running', started: true, reused: true });
+    }
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
     const params = isolation.createIsolatedDesktopParams(task.id, task.target_id);
     const hash = policy.paramsHash(params);
@@ -525,7 +568,12 @@ app.post('/api/tasks/:id/retry', asyncRoute(async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
       [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify(params), hash, task.target_id, String(APPROVAL_TTL_SECONDS)]
     );
-    await events.audit('task_retry_requested', { taskId: task.id, approvalId, targetId: task.target_id });
+    await events.audit('task_retry_requested', {
+      taskId: task.id,
+      approvalId,
+      targetId: task.target_id,
+      reuseDenied: verified.reason ?? null,
+    });
     return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
   }
   await startTaskSession(task.id);
@@ -548,6 +596,26 @@ app.post('/api/tasks/:id/target', asyncRoute(async (req, res) => {
   await invalidateOutstandingTickets(task.id);
   await query('UPDATE tasks SET target_id = $1, updated_at = now() WHERE id = $2', [targetId, task.id]);
   if (targetId === isolation.ISOLATED_DESKTOP_TARGET_ID) {
+    const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
+      broker: BROKER,
+      clientClaim: null,
+    });
+    const plan = isolation.planIsolatedCreateTask({ reuse: verified });
+    if (plan.spawnSession && !plan.mintCreateTicket) {
+      await startTaskSession(task.id);
+      await events.audit('task_target_switched_isolated_reuse_running', {
+        taskId: task.id,
+        targetId,
+        probe: verified.probe?.state,
+      });
+      return res.json({
+        taskId: task.id,
+        status: 'running',
+        started: true,
+        switchedTo: 'isolated_desktop',
+        reused: true,
+      });
+    }
     // Re-issue the high-risk create/start ticket; task stays Queued (not started).
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
     const params = isolation.createIsolatedDesktopParams(task.id, targetId);
@@ -557,7 +625,12 @@ app.post('/api/tasks/:id/target', asyncRoute(async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
       [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify(params), hash, targetId, String(APPROVAL_TTL_SECONDS)]
     );
-    await events.audit('task_target_switched_to_isolated', { taskId: task.id, approvalId, targetId });
+    await events.audit('task_target_switched_to_isolated', {
+      taskId: task.id,
+      approvalId,
+      targetId,
+      reuseDenied: verified.reason ?? null,
+    });
     return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
   }
   // Switched to the control plane explicitly; only an unstarted task may do this.

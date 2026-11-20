@@ -63,8 +63,38 @@ async function waitForIsolatedDesktopReady(opts = {}) {
   return { ok: false, reason: `readiness_timeout:${lastReason}` };
 }
 
+/**
+ * One-shot health GET for reuse decisions. Fail closed on non-ok / unreachable.
+ * Does not start or create anything.
+ */
+async function checkIsolatedDesktopHealthOnce(opts = {}) {
+  const baseUrl = (opts.baseUrl || process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081').replace(
+    /\/$/,
+    '',
+  );
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    return { ok: false, reason: 'fetch_unavailable' };
+  }
+  const healthUrl = `${baseUrl}/eve/v1/health`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 2000);
+    try {
+      const res = await fetchImpl(healthUrl, { method: 'GET', signal: controller.signal });
+      if (res && res.ok) return { ok: true, status: res.status };
+      return { ok: false, reason: `readiness_http_${res?.status ?? 'unknown'}` };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err) {
+    return { ok: false, reason: `readiness_unreachable:${String(err?.message ?? err)}` };
+  }
+}
+
 module.exports = {
   waitForIsolatedDesktopReady,
+  checkIsolatedDesktopHealthOnce,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_INTERVAL_MS,
 };

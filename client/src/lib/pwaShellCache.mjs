@@ -1,13 +1,14 @@
 /**
  * PWA shell-cache helpers (pure). Mirrored by client/public/sw.js — keep in sync.
- * Old fixed name hamster-pwa-shell-v1 left stale assets after deploy; activate must
- * drop every prior hamster-pwa-shell* entry when a new SHELL_CACHE is current.
+ * Cache bucket is hamster-pwa-shell-<deployId>; deployId is stamped at build time.
  */
 
-/** Current shell cache bucket. Bump when SW caching policy changes. */
-export const SHELL_CACHE = 'hamster-pwa-shell-v2'
+import { SHELL_CACHE_PREFIX, shellCacheNameForBuild } from './pwaBuildStamp.mjs'
 
-export const SHELL_CACHE_PREFIX = 'hamster-pwa-shell'
+export { SHELL_CACHE_PREFIX, shellCacheNameForBuild }
+
+/** Default for unit fixtures (not a production deploy id). */
+export const SHELL_CACHE = shellCacheNameForBuild('dev')
 
 /**
  * Given CacheStorage keys from an older install, decide which to delete when

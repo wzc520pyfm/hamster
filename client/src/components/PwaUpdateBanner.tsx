@@ -49,8 +49,8 @@ export function PwaUpdateBanner() {
             size="sm"
             data-testid="pwa-update-reload"
             onClick={() => {
-              void getHamsterServiceWorkerRegistration().then((reg) => {
-                applyHamsterPwaUpdate(reg)
+              void getHamsterServiceWorkerRegistration().then(async (reg) => {
+                await applyHamsterPwaUpdate(reg)
               })
             }}
           >

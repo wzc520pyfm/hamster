@@ -6,18 +6,22 @@
  *   revoked permission can never leave restricted dashboard data in the cache.
  * - No task / conversation / approval payloads are cached.
  *
- * Update policy (keep in sync with client/src/lib/pwaShellCache.mjs):
- * - SHELL_CACHE is versioned; activate deletes prior hamster-pwa-shell* buckets so a
- *   new deploy does not keep serving old hashed JS from a fixed v1 cache.
- * - SKIP_WAITING message lets the page finish a user-controlled reload.
+ * Update policy (keep in sync with client/src/lib/pwaBuildStamp.mjs):
+ * - HAMSTER_PWA_BUILD is stamped at vite build from hashed asset names so every
+ *   deploy that changes the React bundle also changes sw.js (update detection).
+ * - install does NOT skipWaiting when an older worker already controls pages —
+ *   activation waits for the page's SKIP_WAITING message after user Reload.
+ * - First install (no active worker) still activates per browser rules.
+ * - activate deletes prior hamster-pwa-shell* buckets and claims clients.
  */
 
-const SHELL_CACHE = 'hamster-pwa-shell-v2';
+const HAMSTER_PWA_BUILD = '__HAMSTER_PWA_BUILD__';
+const SHELL_CACHE = 'hamster-pwa-shell-' + HAMSTER_PWA_BUILD;
 const SHELL_CACHE_PREFIX = 'hamster-pwa-shell';
 
-self.addEventListener('install', (event) => {
-  // Install immediately; clients opt in to reload via the update banner.
-  event.waitUntil(self.skipWaiting());
+self.addEventListener('install', (_event) => {
+  // Intentionally do not activate early. With existing controlled clients, the new
+  // worker stays in waiting until the user confirms Reload (message SKIP_WAITING).
 });
 
 self.addEventListener('activate', (event) => {

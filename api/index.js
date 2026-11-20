@@ -12,6 +12,7 @@ const eve = require('./src/eve');
 const events = require('./src/events');
 const assets = require('./src/assets');
 const isolation = require('./src/isolation');
+const readiness = require('./src/readiness');
 
 const PORT = Number(process.env.PORT ?? 8080);
 const INTERNAL_SECRET = process.env.HAMSTER_INTERNAL_SECRET ?? 'dev-internal-secret';
@@ -715,7 +716,13 @@ async function decideApproval(req, res, outcome) {
   }
 
   const optionId = outcome === 'approved' ? 'approve' : 'deny';
-  const note = outcome === 'approved' ? isolation.APPROVED_ONCE_NOTE : 'Denied';
+  const isCreateIsolated =
+    outcome === 'approved' && ticket.action === isolation.CREATE_ISOLATED_DESKTOP_ACTION;
+  // For create/start, do not stamp "Approved for this action only" until readiness +
+  // startTaskSession succeed. Otherwise a failed createSession would leave that surface.
+  const note = outcome === 'approved'
+    ? (isCreateIsolated ? null : isolation.APPROVED_ONCE_NOTE)
+    : 'Denied';
   const ticketParams =
     ticket.params && typeof ticket.params === 'object' && !Array.isArray(ticket.params)
       ? ticket.params
@@ -739,7 +746,7 @@ async function decideApproval(req, res, outcome) {
         ticket.eve_session_id,
         ticket.eve_interaction_id,
         optionId,
-        note,
+        note ?? isolation.APPROVED_ONCE_NOTE,
         { targetId: eveTargetId }
       );
     } catch (err) {
@@ -757,7 +764,7 @@ async function decideApproval(req, res, outcome) {
     [outcome, req.body?.decidedBy ?? 'local-user', note, ticket.id]
   );
   await events.audit(`approval_${outcome}`, { approvalId: ticket.id, taskId: ticket.task_id }, req.body?.decidedBy ?? 'local-user');
-  if (outcome === 'approved' && ticket.action === isolation.CREATE_ISOLATED_DESKTOP_ACTION) {
+  if (isCreateIsolated) {
     // Start goes through authorize() so the ticket is consumed exactly once for this start.
     // One start approval must not authorize later starts or in-container tools.
     const auth = await policy.authorize(
@@ -766,18 +773,11 @@ async function decideApproval(req, res, outcome) {
       ticketParams
     );
     if (!auth.allow) {
-      await query(
-        `UPDATE approvals SET status = 'invalidated', decision_note = $2, decided_at = now(), decided_by = 'system'
-          WHERE id = $1`,
-        [ticket.id, isolation.INVALIDATED_NOTE]
-      );
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(409).json({ error: 'no_valid_ticket', status: 'invalidated', reason: auth.reason });
     }
     if (!isolation.isIsolatedDesktopTarget(ticketTargetId)) {
-      await query(
-        `UPDATE approvals SET status = 'invalidated', decision_note = $2 WHERE id = $1`,
-        [ticket.id, isolation.INVALIDATED_NOTE]
-      );
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(409).json({ error: 'target_mismatch', status: 'invalidated' });
     }
     const start = await isolation.startIsolatedDesktop({
@@ -785,27 +785,56 @@ async function decideApproval(req, res, outcome) {
       broker: BROKER,
     });
     if (!start.ok) {
-      // Fail closed: do not leave the ticket looking like "Approved for this action only".
-      await query(
-        `UPDATE approvals SET status = 'invalidated', decision_note = $2, decided_at = now(), decided_by = 'system'
-          WHERE id = $1`,
-        [ticket.id, isolation.INVALIDATED_NOTE]
-      );
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(502).json({
         error: 'isolation_start_failed',
         taskId: ticket.task_id,
         targetId: ticketTargetId,
         reason: start.reason,
         status: 'invalidated',
+        state: 'start_failed',
       });
     }
-    // Success only: keep Approved for this action only (ticket already consumed).
+    // Wait until http://desktop:8081 is ready before createSession.
+    const ready = await readiness.waitForIsolatedDesktopReady({
+      baseUrl: process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+    });
+    if (!ready.ok) {
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_not_ready',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: ready.reason,
+        status: 'invalidated',
+        state: 'start_failed',
+      });
+    }
+    try {
+      await startTaskSession(ticket.task_id);
+    } catch (err) {
+      // createSession / attach failed: ticket must not remain Approved for this action only.
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_session_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: String(err?.message ?? err),
+        status: 'invalidated',
+        state: 'start_failed',
+      });
+    }
+    // Success only: now stamp Approved for this action only (ticket already consumed).
     await query(
       `UPDATE approvals SET decision_note = $2 WHERE id = $1`,
       [ticket.id, isolation.APPROVED_ONCE_NOTE]
     );
-    await startTaskSession(ticket.task_id);
-    return res.json({ id: ticket.id, status: outcome, note: isolation.APPROVED_ONCE_NOTE, taskId: ticket.task_id });
+    return res.json({
+      id: ticket.id,
+      status: outcome,
+      note: isolation.APPROVED_ONCE_NOTE,
+      taskId: ticket.task_id,
+    });
   }
   await query(
     `UPDATE tasks SET status = 'running', updated_at = now()
@@ -813,6 +842,22 @@ async function decideApproval(req, res, outcome) {
     [ticket.task_id]
   );
   return res.json({ id: ticket.id, status: outcome, note, taskId: ticket.task_id });
+}
+
+/** Invalidate start ticket + keep task Queued so UI shows start_failed (not approved). */
+async function markIsolatedStartFailed(ticketId, taskId) {
+  await query(
+    `UPDATE approvals SET status = 'invalidated', decision_note = $2, decided_at = now(), decided_by = 'system'
+      WHERE id = $1`,
+    [ticketId, isolation.INVALIDATED_NOTE]
+  );
+  // Ensure the task stays Queued with no session — execution state becomes start_failed.
+  await query(
+    `UPDATE tasks SET status = 'queued', eve_session_id = NULL, updated_at = now()
+      WHERE id = $1 AND status IN ('queued', 'waiting_for_approval', 'running')`,
+    [taskId]
+  );
+  await events.audit('isolation_start_failed', { approvalId: ticketId, taskId });
 }
 
 async function startTaskSession(taskId) {

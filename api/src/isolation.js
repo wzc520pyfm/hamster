@@ -48,6 +48,8 @@ async function defaultDockerRun(args) {
 }
 
 function isolatedWorkerEnvArgs() {
+  // Forward the same model env names the agent path uses (values come from api process env;
+  // compose passes placeholders — never commit secrets).
   const env = {
     PORT: '8081',
     HAMSTER_API_URL: process.env.HAMSTER_ISOLATED_HAMSTER_API_URL || 'http://api:8080',
@@ -56,6 +58,8 @@ function isolatedWorkerEnvArgs() {
     HAMSTER_AGENT_PASSWORD: process.env.HAMSTER_AGENT_PASSWORD || 'dev-agent-password',
     HAMSTER_MODEL_ID: process.env.HAMSTER_MODEL_ID || '',
     HAMSTER_MODEL_PROVIDER: process.env.HAMSTER_MODEL_PROVIDER || '',
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
     HAMSTER_STEP_DELAY_MS: process.env.HAMSTER_STEP_DELAY_MS || '2000',
   };

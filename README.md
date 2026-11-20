@@ -130,6 +130,28 @@ After install, opening from the home screen enters the same main conversation (s
 page). Safe area, virtual-keyboard handling, long-copy wrapping, Retry placement, disconnect copy, and
 the shell-only service-worker cache are implemented for this path.
 
+## P2 isolated desktop image (optional execution target)
+
+Isolated desktop is an optional per-task target, not an install dependency. Do **not**
+`up` a desktop Compose service, and do **not** pre-create a container named `desktop`.
+
+Build/tag the allowlisted image the broker expects (from the agent Dockerfile; no container start):
+
+```bash
+./scripts/build-worker-isolated.sh
+# tags hamster/worker-isolated:latest
+```
+
+Then bring up the control plane only:
+
+```bash
+docker compose -f docker-compose.p2.yml up -d db agent api client
+```
+
+Create/start of container `desktop` on network `hamster_p2` happens only after an in-app
+approval ticket bound to that target. The api image includes a Docker CLI so the broker can
+talk to the host `docker.sock` (mounted on **api only** — never on agent or desktop).
+
 ## Status
 
 See `docs/p0-report.md` and `docs/p1-electron-pwa.md`. Contract checks and OpenUI Renderer wiring are

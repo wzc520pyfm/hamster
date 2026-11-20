@@ -3,6 +3,7 @@
 # the shared dev stack.
 #
 # Safe start (no standing desktop, no api→desktop install dependency, no pre-approval start):
+#   ./scripts/build-worker-isolated.sh          # tags hamster/worker-isolated:latest (no up desktop)
 #   docker compose -f docker-compose.p2.yml up -d db agent api client
 # Do NOT start a long-running desktop service before in-app approval.
 # After a targetId-bound create/start ticket is approved, the control-plane broker
@@ -77,6 +78,14 @@ services:
       HAMSTER_AGENT_PASSWORD: ${HAMSTER_AGENT_PASSWORD:-dev-agent-password}
       HAMSTER_APPROVAL_TTL_SECONDS: ${HAMSTER_APPROVAL_TTL_SECONDS:-600}
       HAMSTER_CORS_ORIGIN: ${HAMSTER_CORS_ORIGIN:-http://localhost:3000}
+      # Passthrough placeholders for the broker to inject into the desktop worker
+      # (same names as the agent path). Empty by default — never commit secrets.
+      HAMSTER_MODEL_ID: ${HAMSTER_MODEL_ID:-}
+      HAMSTER_MODEL_PROVIDER: ${HAMSTER_MODEL_PROVIDER:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      HAMSTER_STEP_DELAY_MS: ${HAMSTER_STEP_DELAY_MS:-2000}
     depends_on:
       db:
         condition: service_healthy
@@ -84,6 +93,7 @@ services:
         condition: service_started
     # Broker-only: docker.sock on the control plane so create/start can run after approval.
     # Never mount docker.sock into agent or the broker-created desktop.
+    # No privileged / host-pid / host-network / host-root mounts.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:

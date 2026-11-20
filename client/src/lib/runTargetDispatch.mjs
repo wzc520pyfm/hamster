@@ -21,6 +21,15 @@ export function showUnstartedIsolatedActions(runState, status) {
   )
 }
 
+/**
+ * Retry is only for "Isolated desktop is unavailable" / "Couldn't start the isolated desktop".
+ * A pending_approval task must not Retry: awaiting a start approval is not a start failure.
+ * @param {string} runState
+ */
+export function mayRetryIsolatedStart(runState) {
+  return runState === 'start_failed' || runState === 'unavailable'
+}
+
 /** @param {string} text */
 export function isLongTaskDispatch(text) {
   return /^(?:start|dispatch|delegate|派发)\s+(?:a\s+)?(?:long[- ]running\s+)?task:?\s*/is.test(

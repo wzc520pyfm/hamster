@@ -6,6 +6,7 @@ import { getCopy, type Locale } from '@/i18n/messages'
 import {
   taskRunState,
   taskRunTargetLabel,
+  mayRetryIsolatedStart,
   showUnstartedIsolatedActions,
   type TaskRunState,
 } from '@/lib/runTarget'
@@ -86,7 +87,7 @@ export function TaskCard({
 
       {showUnstartedIsolatedActions(runState, task.status) ? (
         <div className="mt-2 flex flex-wrap gap-2" data-testid="task-unstarted-actions">
-          {onRetry ? (
+          {onRetry && mayRetryIsolatedStart(runState) ? (
             <Button
               type="button"
               size="sm"

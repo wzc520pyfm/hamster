@@ -28,14 +28,23 @@ export function mayUseControlPlaneInstead(status: string): boolean {
 }
 
 /**
- * Unstarted isolated tasks (pending_approval or start_failed) may Retry / use control plane.
- * Not only start_failed.
+ * Unstarted isolated tasks (pending_approval or start_failed) may use the control plane instead.
+ * A pending_approval task is queued awaiting a start approval, not failed to start; it keeps the
+ * control-plane switch but must not draw Retry.
  */
 export function showUnstartedIsolatedActions(runState: TaskRunState, status: string): boolean {
   return (
     mayUseControlPlaneInstead(status) &&
     (runState === 'start_failed' || runState === 'pending_approval')
   )
+}
+
+/**
+ * Retry is only for "Isolated desktop is unavailable" / "Couldn't start the isolated desktop".
+ * A pending_approval task must not Retry: awaiting a start approval is not a start failure.
+ */
+export function mayRetryIsolatedStart(runState: TaskRunState): boolean {
+  return runState === 'start_failed' || runState === 'unavailable'
 }
 
 /** Long-task dispatch patterns that read the Run-on selector. Follow-ups must not. */

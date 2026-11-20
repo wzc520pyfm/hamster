@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import {
   canDispatchToIsolated,
   mayUseControlPlaneInstead,
+  mayRetryIsolatedStart,
   showUnstartedIsolatedActions,
   isLongTaskDispatch,
 } from './runTargetDispatch.mjs'
@@ -31,6 +32,14 @@ test('Use the control plane instead: available for pending_approval and start_fa
   assert.equal(showUnstartedIsolatedActions('start_failed', 'queued'), true)
   assert.equal(showUnstartedIsolatedActions('ok', 'running'), false)
   assert.equal(showUnstartedIsolatedActions('stopped', 'failed'), false)
+})
+
+test('Retry: only for an actual isolated start failure; pending_approval must not Retry', () => {
+  assert.equal(mayRetryIsolatedStart('start_failed'), true)
+  assert.equal(mayRetryIsolatedStart('unavailable'), true)
+  assert.equal(mayRetryIsolatedStart('pending_approval'), false)
+  assert.equal(mayRetryIsolatedStart('ok'), false)
+  assert.equal(mayRetryIsolatedStart('stopped'), false)
 })
 
 test('only long-task dispatch reads Run-on; progress/follow-ups do not match', () => {

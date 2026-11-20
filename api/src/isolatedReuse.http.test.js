@@ -657,6 +657,110 @@ test('NATURAL: pin managed digestA when tag retargets B — requires new approva
   });
 });
 
+test('NATURAL: task frozen identity A survives managed replacement B (steer/cancel/stream headers)', async (t) => {
+  await withApi(t, async (ctx) => {
+    const digestA = FIX.imageId;
+    const digestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    ctx.brokerState.mode = 'not_started';
+    ctx.eve.server.__healthMode = 'ok';
+    const first = await ctx.postMessage('start task: freeze A then replace managed B', ISOLATED);
+    const taskId = first.body.task?.taskId || first.body.task?.id;
+    const tickets = await ctx.countCreateTickets(taskId);
+    const approved = await ctx.approve(tickets[0].id);
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.equal(approved.body.instanceId, ctx.identityState.instanceId);
+
+    const taskBefore = await ctx.pool.query(
+      'SELECT eve_session_id, eve_instance_id, eve_container_id, eve_image_id FROM tasks WHERE id = $1',
+      [taskId],
+    );
+    const frozen = taskBefore.rows[0];
+    assert.ok(frozen.eve_session_id);
+    assert.equal(frozen.eve_instance_id, approved.body.instanceId);
+    assert.equal(frozen.eve_image_id, digestA);
+
+    // Replace managed provenance with B — session A must NOT rebind.
+    await ctx.api.upsertManagedIsolatedDesktop({
+      targetId: ISOLATED,
+      instanceId: 'inst_REPLACED_B',
+      containerId: 'ctr_REPLACED_B',
+      imageId: digestB,
+      configImage: isolation.ALLOWLISTED_IMAGE,
+      approvalId: 'appr_B',
+      taskId: 'task_B',
+    });
+    const managedB = await ctx.getManaged();
+    assert.equal(managedB.instanceId, 'inst_REPLACED_B');
+    assert.equal(managedB.imageId, digestB);
+
+    // Eve fake still expects original A identity headers (worker validates frozen A).
+    ctx.identityState.instanceId = frozen.eve_instance_id;
+    ctx.identityState.imageId = digestA;
+
+    const steer = await fetch(`${ctx.origin}/api/tasks/${taskId}/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'steer with frozen A' }),
+    });
+    const steerBody = await steer.json();
+    assert.equal(steer.status, 202, JSON.stringify(steerBody));
+    assert.equal(steerBody.delivered, true, 'steer must use frozen A that gateway accepts');
+
+    // If worker now only accepts B, frozen-A ops fail closed (never silently use B).
+    ctx.identityState.instanceId = 'inst_REPLACED_B';
+    ctx.identityState.imageId = digestB;
+    const steerReject = await fetch(`${ctx.origin}/api/tasks/${taskId}/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'steer must not rebind to B' }),
+    });
+    const rejectBody = await steerReject.json();
+    assert.equal(rejectBody.delivered, false, 'API still sends frozen A; B worker rejects');
+
+    // Stream attach identity: readstream via direct Eve path with frozen A vs B mismatch.
+    ctx.identityState.instanceId = frozen.eve_instance_id;
+    ctx.identityState.imageId = digestA;
+    const streamOk = await fetch(
+      `${process.env.EVE_ISOLATED_API_URL}/eve/v1/session/${frozen.eve_session_id}/stream`,
+      {
+        method: 'GET',
+        headers: {
+          [eve.INSTANCE_HEADER]: frozen.eve_instance_id,
+          [eve.TARGET_HEADER]: ISOLATED,
+          [eve.IMAGE_HEADER]: digestA,
+        },
+      },
+    );
+    assert.equal(streamOk.status, 200);
+    const streamBad = await fetch(
+      `${process.env.EVE_ISOLATED_API_URL}/eve/v1/session/${frozen.eve_session_id}/stream`,
+      {
+        method: 'GET',
+        headers: {
+          [eve.INSTANCE_HEADER]: 'inst_REPLACED_B',
+          [eve.TARGET_HEADER]: ISOLATED,
+          [eve.IMAGE_HEADER]: digestB,
+        },
+      },
+    );
+    assert.equal(streamBad.status, 409);
+
+    // Legacy missing frozen identity fail closed.
+    await ctx.pool.query(
+      'UPDATE tasks SET eve_instance_id = NULL, eve_image_id = NULL WHERE id = $1',
+      [taskId],
+    );
+    const legacy = await fetch(`${ctx.origin}/api/tasks/${taskId}/steer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'legacy' }),
+    });
+    assert.equal(legacy.status, 409);
+    const legacyBody = await legacy.json();
+    assert.match(String(legacyBody.error), /frozen_identity/);
+  });
+});
+
 test('API ops: mismatched identity blocks steer / cancel / approval-answer paths', async (t) => {
   await withApi(t, async (ctx) => {
     ctx.brokerState.mode = 'not_started';

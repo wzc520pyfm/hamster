@@ -14,7 +14,7 @@ if [[ ! -x "${PG_BIN}/initdb" ]]; then
   exit 1
 fi
 
-ROOT="${HAMSTER_P2_PG_ROOT:-/tmp/hamster-p2-ephemeral-pg-$$}"
+ROOT="${HAMSTER_P2_PG_ROOT:-$(mktemp -d /tmp/hamster-p2-ephemeral-pg-XXXXXX)}"
 DATA_DIR="${ROOT}/data"
 LOG_FILE="${ROOT}/postgres.log"
 PORT="${HAMSTER_P2_PG_PORT:-$((55000 + RANDOM % 1000))}"

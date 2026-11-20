@@ -1,0 +1,41 @@
+{
+  "pass": true,
+  "blocker": null,
+  "summary": {
+    "gatewayEntry": "/agent/repos/hamster/agent/lib/isolatedIdentityGateway.mjs",
+    "command": "/home/ubuntu/.nvm/versions/node/v24.22.3/bin/node /agent/repos/hamster/agent/lib/isolatedIdentityGateway.mjs",
+    "nodeExecutable": "/home/ubuntu/.nvm/versions/node/v24.22.3/bin/node",
+    "nodeVersion": "v24.22.3",
+    "evePackage": "eve@1.0.2",
+    "eveSpawn": "npx eve start (via gateway spawnEve)",
+    "gatewayPid": 20389,
+    "evePid": 20397,
+    "gatewayPort": 46395,
+    "upstreamPort": 46545,
+    "fixtureOnly": true
+  },
+  "steps": [
+    {
+      "step": "spawn_production_gateway_main",
+      "ok": true
+    },
+    {
+      "step": "gateway_main_listening",
+      "ok": true
+    },
+    {
+      "step": "gateway_augmented_health_via_main",
+      "ok": true
+    },
+    {
+      "step": "session_without_identity_rejected",
+      "ok": true
+    },
+    {
+      "step": "session_with_identity_via_main_spawned_eve",
+      "ok": true
+    }
+  ],
+  "evidenceRepo": "/agent/repos/hamster/docs/evidence/p2-gateway-main-spawn-eve-20261121",
+  "evidenceRaw": "/opt/cursor/artifacts/p2-gateway-main-spawn-eve-20261121"
+}

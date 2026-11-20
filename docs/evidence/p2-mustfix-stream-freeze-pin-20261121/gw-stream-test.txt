@@ -1,0 +1,14 @@
+✔ gateway augments real Eve health with targetId/instanceId/imageId (23.911638ms)
+✔ gateway rejects session without matching identity headers (worker-side) (11.277127ms)
+✔ document: bare Eve health lacks identity — wrapper is required (0.168425ms)
+✔ ALL session routes require identity; stubs /existing and /cancel are not 202 passthrough (10.565889ms)
+✔ mismatched image digest header rejected on session create (2.344704ms)
+✔ incremental NDJSON stream: first headers/event before end; cancel cleans upstream (107.190482ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 361.063505

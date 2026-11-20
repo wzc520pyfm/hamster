@@ -43,10 +43,48 @@ async function getManagedIsolatedDesktop(targetId = isolation.ISOLATED_DESKTOP_T
   };
 }
 
-/** Frozen identity for isolated Eve calls (steer/cancel/answer/stream). Null for control plane. */
+/**
+ * CURRENT managed provenance for a target (create/start planning only).
+ * NEVER use this to rebind an existing session/task — use identityForTask.
+ */
 async function identityForTarget(targetId) {
   if (!isolation.isIsolatedDesktopTarget(targetId)) return null;
   return getManagedIsolatedDesktop(targetId);
+}
+
+/**
+ * ORIGINAL frozen identity persisted on the task at session create.
+ * Isolated session ops (steer/cancel/answer/stream/reattach) MUST use this —
+ * never the current managed row (session A must not rebind to replacement B).
+ * Legacy rows missing frozen columns fail closed.
+ */
+function frozenIdentityFromTask(task) {
+  if (!task) return null;
+  const targetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+  if (!isolation.isIsolatedDesktopTarget(targetId)) return null;
+  const instanceId = task.eve_instance_id;
+  const imageId = task.eve_image_id;
+  const containerId = task.eve_container_id || null;
+  if (!instanceId || !imageId) {
+    const err = new Error('isolated_task_frozen_identity_missing');
+    err.status = 409;
+    throw err;
+  }
+  if (!isolation.isCompleteImageDigest(imageId)) {
+    const err = new Error('isolated_task_frozen_identity_incomplete');
+    err.status = 409;
+    throw err;
+  }
+  return {
+    targetId,
+    instanceId,
+    containerId,
+    imageId,
+  };
+}
+
+async function identityForTask(task) {
+  return frozenIdentityFromTask(task);
 }
 
 async function upsertManagedIsolatedDesktop(record) {
@@ -253,11 +291,20 @@ async function createTask(conversationId, title, goal, targetId) {
             `[hamster-worker taskId=${taskId} conversationId=${conversationId} targetId=${target} title=${title}] ${goal}`,
             { targetId: target, identity: guard.identity }
           );
-          await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
-            sessionId,
-            'running',
-            taskId,
-          ]);
+          // Persist ORIGINAL frozen identity on the task — later ops must not re-read managed.
+          await query(
+            `UPDATE tasks SET eve_session_id = $1, status = $2,
+               eve_instance_id = $3, eve_container_id = $4, eve_image_id = $5,
+               updated_at = now() WHERE id = $6`,
+            [
+              sessionId,
+              'running',
+              guard.identity.instanceId,
+              guard.identity.containerId || null,
+              guard.identity.imageId,
+              taskId,
+            ],
+          );
           events.attach(`task:${taskId}`, sessionId, {
             targetId: target,
             identity: guard.identity,
@@ -445,7 +492,14 @@ async function steerTask(req, res, taskId, message) {
     [taskId]
   );
   const taskTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
-  const taskIdentity = await identityForTarget(taskTargetId);
+  let taskIdentity = null;
+  try {
+    taskIdentity = await identityForTask(task);
+  } catch (err) {
+    if (isolation.isIsolatedDesktopTarget(taskTargetId)) {
+      return res.status(err.status || 409).json({ error: err.message });
+    }
+  }
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
@@ -524,7 +578,15 @@ async function cancelTask(req, res, taskId) {
     [taskId]
   );
   const cancelTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
-  const cancelIdentity = await identityForTarget(cancelTargetId);
+  let cancelIdentity = null;
+  try {
+    cancelIdentity = await identityForTask(task);
+  } catch (err) {
+    if (isolation.isIsolatedDesktopTarget(cancelTargetId) && task.eve_session_id) {
+      // Fail closed on legacy missing frozen identity — do not rebind to current managed.
+      console.warn('[cancel] frozen identity missing', err.message);
+    }
+  }
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
@@ -543,6 +605,9 @@ async function cancelTask(req, res, taskId) {
   let sessionCancel = 'not-attempted';
   if (task.eve_session_id) {
     try {
+      if (isolation.isIsolatedDesktopTarget(cancelTargetId) && !cancelIdentity) {
+        throw Object.assign(new Error('isolated_task_frozen_identity_missing'), { status: 409 });
+      }
       await eve.cancelSession(task.eve_session_id, {
         targetId: cancelTargetId,
         identity: cancelIdentity,
@@ -615,12 +680,18 @@ async function invalidateOutstandingTickets(taskId) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
         const tid = inv.target_id || isolation.CONTROL_PLANE_TARGET_ID;
+        const taskRes = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+        const taskRow = taskRes.rows[0];
+        let identity = null;
+        if (taskRow && isolation.isIsolatedDesktopTarget(tid)) {
+          identity = await identityForTask(taskRow);
+        }
         await eve.answerInteraction(
           inv.eve_session_id,
           inv.eve_interaction_id,
           'deny',
           isolation.INVALIDATED_NOTE,
-          { targetId: tid, identity: await identityForTarget(tid) }
+          { targetId: tid, identity }
         );
       } catch (err) {
         console.warn('[approvals] invalidate deny not delivered', err.message);
@@ -911,7 +982,17 @@ async function decideApproval(req, res, outcome) {
     }
   }
   const eveTargetId = ticketTargetId || taskRow?.target_id || isolation.CONTROL_PLANE_TARGET_ID;
-  const eveIdentity = await identityForTarget(eveTargetId);
+  // Approval answers bind to the task's ORIGINAL frozen identity — never current managed.
+  let eveIdentity = null;
+  if (ticket.eve_interaction_id && ticket.eve_session_id) {
+    try {
+      eveIdentity = taskRow ? await identityForTask(taskRow) : null;
+    } catch (err) {
+      if (isolation.isIsolatedDesktopTarget(eveTargetId)) {
+        return res.status(err.status || 409).json({ error: err.message });
+      }
+    }
+  }
   if (ticket.eve_interaction_id && ticket.eve_session_id) {
     try {
       await eve.answerInteraction(
@@ -975,11 +1056,15 @@ async function decideApproval(req, res, outcome) {
       startPlan.mode === 'restart'
         ? startPlan.instanceId
         : `inst_${crypto.randomUUID()}`;
+    // Restart pins to approved managed digest A — never freshly inspected tag B.
+    const expectedImageId =
+      startPlan.mode === 'restart' && priorManaged?.imageId ? priorManaged.imageId : null;
     const start = await isolation.startIsolatedDesktop({
       targetId: ticketTargetId,
       broker: BROKER,
       instanceId,
       approvalId: ticket.id,
+      expectedImageId,
     });
     if (!start.ok) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
@@ -1154,21 +1239,36 @@ async function startTaskSession(taskId, opts = {}) {
   if (!t || t.eve_session_id) return t?.eve_session_id ?? null;
   const targetId = t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
   // Route the worker to the runtime that belongs to this targetId (must-fix 3).
-  // Control-plane tasks hit EVE_API_URL (agent); isolated tasks hit EVE_ISOLATED_API_URL (desktop).
-  // Isolated: freeze identity into session headers; gateway enforces worker-side match.
+  // Isolated: freeze identity into session headers AND persist on the task row.
+  // Later ops must use the persisted ORIGINAL identity — never re-read managed.
   let identity = opts.identity || null;
   if (isolation.isIsolatedDesktopTarget(targetId) && !identity) {
     identity = await getManagedIsolatedDesktop(targetId);
+  }
+  if (isolation.isIsolatedDesktopTarget(targetId)) {
+    if (!identity?.instanceId || !identity?.imageId || !isolation.isCompleteImageDigest(identity.imageId)) {
+      const err = new Error('isolated_session_identity_required:startTaskSession');
+      err.status = 409;
+      throw err;
+    }
   }
   const { sessionId } = await eve.createSession(
     `[hamster-worker taskId=${t.id} conversationId=${t.conversation_id} targetId=${targetId} title=${t.title}] ${t.goal ?? ''}`,
     { targetId, identity }
   );
-  await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
-    sessionId,
-    'running',
-    taskId,
-  ]);
+  await query(
+    `UPDATE tasks SET eve_session_id = $1, status = $2,
+       eve_instance_id = $3, eve_container_id = $4, eve_image_id = $5,
+       updated_at = now() WHERE id = $6`,
+    [
+      sessionId,
+      'running',
+      identity?.instanceId || null,
+      identity?.containerId || null,
+      identity?.imageId || null,
+      taskId,
+    ],
+  );
   events.attach(`task:${taskId}`, sessionId, { targetId, identity });
   return sessionId;
 }
@@ -1182,14 +1282,19 @@ async function expireTicket(ticket) {
   );
   if (ticket.eve_interaction_id && ticket.eve_session_id) {
     try {
-      const task = await query('SELECT target_id FROM tasks WHERE id = $1', [ticket.task_id]);
+      const task = await query('SELECT * FROM tasks WHERE id = $1', [ticket.task_id]);
+      const taskRow = task.rows[0];
       const targetId =
         ticket.target_id ||
-        task.rows[0]?.target_id ||
+        taskRow?.target_id ||
         isolation.CONTROL_PLANE_TARGET_ID;
+      let identity = null;
+      if (taskRow && isolation.isIsolatedDesktopTarget(targetId)) {
+        identity = await identityForTask(taskRow);
+      }
       await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, 'deny', note, {
         targetId,
-        identity: await identityForTarget(targetId),
+        identity,
       });
     } catch (err) {
       console.warn('[approvals] expiry deny not delivered', err.message);
@@ -1213,17 +1318,22 @@ async function sweepExpired() {
     for (const ticket of rows) {
       if (ticket.eve_interaction_id && ticket.eve_session_id) {
         try {
-          const task = await query('SELECT target_id FROM tasks WHERE id = $1', [ticket.task_id]);
+          const task = await query('SELECT * FROM tasks WHERE id = $1', [ticket.task_id]);
+          const taskRow = task.rows[0];
           const targetId =
             ticket.target_id ||
-            task.rows[0]?.target_id ||
+            taskRow?.target_id ||
             isolation.CONTROL_PLANE_TARGET_ID;
+          let identity = null;
+          if (taskRow && isolation.isIsolatedDesktopTarget(targetId)) {
+            identity = await identityForTask(taskRow);
+          }
           await eve.answerInteraction(
             ticket.eve_session_id,
             ticket.eve_interaction_id,
             'deny',
             events.EXPIRY_NOTE,
-            { targetId, identity: await identityForTarget(targetId) }
+            { targetId, identity }
           );
         } catch (err) {
           console.warn('[approvals] expiry deny not delivered', err.message);
@@ -1345,14 +1455,24 @@ app.use((err, req, res, next) => {
 
 async function reattachFollowers() {
   const [tasks, convs] = await Promise.all([
-    query("SELECT id, eve_session_id, target_id FROM tasks WHERE eve_session_id IS NOT NULL AND status NOT IN ('succeeded','failed','cancelled')"),
+    query(
+      `SELECT id, eve_session_id, target_id, eve_instance_id, eve_container_id, eve_image_id
+       FROM tasks WHERE eve_session_id IS NOT NULL AND status NOT IN ('succeeded','failed','cancelled')`,
+    ),
     query('SELECT id, eve_session_id FROM conversations WHERE eve_session_id IS NOT NULL'),
   ]);
   for (const t of tasks.rows) {
     const tid = t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+    let identity = null;
+    try {
+      identity = await identityForTask(t);
+    } catch (err) {
+      console.warn('[reattach] refusing stream without frozen identity', t.id, err.message);
+      continue;
+    }
     events.attach(`task:${t.id}`, t.eve_session_id, {
       targetId: tid,
-      identity: await identityForTarget(tid),
+      identity,
     });
   }
   for (const c of convs.rows) {
@@ -1389,6 +1509,9 @@ if (require.main === module) {
     setIsolationBrokerForTests,
     getManagedIsolatedDesktop,
     upsertManagedIsolatedDesktop,
+    frozenIdentityFromTask,
+    identityForTask,
+    identityForTarget,
     INTERNAL_SECRET,
     pool,
     bootHttpServer,

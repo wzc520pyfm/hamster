@@ -270,16 +270,23 @@ function createDockerIsolationBroker(opts = {}) {
      * Create/start only after approval. Never adopts an arbitrary same-name container:
      * unmanaged name collision → fail closed (does NOT stop/rm live desktop).
      */
-    start: async ({ targetId, instanceId, approvalId } = {}) => {
+    /**
+     * @param {{ targetId?: string, instanceId: string, approvalId?: string,
+     *           expectedImageId?: string|null }} opts
+     * expectedImageId = approved immutable digest A from managed provenance.
+     * Restart pins to A even when the mutable tag now resolves to B.
+     * Create still uses the complete digest of the current allowlisted tag.
+     */
+    start: async ({ targetId, instanceId, approvalId, expectedImageId } = {}) => {
       if (targetId && targetId !== ISOLATED_DESKTOP_TARGET_ID) {
         return { ok: false, reason: 'not_isolated_desktop_target' };
       }
       if (!instanceId || typeof instanceId !== 'string') {
         return { ok: false, reason: 'instance_id_required' };
       }
-      let allowlistedImageId;
+      let currentTagDigest;
       try {
-        allowlistedImageId = await dockerRun([
+        currentTagDigest = await dockerRun([
           'image',
           'inspect',
           '--format',
@@ -289,13 +296,16 @@ function createDockerIsolationBroker(opts = {}) {
       } catch (err) {
         return { ok: false, reason: `image_unavailable:${String(err?.message ?? err)}` };
       }
-      if (!isCompleteImageDigest(allowlistedImageId)) {
+      if (!isCompleteImageDigest(currentTagDigest)) {
         return {
           ok: false,
           reason: 'image_digest_incomplete',
-          detail: allowlistedImageId || null,
+          detail: currentTagDigest || null,
         };
       }
+      const pinnedDigest = isCompleteImageDigest(expectedImageId)
+        ? String(expectedImageId).trim()
+        : null;
 
       let existing = null;
       try {
@@ -307,14 +317,13 @@ function createDockerIsolationBroker(opts = {}) {
       if (existing?.containerId) {
         // Fail closed: do not silently adopt / replace an unmanaged or foreign instance.
         // Never docker rm/stop here — live desktop must not be replaced by this path.
-        // Restart requires container digest === complete allowlisted digest (or caller-pinned).
-        const digestOk = digestsEqual(existing.imageId, allowlistedImageId);
-        if (
-          existing.managed !== MANAGED_LABEL_VALUE ||
-          existing.instanceId !== instanceId ||
-          existing.targetId !== ISOLATED_DESKTOP_TARGET_ID ||
-          !digestOk
-        ) {
+        // Restart digest pin: approved expectedImageId A wins over freshly inspected tag B.
+        const restartDigest = pinnedDigest || currentTagDigest;
+        const labelsOk =
+          existing.managed === MANAGED_LABEL_VALUE &&
+          existing.instanceId === instanceId &&
+          existing.targetId === ISOLATED_DESKTOP_TARGET_ID;
+        if (!labelsOk) {
           return {
             ok: false,
             reason: 'unmanaged_or_foreign_container_present',
@@ -322,14 +331,28 @@ function createDockerIsolationBroker(opts = {}) {
             instanceId: existing.instanceId,
           };
         }
+        if (!digestsEqual(existing.imageId, restartDigest)) {
+          // Managed same instance but image changed (tag retarget / replaced) → new approval.
+          // Do not treat as "match freshly inspected B"; do not stop/rm/adopt.
+          return {
+            ok: false,
+            reason: 'managed_image_digest_changed_requires_approval',
+            containerId: existing.containerId,
+            instanceId: existing.instanceId,
+            imageId: existing.imageId,
+            expectedImageId: restartDigest,
+            currentTagDigest,
+          };
+        }
         await dockerRun(['start', existing.containerId]);
         const after = await inspectNamed();
-        if (!digestsEqual(after.imageId, allowlistedImageId)) {
+        // Post-start must still equal approved A (restartDigest), not tag B.
+        if (!digestsEqual(after.imageId, restartDigest)) {
           return {
             ok: false,
             reason: 'image_digest_mismatch_after_start',
             imageId: after.imageId,
-            expectedImageId: allowlistedImageId,
+            expectedImageId: restartDigest,
           };
         }
         return {
@@ -338,12 +361,15 @@ function createDockerIsolationBroker(opts = {}) {
           imageId: after.imageId,
           configImage: after.configImage,
           instanceId: after.instanceId,
-          allowlistedImageId,
+          allowlistedImageId: restartDigest,
+          pinnedDigest: pinnedDigest || null,
+          currentTagDigest,
         };
       }
 
-      // Create with COMPLETE immutable digest — never the mutable tag ref.
+      // Create with COMPLETE immutable digest of current tag — never the mutable tag ref.
       // Isolated image CMD override: identity gateway wraps real `eve start`.
+      const createDigest = currentTagDigest;
       const containerId = await dockerRun([
         'create',
         '--name',
@@ -362,9 +388,9 @@ function createDockerIsolationBroker(opts = {}) {
         ...isolatedWorkerEnvArgs({
           HAMSTER_ISOLATED_INSTANCE_ID: instanceId,
           HAMSTER_ISOLATED_TARGET_ID: ISOLATED_DESKTOP_TARGET_ID,
-          HAMSTER_ISOLATED_IMAGE_ID: allowlistedImageId,
+          HAMSTER_ISOLATED_IMAGE_ID: createDigest,
         }),
-        allowlistedImageId,
+        createDigest,
         'node',
         '/app/lib/isolatedIdentityGateway.mjs',
       ]);
@@ -378,12 +404,12 @@ function createDockerIsolationBroker(opts = {}) {
           reason: `inspect_before_start_failed:${String(err?.message ?? err)}`,
         };
       }
-      if (!digestsEqual(beforeStart.imageId, allowlistedImageId)) {
+      if (!digestsEqual(beforeStart.imageId, createDigest)) {
         return {
           ok: false,
           reason: 'image_digest_mismatch_before_start',
           imageId: beforeStart.imageId,
-          expectedImageId: allowlistedImageId,
+          expectedImageId: createDigest,
         };
       }
       await dockerRun(['start', containerId || ISOLATED_CONTAINER_NAME]);
@@ -393,26 +419,26 @@ function createDockerIsolationBroker(opts = {}) {
       } catch {
         afterCreate = {
           containerId: containerId || null,
-          imageId: allowlistedImageId,
-          configImage: allowlistedImageId,
+          imageId: createDigest,
+          configImage: createDigest,
           instanceId,
         };
       }
-      if (!digestsEqual(afterCreate.imageId, allowlistedImageId)) {
+      if (!digestsEqual(afterCreate.imageId, createDigest)) {
         return {
           ok: false,
           reason: 'image_digest_mismatch_after_start',
           imageId: afterCreate.imageId,
-          expectedImageId: allowlistedImageId,
+          expectedImageId: createDigest,
         };
       }
       return {
         ok: true,
         containerId: afterCreate.containerId || containerId,
-        imageId: afterCreate.imageId || allowlistedImageId,
-        configImage: afterCreate.configImage || allowlistedImageId,
+        imageId: afterCreate.imageId || createDigest,
+        configImage: afterCreate.configImage || createDigest,
         instanceId: afterCreate.instanceId || instanceId,
-        allowlistedImageId,
+        allowlistedImageId: createDigest,
       };
     },
     status: async () => {
@@ -543,7 +569,13 @@ function taskExecutionState(task) {
  * Returns { ok, reason, ...identity }; never starts anything it cannot positively resolve.
  * Never stops/replaces an unmanaged live desktop — broker fails closed on name collision.
  */
-async function startIsolatedDesktop({ targetId, broker, instanceId, approvalId } = {}) {
+async function startIsolatedDesktop({
+  targetId,
+  broker,
+  instanceId,
+  approvalId,
+  expectedImageId,
+} = {}) {
   if (!isIsolatedDesktopTarget(targetId)) {
     return { ok: false, reason: 'not_isolated_desktop_target' };
   }
@@ -555,8 +587,13 @@ async function startIsolatedDesktop({ targetId, broker, instanceId, approvalId }
     return { ok: false, reason: 'instance_id_required' };
   }
   try {
-    const result = await runner.start({ targetId, instanceId, approvalId });
-    if (!result?.ok) return { ok: false, reason: result?.reason ?? 'broker_start_failed' };
+    const result = await runner.start({
+      targetId,
+      instanceId,
+      approvalId,
+      expectedImageId: expectedImageId || null,
+    });
+    if (!result?.ok) return { ok: false, reason: result?.reason ?? 'broker_start_failed', ...result };
     return {
       ok: true,
       containerId: result.containerId ?? null,

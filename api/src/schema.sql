@@ -151,4 +151,9 @@ CREATE INDEX IF NOT EXISTS isolated_desktop_managed_instance_idx
 -- Must run AFTER CREATE TABLE so a fresh database does not ALTER missing relations.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS goal TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_id TEXT NOT NULL DEFAULT 'target_control_plane';
+-- Frozen isolated-desktop identity bound at session create. Ops MUST use these
+-- columns — never re-read current managed row (A session must not rebind to B).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS eve_instance_id TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS eve_container_id TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS eve_image_id TEXT;
 ALTER TABLE approvals ADD COLUMN IF NOT EXISTS target_id TEXT;

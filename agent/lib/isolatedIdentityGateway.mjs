@@ -4,10 +4,10 @@
  *
  * Real Eve (`npx eve start`) health is `{ ok, status, workflowId }` and
  * session routes reject unknown body fields. This gateway:
- *   - proxies to a local Eve process
+ *   - proxies to a local Eve process (main() spawns Eve itself)
  *   - augments GET /eve/v1/health with targetId + instanceId (+ imageId)
  *   - requires matching x-hamster-* headers on ALL /eve/v1/session* routes
- *     (create, follow-up, cancel, stream, compact, clear, end, stubs, …)
+ *   - streams session bodies incrementally (NDJSON) with backpressure + cancel
  *   - fails closed on other non-health paths (no unsafe passthrough)
  *
  * Control-plane agent keeps plain `eve start`. Broker create for the
@@ -18,6 +18,7 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { once } from 'node:events';
 
 const INSTANCE_HEADER = 'x-hamster-instance-id';
 const TARGET_HEADER = 'x-hamster-target-id';
@@ -52,6 +53,10 @@ function isSessionRoute(pathname) {
 
 function isHealthRoute(pathname) {
   return pathname === '/eve/v1/health';
+}
+
+function isStreamPath(pathname) {
+  return pathname.includes('/stream');
 }
 
 async function readBody(req) {
@@ -115,7 +120,21 @@ function checkIdentity(req, self) {
   return null;
 }
 
-async function proxy(req, res, { mutateHealth = false, requireIdentity = false, self } = {}) {
+function copyUpstreamHeaders(upstream) {
+  const outHeaders = {};
+  upstream.headers.forEach((v, k) => {
+    if (k === 'transfer-encoding' || k === 'content-length') return;
+    outHeaders[k] = v;
+  });
+  return outHeaders;
+}
+
+/**
+ * Incremental proxy: write response headers as soon as upstream headers arrive,
+ * then pipe body chunks with backpressure. Client abort cancels upstream.
+ * Never buffers the full body via arrayBuffer().
+ */
+async function proxyIncremental(req, res, { mutateHealth = false, requireIdentity = false, self } = {}) {
   if (requireIdentity) {
     const bad = checkIdentity(req, self);
     if (bad) {
@@ -132,18 +151,28 @@ async function proxy(req, res, { mutateHealth = false, requireIdentity = false, 
   delete headers[IMAGE_HEADER];
   delete headers.host;
 
+  const abort = new AbortController();
+  const cancelUpstream = () => {
+    try {
+      abort.abort();
+    } catch {
+      /* ignore */
+    }
+  };
+  req.on('aborted', cancelUpstream);
+  res.on('close', () => {
+    if (!res.writableEnded) cancelUpstream();
+  });
+
   const upstream = await fetch(upstreamUrl(req.url || '/'), {
     method: req.method,
     headers,
     body: bodyBuf && bodyBuf.length ? bodyBuf : undefined,
     redirect: 'manual',
+    signal: abort.signal,
   });
 
-  const outHeaders = {};
-  upstream.headers.forEach((v, k) => {
-    if (k === 'transfer-encoding') return;
-    outHeaders[k] = v;
-  });
+  const outHeaders = copyUpstreamHeaders(upstream);
 
   if (mutateHealth && upstream.ok) {
     const text = await upstream.text();
@@ -170,10 +199,47 @@ async function proxy(req, res, { mutateHealth = false, requireIdentity = false, 
     return;
   }
 
-  const buf = Buffer.from(await upstream.arrayBuffer());
-  outHeaders['content-length'] = String(buf.length);
+  // Stream immediately — do not await full body before headers.
   res.writeHead(upstream.status, outHeaders);
-  res.end(buf);
+
+  if (!upstream.body) {
+    res.end();
+    return;
+  }
+
+  const reader = upstream.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.length === 0) continue;
+      const chunk = Buffer.from(value);
+      if (res.destroyed || req.aborted) {
+        await reader.cancel('client_closed').catch(() => {});
+        cancelUpstream();
+        break;
+      }
+      const ok = res.write(chunk);
+      if (!ok) {
+        await once(res, 'drain').catch(() => {});
+        if (res.destroyed || req.aborted) {
+          await reader.cancel('client_closed_after_backpressure').catch(() => {});
+          cancelUpstream();
+          break;
+        }
+      }
+    }
+    if (!res.writableEnded && !res.destroyed) res.end();
+  } catch (err) {
+    await reader.cancel(String(err?.message ?? err)).catch(() => {});
+    cancelUpstream();
+    if (!res.headersSent) {
+      res.writeHead(502, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'gateway_stream_failed' }));
+    } else if (!res.writableEnded) {
+      res.destroy(err);
+    }
+  }
 }
 
 export function createIsolatedIdentityGatewayServer(opts = {}) {
@@ -203,12 +269,12 @@ export function createIsolatedIdentityGatewayServer(opts = {}) {
           res.end(JSON.stringify(augmented));
           return;
         }
-        await proxy(req, res, { mutateHealth: true, self });
+        await proxyIncremental(req, res, { mutateHealth: true, self });
         return;
       }
 
       if (isSessionRoute(pathname)) {
-        if (typeof opts.fetchUpstream === 'function') {
+        if (typeof opts.fetchUpstream === 'function' && !isStreamPath(pathname)) {
           const bad = checkIdentity(req, self);
           if (bad) {
             res.writeHead(409, { 'content-type': 'application/json' });
@@ -225,7 +291,22 @@ export function createIsolatedIdentityGatewayServer(opts = {}) {
           res.end(typeof up.body === 'string' ? up.body : JSON.stringify(up.body ?? {}));
           return;
         }
-        await proxy(req, res, { requireIdentity: true, self });
+        // Streams (and any session route without fetchUpstream stub) use real incremental proxy.
+        // Tests inject streamUpstream as a local http server via env, or omit fetchUpstream.
+        if (typeof opts.fetchUpstream === 'function' && isStreamPath(pathname)) {
+          // Require identity, then refuse stub-shaped stream (must use real upstream).
+          const bad = checkIdentity(req, self);
+          if (bad) {
+            res.writeHead(409, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, ...bad }));
+            return;
+          }
+          if (typeof opts.streamUpstream === 'function') {
+            await opts.streamUpstream(req, res, { pathname, self });
+            return;
+          }
+        }
+        await proxyIncremental(req, res, { requireIdentity: true, self });
         return;
       }
 
@@ -233,14 +314,18 @@ export function createIsolatedIdentityGatewayServer(opts = {}) {
       res.writeHead(404, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: false, error: 'route_not_allowed_by_gateway' }));
     } catch (err) {
-      res.writeHead(502, { 'content-type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          ok: false,
-          error: 'gateway_proxy_failed',
-          detail: String(err?.message ?? err),
-        }),
-      );
+      if (!res.headersSent) {
+        res.writeHead(502, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: false,
+            error: 'gateway_proxy_failed',
+            detail: String(err?.message ?? err),
+          }),
+        );
+      } else if (!res.writableEnded) {
+        res.destroy(err);
+      }
     }
   });
   return server;
@@ -252,7 +337,7 @@ export const IDENTITY_HEADERS = {
   IMAGE: IMAGE_HEADER,
 };
 
-export { isSessionRoute, isHealthRoute, checkIdentity };
+export { isSessionRoute, isHealthRoute, checkIdentity, isStreamPath, proxyIncremental };
 
 async function main() {
   if (!instanceId) {
@@ -266,11 +351,14 @@ async function main() {
   console.log(
     `[isolated-identity-gateway] identity instanceId=${instanceId} targetId=${targetId} imageId=${imageId || '(none)'}`,
   );
-  spawnEve();
+  const eveChild = spawnEve();
+  console.log(`[isolated-identity-gateway] spawned eve pid=${eveChild.pid}`);
   await waitUpstreamHealthy();
   const server = createIsolatedIdentityGatewayServer();
   await new Promise((resolve) => server.listen(publicPort, '0.0.0.0', resolve));
-  console.log(`[isolated-identity-gateway] listening on 0.0.0.0:${publicPort}`);
+  console.log(
+    `[isolated-identity-gateway] listening on 0.0.0.0:${publicPort} gatewayPid=${process.pid} evePid=${eveChild.pid}`,
+  );
 }
 
 const isMain =

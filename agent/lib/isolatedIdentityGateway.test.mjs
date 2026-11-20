@@ -11,6 +11,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import {
   createIsolatedIdentityGatewayServer,
   IDENTITY_HEADERS,
@@ -158,15 +159,12 @@ test('ALL session routes require identity; stubs /existing and /cancel are not 2
       [IDENTITY_HEADERS.TARGET]: 'target_isolated_desktop',
       [IDENTITY_HEADERS.IMAGE]: DIGEST,
     };
-    for (const path of [
-      '/eve/v1/session/existing',
-      '/eve/v1/session/existing/cancel',
-      '/eve/v1/session/sess_1/stream',
-    ]) {
+    // Non-stream stubs still use fetchUpstream; stream uses incremental proxy (separate test).
+    for (const path of ['/eve/v1/session/existing', '/eve/v1/session/existing/cancel']) {
       const ok = await fetch(`${base}${path}`, { method: 'POST', headers: okHdrs, body: '{}' });
       assert.equal(ok.status, 202, path);
     }
-    assert.equal(forwarded.length, 3);
+    assert.equal(forwarded.length, 2);
 
     // Non-session routes fail closed — no unsafe passthrough.
     const other = await fetch(`${base}/eve/v1/other`, { method: 'GET' });
@@ -206,5 +204,109 @@ test('mismatched image digest header rejected on session create', async () => {
     assert.equal(upstream, 0);
   } finally {
     await new Promise((r) => server.close(r));
+  }
+});
+
+test('incremental NDJSON stream: first headers/event before end; cancel cleans upstream', async () => {
+  let upstreamCanceled = false;
+  let upstreamReqClosed = false;
+  const events = [
+    '{"type":"ping","n":1}\n',
+    '{"type":"ping","n":2}\n',
+    '{"type":"ping","n":3}\n',
+  ];
+
+  // Continuous upstream: delays 250ms between lines; never buffers whole body first.
+  const upstream = http.createServer((req, res) => {
+    if (!req.url.includes('/stream')) {
+      res.writeHead(404).end();
+      return;
+    }
+    req.on('aborted', () => {
+      upstreamCanceled = true;
+    });
+    res.on('close', () => {
+      upstreamReqClosed = true;
+    });
+    res.writeHead(200, {
+      'content-type': 'application/x-ndjson',
+      'cache-control': 'no-cache',
+    });
+    let i = 0;
+    const tick = () => {
+      if (res.destroyed || res.writableEnded) return;
+      if (i >= events.length) {
+        res.end();
+        return;
+      }
+      res.write(events[i]);
+      i += 1;
+      setTimeout(tick, 250);
+    };
+    tick();
+  });
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const upPort = upstream.address().port;
+  process.env.HAMSTER_EVE_UPSTREAM_HOST = '127.0.0.1';
+  process.env.HAMSTER_EVE_UPSTREAM_PORT = String(upPort);
+
+  const gateway = createIsolatedIdentityGatewayServer({
+    instanceId: 'inst_boot_1',
+    targetId: 'target_isolated_desktop',
+    imageId: DIGEST,
+    // No fetchUpstream — real incremental proxy to local upstream.
+  });
+  await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
+  const gwPort = gateway.address().port;
+
+  try {
+    const ac = new AbortController();
+    const t0 = Date.now();
+    const res = await fetch(`http://127.0.0.1:${gwPort}/eve/v1/session/sess_stream/stream`, {
+      method: 'GET',
+      headers: {
+        [IDENTITY_HEADERS.INSTANCE]: 'inst_boot_1',
+        [IDENTITY_HEADERS.TARGET]: 'target_isolated_desktop',
+        [IDENTITY_HEADERS.IMAGE]: DIGEST,
+      },
+      signal: ac.signal,
+    });
+    // Headers must arrive before the full finite stream ends (~750ms+).
+    const headersAt = Date.now() - t0;
+    assert.equal(res.status, 200);
+    assert.match(String(res.headers.get('content-type') || ''), /ndjson|octet|json/i);
+    assert.ok(headersAt < 400, `headers too late (${headersAt}ms) — still buffering?`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let firstEventAt = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      if (firstEventAt == null && buf.includes('"n":1')) {
+        firstEventAt = Date.now() - t0;
+        // Cancel after first event — must clean upstream (not wait for full body).
+        ac.abort();
+        break;
+      }
+    }
+    assert.ok(firstEventAt != null, 'first NDJSON event never arrived before end');
+    assert.ok(firstEventAt < 500, `first event too late (${firstEventAt}ms)`);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.ok(
+      upstreamCanceled || upstreamReqClosed,
+      'upstream must be cancelled/closed after client abort',
+    );
+
+    // Identity still required on stream.
+    const bad = await fetch(`http://127.0.0.1:${gwPort}/eve/v1/session/sess_stream/stream`, {
+      method: 'GET',
+    });
+    assert.equal(bad.status, 409);
+  } finally {
+    await new Promise((r) => gateway.close(r));
+    await new Promise((r) => upstream.close(r));
   }
 });

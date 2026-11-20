@@ -627,3 +627,80 @@ test('broker create refuses incomplete digest from image inspect', async () => {
   assert.equal(start.ok, false);
   assert.equal(start.reason, 'image_digest_incomplete');
 });
+
+test('broker restart pins approved digestA when tag now resolves to B (no foreign/stop/rm)', async () => {
+  const digestA = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const digestB = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const calls = [];
+  let running = false;
+  const broker = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      calls.push(args);
+      if (args[0] === 'image') return digestB; // mutable tag retargeted to B
+      if (args[0] === 'inspect') {
+        return [
+          'ctr_a',
+          digestA, // container still approved A
+          isolation.ALLOWLISTED_IMAGE,
+          running ? 'true' : 'false',
+          'inst_a',
+          isolation.MANAGED_LABEL_VALUE,
+          ISOLATED,
+        ].join('\t');
+      }
+      if (args[0] === 'start') {
+        running = true;
+        return 'ctr_a';
+      }
+      throw new Error(`unexpected ${args.join(' ')}`);
+    },
+  });
+
+  // Without pin: comparing to freshly inspected B would wrongly reject A — pin required.
+  const noPin = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_a',
+    approvalId: 'appr_restart',
+  });
+  assert.equal(noPin.ok, false);
+  assert.equal(noPin.reason, 'managed_image_digest_changed_requires_approval');
+  assert.ok(!calls.some((a) => a[0] === 'rm' || a[0] === 'stop'));
+
+  const pinned = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_a',
+    approvalId: 'appr_restart',
+    expectedImageId: digestA,
+  });
+  assert.equal(pinned.ok, true, JSON.stringify(pinned));
+  assert.equal(pinned.imageId, digestA);
+  assert.equal(pinned.instanceId, 'inst_a');
+  assert.ok(calls.some((a) => a[0] === 'start'));
+  assert.ok(!calls.some((a) => a[0] === 'rm' || a[0] === 'create'));
+
+  // Container image already B while managed approved A → new approval, no adopt.
+  const brokerB = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      if (args[0] === 'image') return digestB;
+      if (args[0] === 'inspect') {
+        return [
+          'ctr_a',
+          digestB,
+          isolation.ALLOWLISTED_IMAGE,
+          'false',
+          'inst_a',
+          isolation.MANAGED_LABEL_VALUE,
+          ISOLATED,
+        ].join('\t');
+      }
+      throw new Error('must not start/rm');
+    },
+  });
+  const changed = await brokerB.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_a',
+    expectedImageId: digestA,
+  });
+  assert.equal(changed.ok, false);
+  assert.equal(changed.reason, 'managed_image_digest_changed_requires_approval');
+});

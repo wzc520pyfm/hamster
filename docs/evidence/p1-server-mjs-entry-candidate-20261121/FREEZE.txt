@@ -1,12 +1,11 @@
 branch=cursor/p1-server-mjs-entry-182b
 baseBranch=main
 baseFullSha=583285679d618fa58abd2d2a537c078fbb4d66a2
-baseSubject=P1: integrate PWA update reliability foundation (#4)
 productionCommitFullSha=ed13bf548ed040d80fb8062f5860fb71150604ca
-evidenceCommitFullSha=18059c86ac6e35680d674adba8d477f53f600ce4
-candidateHeadFullSha=f6c62261ada30265ad79b1716d6635047cc538ef
-candidateHeadSubject=docs(evidence): freeze materials for server.mjs entry candidate
-parentOfHeadFullSha=18059c86ac6e35680d674adba8d477f53f600ce4
+evidenceHarnessCommitFullSha=18059c86ac6e35680d674adba8d477f53f600ce4
+materialsCommitFullSha=f6c62261ada30265ad79b1716d6635047cc538ef
+# Authoritative tip: `git rev-parse origin/cursor/p1-server-mjs-entry-182b`
+# Do not embed tip SHA of the commit that only edits this file (avoids FREEZE self-ref churn).
 authorCommitter=wzc520pyfm <wzc520pyfm@users.noreply.github.com>
 oldFrozenUntouched=cursor/p1-pwa-candidate-182b@8b4190359cb1609e8fb3c42a6676c60ea92cf7a1
 devEvidenceUntouched=feat/p1-deepseek-live-model-20261120@1dba605b1ed0a5ffc2dd54a437bca1349e2e9081

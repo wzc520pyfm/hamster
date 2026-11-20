@@ -113,9 +113,24 @@ test('execution targets: start is fail-closed without broker and rejects non-iso
 
   const isolatedOk = await isolation.startIsolatedDesktop({
     targetId: ISOLATED,
-    broker: { start: async () => ({ ok: true, containerId: 'ctr_test' }) },
+    instanceId: 'inst_test',
+    broker: {
+      start: async ({ instanceId }) => ({
+        ok: true,
+        containerId: 'ctr_test',
+        instanceId,
+      }),
+    },
   });
   assert.equal(isolatedOk.ok, true);
+  assert.equal(isolatedOk.instanceId, 'inst_test');
+
+  const missingInstance = await isolation.startIsolatedDesktop({
+    targetId: ISOLATED,
+    broker: { start: async () => ({ ok: true, containerId: 'ctr_x' }) },
+  });
+  assert.equal(missingInstance.ok, false);
+  assert.equal(missingInstance.reason, 'instance_id_required');
 });
 
 test('policy: HIGH_RISK_ACTIONS now covers publish_dashboard and create_isolated_desktop', () => {
@@ -214,24 +229,42 @@ test('probe: running container is ok / available', async () => {
   assert.equal(probe.available, true);
 });
 
-test('broker start args: allowlisted image, named desktop, hamster_p2, no docker.sock mount', async () => {
+test('broker start args: allowlisted image, named desktop, hamster_p2, labels, no docker.sock mount', async () => {
   const calls = [];
+  let created = false;
   const broker = isolation.createDockerIsolationBroker({
     dockerRun: async (args) => {
       calls.push(args);
-      if (args[0] === 'create') return 'ctr_abc';
+      if (args[0] === 'create') {
+        created = true;
+        return 'ctr_abc';
+      }
       if (args[0] === 'start') return 'ctr_abc';
       if (args[0] === 'inspect') {
-        // No existing container — force create path.
-        const err = new Error('No such object: desktop');
-        throw err;
+        if (!created) {
+          throw new Error('No such object: desktop');
+        }
+        return [
+          'ctr_abc',
+          'sha256:img',
+          isolation.ALLOWLISTED_IMAGE,
+          'true',
+          'inst_broker_test',
+          isolation.MANAGED_LABEL_VALUE,
+          ISOLATED,
+        ].join('\t');
       }
       if (args[0] === 'image') return 'ok';
       return '';
     },
   });
-  const result = await broker.start({ targetId: ISOLATED });
+  const result = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_broker_test',
+    approvalId: 'appr_broker',
+  });
   assert.equal(result.ok, true);
+  assert.equal(result.instanceId, 'inst_broker_test');
   const create = calls.find((a) => a[0] === 'create');
   assert.ok(create, 'expected docker create');
   assert.ok(create.includes('--name'));
@@ -239,6 +272,8 @@ test('broker start args: allowlisted image, named desktop, hamster_p2, no docker
   assert.ok(create.includes('--network'));
   assert.equal(create[create.indexOf('--network') + 1], 'hamster_p2');
   assert.ok(create.includes(isolation.ALLOWLISTED_IMAGE));
+  assert.ok(create.includes(`${isolation.LABEL_INSTANCE}=inst_broker_test`));
+  assert.ok(create.includes(`${isolation.LABEL_MANAGED}=${isolation.MANAGED_LABEL_VALUE}`));
   const joined = create.join(' ');
   assert.equal(joined.includes('docker.sock'), false);
   assert.equal(joined.includes('--privileged'), false);

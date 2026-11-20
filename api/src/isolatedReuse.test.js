@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * P2 — healthy already-running isolated desktop reuse (createTask).
- * Fail closed: never trust client "running"; not_started/unavailable/unhealthy
- * still require create/start ticket; create tickets never authorize tools.
+ * P2 — managed-instance reuse for isolated desktop.
+ * Fail closed: provenance + containerId/image + health bind; never trust client
+ * "running"; never adopt arbitrary same-name 2xx runtime.
  *
  * Run: cd api && node --test src/isolatedReuse.test.js
  */
@@ -19,93 +19,184 @@ const readiness = require('./readiness');
 const ISOLATED = isolation.ISOLATED_DESKTOP_TARGET_ID;
 const CONTROL = isolation.CONTROL_PLANE_TARGET_ID;
 
-test('shouldSkipCreateIsolatedDesktopApproval: healthy probe+health => skip ticket', () => {
+const MANAGED = {
+  targetId: ISOLATED,
+  instanceId: 'inst_abc',
+  containerId: 'ctr_abc123',
+  imageId: 'sha256:img1',
+  configImage: isolation.ALLOWLISTED_IMAGE,
+  approvalId: 'appr_prior',
+};
+
+function healthyProbe(overrides = {}) {
+  return {
+    state: 'ok',
+    ok: true,
+    containerId: MANAGED.containerId,
+    imageId: MANAGED.imageId,
+    configImage: MANAGED.configImage,
+    instanceId: MANAGED.instanceId,
+    managed: isolation.MANAGED_LABEL_VALUE,
+    targetId: ISOLATED,
+    ...overrides,
+  };
+}
+
+function healthyHealth(overrides = {}) {
+  return {
+    ok: true,
+    status: 200,
+    targetId: ISOLATED,
+    instanceId: MANAGED.instanceId,
+    ...overrides,
+  };
+}
+
+test('shouldSkip: managed same instance + bound health => skip ticket', () => {
   const d = isolation.shouldSkipCreateIsolatedDesktopApproval({
-    probe: { state: 'ok', ok: true },
-    health: { ok: true },
-    clientClaim: { running: true }, // ignored
+    probe: healthyProbe(),
+    health: healthyHealth(),
+    managed: MANAGED,
+    clientClaim: { running: true },
   });
   assert.equal(d.skip, true);
   assert.equal(d.reason, null);
 });
 
-test('shouldSkipCreateIsolatedDesktopApproval: client running claim alone never skips', () => {
+test('shouldSkip: client running claim alone never skips', () => {
   const d = isolation.shouldSkipCreateIsolatedDesktopApproval({
     probe: { state: 'not_started' },
     health: { ok: false },
+    managed: null,
     clientClaim: { running: true, state: 'ok' },
   });
   assert.equal(d.skip, false);
   assert.equal(d.reason, 'not_started');
 });
 
-test('shouldSkipCreateIsolatedDesktopApproval: not_started requires create/start ticket', () => {
+test('shouldSkip: probe ok + health 2xx without managed provenance => fail closed', () => {
   const d = isolation.shouldSkipCreateIsolatedDesktopApproval({
-    probe: { state: 'not_started', ok: true },
-    health: { ok: true }, // health alone is insufficient without probe ok
+    probe: healthyProbe(),
+    health: healthyHealth(),
+    managed: null,
   });
   assert.equal(d.skip, false);
-  assert.equal(d.reason, 'not_started');
+  assert.equal(d.reason, 'unmanaged_instance');
 });
 
-test('shouldSkipCreateIsolatedDesktopApproval: unavailable / unknown fail closed', () => {
+test('shouldSkip: wrong image / container / health spoof / not_started', () => {
   assert.equal(
     isolation.shouldSkipCreateIsolatedDesktopApproval({
-      probe: { state: 'unavailable' },
-      health: { ok: true },
-    }).skip,
-    false,
+      probe: healthyProbe({ configImage: 'evil/other:latest' }),
+      health: healthyHealth(),
+      managed: MANAGED,
+    }).reason,
+    'image_not_allowlisted',
   );
   assert.equal(
     isolation.shouldSkipCreateIsolatedDesktopApproval({
-      probe: null,
-      health: { ok: true },
-    }).skip,
-    false,
+      probe: healthyProbe({ containerId: 'ctr_other' }),
+      health: healthyHealth(),
+      managed: MANAGED,
+    }).reason,
+    'container_id_mismatch',
   );
   assert.equal(
     isolation.shouldSkipCreateIsolatedDesktopApproval({
-      probe: { state: 'ok' },
-      health: { ok: false, reason: 'readiness_timeout' },
+      probe: healthyProbe(),
+      health: healthyHealth({ instanceId: 'inst_spoof' }),
+      managed: MANAGED,
+    }).reason,
+    'health_instance_mismatch',
+  );
+  assert.equal(
+    isolation.shouldSkipCreateIsolatedDesktopApproval({
+      probe: healthyProbe(),
+      health: healthyHealth({ targetId: CONTROL }),
+      managed: MANAGED,
+    }).reason,
+    'health_target_mismatch',
+  );
+  assert.equal(
+    isolation.shouldSkipCreateIsolatedDesktopApproval({
+      probe: { state: 'not_started', ok: true },
+      health: healthyHealth(),
+      managed: MANAGED,
+    }).reason,
+    'not_started',
+  );
+  assert.equal(
+    isolation.shouldSkipCreateIsolatedDesktopApproval({
+      probe: healthyProbe(),
+      health: { ok: false },
+      managed: MANAGED,
     }).reason,
     'health_not_ready',
   );
-  assert.equal(
-    isolation.shouldSkipCreateIsolatedDesktopApproval({
-      probe: { state: 'ok' },
-      health: null,
-    }).skip,
-    false,
-  );
 });
 
-test('verifyHealthyIsolatedDesktopForReuse: probe ok + health ok => reuse', async () => {
+test('verifyHealthyIsolatedDesktopForReuse: managed + probe + health => reuse + identity', async () => {
   const broker = {
-    status: async () => ({ ok: true, running: true, state: 'ok' }),
+    status: async () => ({
+      ok: true,
+      running: true,
+      state: 'ok',
+      containerId: MANAGED.containerId,
+      imageId: MANAGED.imageId,
+      configImage: MANAGED.configImage,
+      instanceId: MANAGED.instanceId,
+      managed: isolation.MANAGED_LABEL_VALUE,
+      targetId: ISOLATED,
+    }),
     start: async () => {
       throw new Error('start must not be called on reuse path');
     },
   };
   const out = await isolation.verifyHealthyIsolatedDesktopForReuse({
     broker,
-    waitReady: async () => ({ ok: true, status: 200 }),
+    getManagedInstance: async () => MANAGED,
+    waitReady: async () => healthyHealth(),
   });
   assert.equal(out.reuse, true);
-  assert.equal(out.probe.state, 'ok');
-  assert.equal(out.health.ok, true);
+  assert.equal(out.identity.instanceId, MANAGED.instanceId);
+  assert.equal(out.identity.containerId, MANAGED.containerId);
 });
 
-test('verifyHealthyIsolatedDesktopForReuse: not_started => no reuse, no docker start', async () => {
-  let started = false;
-  const broker = {
-    status: async () => ({ ok: false, running: false, state: 'not_started' }),
-    start: async () => {
-      started = true;
-      return { ok: true };
-    },
-  };
+test('verify: same-name healthy without managed => no reuse', async () => {
   const out = await isolation.verifyHealthyIsolatedDesktopForReuse({
-    broker,
+    broker: {
+      status: async () => ({
+        ok: true,
+        running: true,
+        state: 'ok',
+        containerId: 'ctr_external',
+        imageId: 'sha256:x',
+        configImage: isolation.ALLOWLISTED_IMAGE,
+        instanceId: null,
+        managed: null,
+      }),
+      start: async () => {
+        throw new Error('must not start');
+      },
+    },
+    getManagedInstance: async () => null,
+    waitReady: async () => ({ ok: true, targetId: ISOLATED, instanceId: 'inst_x' }),
+  });
+  assert.equal(out.reuse, false);
+  assert.equal(out.reason, 'unmanaged_instance');
+});
+
+test('verify: not_started => no reuse, no docker start', async () => {
+  let started = false;
+  const out = await isolation.verifyHealthyIsolatedDesktopForReuse({
+    broker: {
+      status: async () => ({ ok: false, running: false, state: 'not_started' }),
+      start: async () => {
+        started = true;
+        return { ok: true };
+      },
+    },
+    getManagedInstance: async () => MANAGED,
     waitReady: async () => {
       throw new Error('health must not be polled when probe is not ok');
     },
@@ -115,31 +206,65 @@ test('verifyHealthyIsolatedDesktopForReuse: not_started => no reuse, no docker s
   assert.equal(started, false);
 });
 
-test('verifyHealthyIsolatedDesktopForReuse: probe ok but health fail => no reuse (ticket still required)', async () => {
-  const broker = {
-    status: async () => ({ ok: true, running: true, state: 'ok' }),
-    start: async () => {
-      throw new Error('must not start');
+test('recheckManagedIsolatedIdentity: identity swap fail closed', async () => {
+  let calls = 0;
+  const out = await isolation.recheckManagedIsolatedIdentity({
+    expected: {
+      targetId: ISOLATED,
+      instanceId: MANAGED.instanceId,
+      containerId: MANAGED.containerId,
+      imageId: MANAGED.imageId,
+      configImage: MANAGED.configImage,
     },
+    getManagedInstance: async () => MANAGED,
+    broker: {
+      status: async () => {
+        calls += 1;
+        return {
+          ok: true,
+          running: true,
+          state: 'ok',
+          containerId: 'ctr_REPLACED',
+          imageId: MANAGED.imageId,
+          configImage: MANAGED.configImage,
+          instanceId: MANAGED.instanceId,
+          managed: isolation.MANAGED_LABEL_VALUE,
+          targetId: ISOLATED,
+        };
+      },
+    },
+    waitReady: async () => healthyHealth(),
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.reason, 'identity_swapped');
+  assert.equal(calls, 1);
+});
+
+test('recheckManagedIsolatedIdentity: stable identity holds', async () => {
+  const expected = {
+    targetId: ISOLATED,
+    instanceId: MANAGED.instanceId,
+    containerId: MANAGED.containerId,
+    imageId: MANAGED.imageId,
+    configImage: MANAGED.configImage,
   };
-  const out = await isolation.verifyHealthyIsolatedDesktopForReuse({
-    broker,
-    waitReady: async () => ({ ok: false, reason: 'readiness_timeout:x' }),
+  const out = await isolation.recheckManagedIsolatedIdentity({
+    expected,
+    getManagedInstance: async () => MANAGED,
+    broker: {
+      status: async () => ({
+        ok: true,
+        running: true,
+        state: 'ok',
+        ...healthyProbe(),
+      }),
+    },
+    waitReady: async () => healthyHealth(),
   });
-  assert.equal(out.reuse, false);
-  assert.equal(out.reason, 'health_not_ready');
+  assert.equal(out.ok, true);
 });
 
-test('verifyHealthyIsolatedDesktopForReuse: unavailable broker fail closed', async () => {
-  const out = await isolation.verifyHealthyIsolatedDesktopForReuse({
-    broker: null,
-    waitReady: async () => ({ ok: true }),
-  });
-  assert.equal(out.reuse, false);
-  assert.match(String(out.reason), /unavailable|broker/i);
-});
-
-test('createTaskDecision: healthy reuse => no create ticket; spawn session', () => {
+test('planIsolatedCreateTask: healthy reuse => no create ticket; spawn session', () => {
   const plan = isolation.planIsolatedCreateTask({
     reuse: { reuse: true, reason: null },
   });
@@ -148,17 +273,14 @@ test('createTaskDecision: healthy reuse => no create ticket; spawn session', () 
   assert.equal(plan.startDesktop, false);
 });
 
-test('createTaskDecision: not_started => mint create ticket; no spawn; no start', () => {
-  const plan = isolation.planIsolatedCreateTask({
-    reuse: { reuse: false, reason: 'not_started' },
-  });
-  assert.equal(plan.mintCreateTicket, true);
-  assert.equal(plan.spawnSession, false);
-  assert.equal(plan.startDesktop, false);
-});
-
-test('createTaskDecision: unhealthy/unavailable => mint ticket (fail closed for reuse)', () => {
-  for (const reason of ['health_not_ready', 'unavailable', 'unavailable_or_unknown']) {
+test('planIsolatedCreateTask: not_started / unmanaged => mint ticket', () => {
+  for (const reason of [
+    'not_started',
+    'unmanaged_instance',
+    'health_instance_mismatch',
+    'identity_swapped',
+    'image_not_allowlisted',
+  ]) {
     const plan = isolation.planIsolatedCreateTask({
       reuse: { reuse: false, reason },
     });
@@ -168,14 +290,12 @@ test('createTaskDecision: unhealthy/unavailable => mint ticket (fail closed for 
   }
 });
 
-test('security: create_isolated_desktop ticket cannot authorize publish_dashboard (params/action)', () => {
-  // Different action + hash ⇒ authorize path would require its own approved ticket.
+test('security: create_isolated_desktop ticket cannot authorize publish_dashboard', () => {
   assert.equal(policy.isHighRiskAction('publish_dashboard'), true);
   assert.equal(policy.isHighRiskAction('create_isolated_desktop'), true);
   const createParams = isolation.createIsolatedDesktopParams('task_a', ISOLATED);
   const toolParams = { taskId: 'task_a', title: 'Dash', targetId: ISOLATED };
   assert.notEqual(policy.paramsHash(createParams), policy.paramsHash(toolParams));
-  assert.notEqual(isolation.CREATE_ISOLATED_DESKTOP_ACTION, 'publish_dashboard');
 });
 
 test('security: cross-target high-risk binding rejected; missing targetId fail closed', () => {
@@ -194,17 +314,6 @@ test('security: cross-target high-risk binding rejected; missing targetId fail c
   );
 });
 
-test('security: stale/startup create params must not match tool authorize hash', () => {
-  const startParams = isolation.createIsolatedDesktopParams('task_old', ISOLATED);
-  const toolParams = {
-    taskId: 'task_old',
-    title: 'Secret dash',
-    channel: 'local',
-    targetId: ISOLATED,
-  };
-  assert.notEqual(policy.paramsHash(startParams), policy.paramsHash(toolParams));
-});
-
 test('security regression: electron main keeps sandbox/contextIsolation/nodeIntegration guards', () => {
   const mainPath = path.join(__dirname, '../../electron/main.js');
   const src = fs.readFileSync(mainPath, 'utf8');
@@ -214,9 +323,47 @@ test('security regression: electron main keeps sandbox/contextIsolation/nodeInte
   assert.match(src, /setWindowOpenHandler/);
 });
 
+test('readiness: one-shot requires identity bind when expectedIdentity set', async () => {
+  const unbound = await readiness.checkIsolatedDesktopHealthOnce({
+    baseUrl: 'http://desktop.test:8081',
+    expectedIdentity: { targetId: ISOLATED, instanceId: 'inst_abc' },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    }),
+  });
+  assert.equal(unbound.ok, false);
+  assert.equal(unbound.reason, 'health_identity_unbound');
+
+  const spoof = await readiness.checkIsolatedDesktopHealthOnce({
+    baseUrl: 'http://desktop.test:8081',
+    expectedIdentity: { targetId: ISOLATED, instanceId: 'inst_abc' },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, targetId: ISOLATED, instanceId: 'inst_other' }),
+    }),
+  });
+  assert.equal(spoof.ok, false);
+  assert.equal(spoof.reason, 'health_instance_mismatch');
+
+  const ok = await readiness.checkIsolatedDesktopHealthOnce({
+    baseUrl: 'http://desktop.test:8081',
+    expectedIdentity: { targetId: ISOLATED, instanceId: 'inst_abc' },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, targetId: ISOLATED, instanceId: 'inst_abc' }),
+    }),
+  });
+  assert.equal(ok.ok, true);
+});
+
 test('readiness one-shot health check fail closed when fetch fails', async () => {
   const result = await readiness.checkIsolatedDesktopHealthOnce({
     baseUrl: 'http://desktop.test:8081',
+    requireHealthIdentity: false,
     fetchImpl: async () => {
       throw new Error('ECONNREFUSED');
     },
@@ -225,10 +372,32 @@ test('readiness one-shot health check fail closed when fetch fails', async () =>
   assert.match(result.reason, /unreachable|ECONNREFUSED/i);
 });
 
-test('readiness one-shot health check ok on 200', async () => {
-  const result = await readiness.checkIsolatedDesktopHealthOnce({
-    baseUrl: 'http://desktop.test:8081',
-    fetchImpl: async () => ({ ok: true, status: 200 }),
+test('broker start refuses unmanaged same-name container (never rm/stop)', async () => {
+  const calls = [];
+  const broker = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      calls.push(args);
+      if (args[0] === 'image') return 'sha256:allow';
+      if (args[0] === 'inspect') {
+        return [
+          'ctr_foreign',
+          'sha256:img',
+          isolation.ALLOWLISTED_IMAGE,
+          'true',
+          '',
+          '',
+          '',
+        ].join('\t');
+      }
+      throw new Error(`unexpected docker ${args.join(' ')}`);
+    },
   });
-  assert.equal(result.ok, true);
+  const start = await broker.start({
+    targetId: ISOLATED,
+    instanceId: 'inst_new',
+    approvalId: 'appr_1',
+  });
+  assert.equal(start.ok, false);
+  assert.equal(start.reason, 'unmanaged_or_foreign_container_present');
+  assert.ok(!calls.some((a) => a[0] === 'rm' || a[0] === 'stop'));
 });

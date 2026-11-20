@@ -6,8 +6,6 @@
 
 const isolation = require('./isolation');
 
-const EVE_URL = process.env.EVE_API_URL ?? 'http://localhost:8081';
-const EVE_ISOLATED_URL = process.env.EVE_ISOLATED_API_URL ?? 'http://desktop:8081';
 const REQUEST_TIMEOUT_MS = 15000;
 const AGENT_USER = process.env.HAMSTER_AGENT_USERNAME ?? 'hamster';
 const AGENT_PASSWORD = process.env.HAMSTER_AGENT_PASSWORD;
@@ -15,19 +13,28 @@ const BASIC_AUTH = AGENT_PASSWORD
   ? 'Basic ' + Buffer.from(`${AGENT_USER}:${AGENT_PASSWORD}`).toString('base64')
   : null;
 
+function controlPlaneEveUrl() {
+  return process.env.EVE_API_URL ?? 'http://localhost:8081';
+}
+
+function isolatedEveUrl() {
+  return process.env.EVE_ISOLATED_API_URL ?? 'http://desktop:8081';
+}
+
 /**
  * Resolve the eve base URL for an execution target.
  * Isolated desktop must never share the control-plane agent endpoint.
+ * URLs are read at call time so tests / restarts can rebind without stale module constants.
  */
 function baseUrlForTarget(targetId) {
   if (isolation.isIsolatedDesktopTarget(targetId)) {
-    return EVE_ISOLATED_URL;
+    return isolatedEveUrl();
   }
-  return EVE_URL;
+  return controlPlaneEveUrl();
 }
 
 async function eveFetch(path, { method = 'GET', body, baseUrl } = {}) {
-  const root = baseUrl || EVE_URL;
+  const root = baseUrl || controlPlaneEveUrl();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -100,8 +107,12 @@ module.exports = {
   answerInteraction,
   cancelSession,
   eveFetch,
-  EVE_URL,
-  EVE_ISOLATED_URL,
+  get EVE_URL() {
+    return controlPlaneEveUrl();
+  },
+  get EVE_ISOLATED_URL() {
+    return isolatedEveUrl();
+  },
   baseUrlForTarget,
 };
 

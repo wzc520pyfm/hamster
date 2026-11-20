@@ -1,0 +1,316 @@
+TAP version 13
+# Subtest: HTTP: managed healthy reuse → 0 create tickets, 0 broker.start
+ok 1 - HTTP: managed healthy reuse → 0 create tickets, 0 broker.start
+  ---
+  duration_ms: 172.737224
+  type: 'test'
+  ...
+# Subtest: HTTP: external same-name 2xx without managed provenance → mint ticket
+ok 2 - HTTP: external same-name 2xx without managed provenance → mint ticket
+  ---
+  duration_ms: 36.940903
+  type: 'test'
+  ...
+# Subtest: HTTP: not_started still requires create/start approval; no silent start
+ok 3 - HTTP: not_started still requires create/start approval; no silent start
+  ---
+  duration_ms: 31.696699
+  type: 'test'
+  ...
+# Subtest: HTTP negative: wrong image on probe → mint ticket (fail closed)
+ok 4 - HTTP negative: wrong image on probe → mint ticket (fail closed)
+  ---
+  duration_ms: 33.641381
+  type: 'test'
+  ...
+# Subtest: HTTP negative: spoofed health instanceId → mint ticket
+ok 5 - HTTP negative: spoofed health instanceId → mint ticket
+  ---
+  duration_ms: 34.330511
+  type: 'test'
+  ...
+# Subtest: HTTP negative: identity swap at session boundary → mint ticket
+ok 6 - HTTP negative: identity swap at session boundary → mint ticket
+  ---
+  duration_ms: 34.233551
+  type: 'test'
+  ...
+# Subtest: HTTP authorize chain: approve create/start → managed provenance → reuse
+ok 7 - HTTP authorize chain: approve create/start → managed provenance → reuse
+  ---
+  duration_ms: 53.38546
+  type: 'test'
+  ...
+# Subtest: HTTP: create/start ticket cannot authorize publish_dashboard; cross-target denied
+ok 8 - HTTP: create/start ticket cannot authorize publish_dashboard; cross-target denied
+  ---
+  duration_ms: 36.503233
+  type: 'test'
+  ...
+# Subtest: unit guard: highRiskTargetAllows still fail-closed for missing targetId
+ok 9 - unit guard: highRiskTargetAllows still fail-closed for missing targetId
+  ---
+  duration_ms: 0.262238
+  type: 'test'
+  ...
+# Subtest: shouldSkip: managed same instance + bound health => skip ticket
+ok 10 - shouldSkip: managed same instance + bound health => skip ticket
+  ---
+  duration_ms: 0.805429
+  type: 'test'
+  ...
+# Subtest: shouldSkip: client running claim alone never skips
+ok 11 - shouldSkip: client running claim alone never skips
+  ---
+  duration_ms: 0.757152
+  type: 'test'
+  ...
+# Subtest: shouldSkip: probe ok + health 2xx without managed provenance => fail closed
+ok 12 - shouldSkip: probe ok + health 2xx without managed provenance => fail closed
+  ---
+  duration_ms: 0.09881
+  type: 'test'
+  ...
+# Subtest: shouldSkip: wrong image / container / health spoof / not_started
+ok 13 - shouldSkip: wrong image / container / health spoof / not_started
+  ---
+  duration_ms: 0.163825
+  type: 'test'
+  ...
+# Subtest: verifyHealthyIsolatedDesktopForReuse: managed + probe + health => reuse + identity
+ok 14 - verifyHealthyIsolatedDesktopForReuse: managed + probe + health => reuse + identity
+  ---
+  duration_ms: 0.333473
+  type: 'test'
+  ...
+# Subtest: verify: same-name healthy without managed => no reuse
+ok 15 - verify: same-name healthy without managed => no reuse
+  ---
+  duration_ms: 0.143665
+  type: 'test'
+  ...
+# Subtest: verify: not_started => no reuse, no docker start
+ok 16 - verify: not_started => no reuse, no docker start
+  ---
+  duration_ms: 0.161824
+  type: 'test'
+  ...
+# Subtest: recheckManagedIsolatedIdentity: identity swap fail closed
+ok 17 - recheckManagedIsolatedIdentity: identity swap fail closed
+  ---
+  duration_ms: 0.219342
+  type: 'test'
+  ...
+# Subtest: recheckManagedIsolatedIdentity: stable identity holds
+ok 18 - recheckManagedIsolatedIdentity: stable identity holds
+  ---
+  duration_ms: 0.309926
+  type: 'test'
+  ...
+# Subtest: planIsolatedCreateTask: healthy reuse => no create ticket; spawn session
+ok 19 - planIsolatedCreateTask: healthy reuse => no create ticket; spawn session
+  ---
+  duration_ms: 0.252307
+  type: 'test'
+  ...
+# Subtest: planIsolatedCreateTask: not_started / unmanaged => mint ticket
+ok 20 - planIsolatedCreateTask: not_started / unmanaged => mint ticket
+  ---
+  duration_ms: 0.176563
+  type: 'test'
+  ...
+# Subtest: security: create_isolated_desktop ticket cannot authorize publish_dashboard
+ok 21 - security: create_isolated_desktop ticket cannot authorize publish_dashboard
+  ---
+  duration_ms: 0.423792
+  type: 'test'
+  ...
+# Subtest: security: cross-target high-risk binding rejected; missing targetId fail closed
+ok 22 - security: cross-target high-risk binding rejected; missing targetId fail closed
+  ---
+  duration_ms: 0.099497
+  type: 'test'
+  ...
+# Subtest: security regression: electron main keeps sandbox/contextIsolation/nodeIntegration guards
+ok 23 - security regression: electron main keeps sandbox/contextIsolation/nodeIntegration guards
+  ---
+  duration_ms: 0.300293
+  type: 'test'
+  ...
+# Subtest: readiness: one-shot requires identity bind when expectedIdentity set
+ok 24 - readiness: one-shot requires identity bind when expectedIdentity set
+  ---
+  duration_ms: 0.893656
+  type: 'test'
+  ...
+# Subtest: readiness one-shot health check fail closed when fetch fails
+ok 25 - readiness one-shot health check fail closed when fetch fails
+  ---
+  duration_ms: 0.24374
+  type: 'test'
+  ...
+# Subtest: broker start refuses unmanaged same-name container (never rm/stop)
+ok 26 - broker start refuses unmanaged same-name container (never rm/stop)
+  ---
+  duration_ms: 0.390556
+  type: 'test'
+  ...
+# Subtest: execution targets: stable ids and known-target resolution
+ok 27 - execution targets: stable ids and known-target resolution
+  ---
+  duration_ms: 0.700755
+  type: 'test'
+  ...
+# Subtest: execution targets: control-plane task is ok
+ok 28 - execution targets: control-plane task is ok
+  ---
+  duration_ms: 0.189437
+  type: 'test'
+  ...
+# Subtest: execution targets: missing task on isolated surface is unavailable
+ok 29 - execution targets: missing task on isolated surface is unavailable
+  ---
+  duration_ms: 0.070231
+  type: 'test'
+  ...
+# Subtest: execution targets: queued task assigned to isolated without pending ticket -> start_failed
+ok 30 - execution targets: queued task assigned to isolated without pending ticket -> start_failed
+  ---
+  duration_ms: 0.071845
+  type: 'test'
+  ...
+# Subtest: execution targets: queued task assigned to isolated with pending create/start ticket -> pending_approval
+ok 31 - execution targets: queued task assigned to isolated with pending create/start ticket -> pending_approval
+  ---
+  duration_ms: 0.790019
+  type: 'test'
+  ...
+# Subtest: execution targets: running task on isolated is ok (approved + started)
+ok 32 - execution targets: running task on isolated is ok (approved + started)
+  ---
+  duration_ms: 0.106929
+  type: 'test'
+  ...
+# Subtest: execution targets: ordinary isolated failure is failed, not stopped
+ok 33 - execution targets: ordinary isolated failure is failed, not stopped
+  ---
+  duration_ms: 0.119936
+  type: 'test'
+  ...
+# Subtest: execution targets: mid-run container stop (detected) -> stopped
+ok 34 - execution targets: mid-run container stop (detected) -> stopped
+  ---
+  duration_ms: 0.08894
+  type: 'test'
+  ...
+# Subtest: execution targets: task lifecycle stays distinct from container state copy
+ok 35 - execution targets: task lifecycle stays distinct from container state copy
+  ---
+  duration_ms: 0.237731
+  type: 'test'
+  ...
+# Subtest: createIsolatedDesktopParams includes targetId and exact same-host scope copy
+ok 36 - createIsolatedDesktopParams includes targetId and exact same-host scope copy
+  ---
+  duration_ms: 0.347376
+  type: 'test'
+  ...
+# Subtest: execution targets: start is fail-closed without broker and rejects non-isolated targets
+ok 37 - execution targets: start is fail-closed without broker and rejects non-isolated targets
+  ---
+  duration_ms: 0.267242
+  type: 'test'
+  ...
+# Subtest: policy: HIGH_RISK_ACTIONS now covers publish_dashboard and create_isolated_desktop
+ok 38 - policy: HIGH_RISK_ACTIONS now covers publish_dashboard and create_isolated_desktop
+  ---
+  duration_ms: 0.066903
+  type: 'test'
+  ...
+# Subtest: policy: LOW_RISK_ACTIONS stays low risk (no high-risk leakage)
+ok 39 - policy: LOW_RISK_ACTIONS stays low risk (no high-risk leakage)
+  ---
+  duration_ms: 0.056809
+  type: 'test'
+  ...
+# Subtest: policy: ticket is bound to the task execution target (cross-target approval is denied)
+ok 40 - policy: ticket is bound to the task execution target (cross-target approval is denied)
+  ---
+  duration_ms: 0.090076
+  type: 'test'
+  ...
+# Subtest: broker names align with compose: container desktop on network hamster_p2
+ok 41 - broker names align with compose: container desktop on network hamster_p2
+  ---
+  duration_ms: 0.03512
+  type: 'test'
+  ...
+# Subtest: probe: not_started is distinct from unavailable (broker ok, container absent)
+ok 42 - probe: not_started is distinct from unavailable (broker ok, container absent)
+  ---
+  duration_ms: 0.144887
+  type: 'test'
+  ...
+# Subtest: probe: unavailable when broker missing or probe fails
+ok 43 - probe: unavailable when broker missing or probe fails
+  ---
+  duration_ms: 0.121289
+  type: 'test'
+  ...
+# Subtest: probe: running container is ok / available
+ok 44 - probe: running container is ok / available
+  ---
+  duration_ms: 0.057707
+  type: 'test'
+  ...
+# Subtest: broker start args: allowlisted image, named desktop, hamster_p2, labels, no docker.sock mount
+ok 45 - broker start args: allowlisted image, named desktop, hamster_p2, labels, no docker.sock mount
+  ---
+  duration_ms: 0.442404
+  type: 'test'
+  ...
+# Subtest: waitForIsolatedDesktopReady: succeeds when health returns ok
+ok 46 - waitForIsolatedDesktopReady: succeeds when health returns ok
+  ---
+  duration_ms: 0.914376
+  type: 'test'
+  ...
+# Subtest: waitForIsolatedDesktopReady: times out when unreachable (fail closed)
+ok 47 - waitForIsolatedDesktopReady: times out when unreachable (fail closed)
+  ---
+  duration_ms: 0.397798
+  type: 'test'
+  ...
+# Subtest: waitForIsolatedDesktopReady: non-ok HTTP eventually times out
+ok 48 - waitForIsolatedDesktopReady: non-ok HTTP eventually times out
+  ---
+  duration_ms: 0.409623
+  type: 'test'
+  ...
+# Subtest: queued isolated task without pending create ticket is start_failed
+ok 49 - queued isolated task without pending create ticket is start_failed
+  ---
+  duration_ms: 0.684025
+  type: 'test'
+  ...
+# Subtest: approve-once note must not be the decision_note after a simulated start failure path
+ok 50 - approve-once note must not be the decision_note after a simulated start failure path
+  ---
+  duration_ms: 0.132891
+  type: 'test'
+  ...
+# Subtest: readiness failure reason is distinct and fail-closed (feeds start_failed path)
+ok 51 - readiness failure reason is distinct and fail-closed (feeds start_failed path)
+  ---
+  duration_ms: 0.640507
+  type: 'test'
+  ...
+1..51
+# tests 51
+# suites 0
+# pass 51
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10495.76334

@@ -129,6 +129,24 @@ CREATE TABLE IF NOT EXISTS metrics_weekly (
   exceptions  INTEGER NOT NULL
 );
 
+-- Provenance for isolated-desktop reuse: only Hamster-approved create/start may
+-- record a managed instance. Same-name/image 2xx alone never authorizes reuse.
+CREATE TABLE IF NOT EXISTS isolated_desktop_managed (
+  target_id              TEXT PRIMARY KEY,
+  instance_id            TEXT NOT NULL,
+  container_id           TEXT NOT NULL,
+  image_id               TEXT NOT NULL,
+  config_image           TEXT NOT NULL,
+  approval_id            TEXT,
+  task_id                TEXT,
+  managed_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS isolated_desktop_managed_container_idx
+  ON isolated_desktop_managed (container_id);
+CREATE INDEX IF NOT EXISTS isolated_desktop_managed_instance_idx
+  ON isolated_desktop_managed (instance_id);
+
 -- Idempotent migrations for deployments created before the isolated-desktop slice.
 -- Must run AFTER CREATE TABLE so a fresh database does not ALTER missing relations.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS goal TEXT;

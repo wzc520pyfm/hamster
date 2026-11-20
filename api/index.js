@@ -18,7 +18,82 @@ const PORT = Number(process.env.PORT ?? 8080);
 const INTERNAL_SECRET = process.env.HAMSTER_INTERNAL_SECRET ?? 'dev-internal-secret';
 const APPROVAL_TTL_SECONDS = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
 const CORS_ORIGIN = process.env.HAMSTER_CORS_ORIGIN ?? 'http://localhost:3000';
-const BROKER = isolation.createDockerIsolationBroker();
+/** Mutable so isolated HTTP tests can inject a fake broker (never the box desktop). */
+let BROKER = isolation.createDockerIsolationBroker();
+function setIsolationBrokerForTests(broker) {
+  BROKER = broker;
+}
+
+async function getManagedIsolatedDesktop(targetId = isolation.ISOLATED_DESKTOP_TARGET_ID) {
+  const { rows } = await query(
+    `SELECT target_id, instance_id, container_id, image_id, config_image, approval_id, task_id
+       FROM isolated_desktop_managed WHERE target_id = $1`,
+    [targetId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    targetId: row.target_id,
+    instanceId: row.instance_id,
+    containerId: row.container_id,
+    imageId: row.image_id,
+    configImage: row.config_image,
+    approvalId: row.approval_id,
+    taskId: row.task_id,
+  };
+}
+
+async function upsertManagedIsolatedDesktop(record) {
+  await query(
+    `INSERT INTO isolated_desktop_managed
+       (target_id, instance_id, container_id, image_id, config_image, approval_id, task_id, managed_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+     ON CONFLICT (target_id) DO UPDATE SET
+       instance_id = EXCLUDED.instance_id,
+       container_id = EXCLUDED.container_id,
+       image_id = EXCLUDED.image_id,
+       config_image = EXCLUDED.config_image,
+       approval_id = EXCLUDED.approval_id,
+       task_id = EXCLUDED.task_id,
+       updated_at = now()`,
+    [
+      record.targetId || isolation.ISOLATED_DESKTOP_TARGET_ID,
+      record.instanceId,
+      record.containerId,
+      record.imageId || '',
+      record.configImage || isolation.ALLOWLISTED_IMAGE,
+      record.approvalId || null,
+      record.taskId || null,
+    ],
+  );
+}
+
+async function verifyIsolatedReuseOrDeny(clientClaim = null) {
+  return isolation.verifyHealthyIsolatedDesktopForReuse({
+    broker: BROKER,
+    clientClaim,
+    getManagedInstance: getManagedIsolatedDesktop,
+  });
+}
+
+/**
+ * Session-creation boundary: recheck frozen managed identity; fail closed on swap.
+ * @returns {Promise<{ ok: true, identity: object } | { ok: false, reason: string, verified?: object }>}
+ */
+async function guardIsolatedSessionIdentity(verified) {
+  if (!verified?.reuse || !verified.identity) {
+    return { ok: false, reason: verified?.reason || 'reuse_denied', verified };
+  }
+  const recheck = await isolation.recheckManagedIsolatedIdentity({
+    broker: BROKER,
+    expected: verified.identity,
+    getManagedInstance: getManagedIsolatedDesktop,
+  });
+  if (!recheck.ok) {
+    return { ok: false, reason: recheck.reason || 'identity_recheck_failed', verified, recheck };
+  }
+  return { ok: true, identity: verified.identity, recheck };
+}
 
 const app = express();
 app.use((req, res, next) => {
@@ -153,31 +228,35 @@ async function createTask(conversationId, title, goal, targetId) {
   try {
     if (target === isolation.ISOLATED_DESKTOP_TARGET_ID) {
       // Isolated desktop: create/start stays high-risk and ticket-gated unless the
-      // control plane independently verifies the named target is already running AND
-      // HTTP-healthy. Client "running" claims are ignored. Reuse never calls docker
-      // create/start and never authorizes in-container tools.
-      const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
-        broker: BROKER,
-        clientClaim: null,
-      });
+      // control plane verifies a previously managed/approved SAME instance
+      // (containerId + image + health/session bind). Name+2xx alone never reuses.
+      // Client "running" claims are ignored. Reuse never calls docker create/start.
+      const verified = await verifyIsolatedReuseOrDeny(null);
       const plan = isolation.planIsolatedCreateTask({ reuse: verified });
       if (plan.spawnSession && !plan.mintCreateTicket) {
-        await events.audit('task_created_isolated_reuse_running', {
-          taskId,
-          targetId: target,
-          probe: verified.probe?.state,
-        });
-        const { sessionId } = await eve.createSession(
-          `[hamster-worker taskId=${taskId} conversationId=${conversationId} targetId=${target} title=${title}] ${goal}`,
-          { targetId: target }
-        );
-        await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
-          sessionId,
-          'running',
-          taskId,
-        ]);
-        events.attach(`task:${taskId}`, sessionId, { targetId: target });
-        return { task: await taskDetail(taskId) };
+        const guard = await guardIsolatedSessionIdentity(verified);
+        if (guard.ok) {
+          await events.audit('task_created_isolated_reuse_running', {
+            taskId,
+            targetId: target,
+            probe: verified.probe?.state,
+            instanceId: guard.identity?.instanceId,
+            containerId: guard.identity?.containerId,
+          });
+          const { sessionId } = await eve.createSession(
+            `[hamster-worker taskId=${taskId} conversationId=${conversationId} targetId=${target} title=${title}] ${goal}`,
+            { targetId: target }
+          );
+          await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
+            sessionId,
+            'running',
+            taskId,
+          ]);
+          events.attach(`task:${taskId}`, sessionId, { targetId: target });
+          return { task: await taskDetail(taskId) };
+        }
+        // Identity swap / TOCTOU fail closed → mint create/start ticket.
+        verified.reason = guard.reason || 'identity_recheck_failed';
       }
       // Selecting Isolated desktop is NOT approval — only this ticket authorizes create/start.
       const approvalId = `appr_${taskId}_create_${crypto.randomUUID()}`;
@@ -546,19 +625,21 @@ app.post('/api/tasks/:id/retry', asyncRoute(async (req, res) => {
   }
   if (task.target_id === isolation.ISOLATED_DESKTOP_TARGET_ID) {
     await invalidateOutstandingTickets(task.id);
-    const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
-      broker: BROKER,
-      clientClaim: null,
-    });
+    const verified = await verifyIsolatedReuseOrDeny(null);
     const plan = isolation.planIsolatedCreateTask({ reuse: verified });
     if (plan.spawnSession && !plan.mintCreateTicket) {
-      await startTaskSession(task.id);
-      await events.audit('task_retry_isolated_reuse_running', {
-        taskId: task.id,
-        targetId: task.target_id,
-        probe: verified.probe?.state,
-      });
-      return res.json({ taskId: task.id, status: 'running', started: true, reused: true });
+      const guard = await guardIsolatedSessionIdentity(verified);
+      if (guard.ok) {
+        await startTaskSession(task.id);
+        await events.audit('task_retry_isolated_reuse_running', {
+          taskId: task.id,
+          targetId: task.target_id,
+          probe: verified.probe?.state,
+          instanceId: guard.identity?.instanceId,
+        });
+        return res.json({ taskId: task.id, status: 'running', started: true, reused: true });
+      }
+      verified.reason = guard.reason || 'identity_recheck_failed';
     }
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
     const params = isolation.createIsolatedDesktopParams(task.id, task.target_id);
@@ -596,25 +677,27 @@ app.post('/api/tasks/:id/target', asyncRoute(async (req, res) => {
   await invalidateOutstandingTickets(task.id);
   await query('UPDATE tasks SET target_id = $1, updated_at = now() WHERE id = $2', [targetId, task.id]);
   if (targetId === isolation.ISOLATED_DESKTOP_TARGET_ID) {
-    const verified = await isolation.verifyHealthyIsolatedDesktopForReuse({
-      broker: BROKER,
-      clientClaim: null,
-    });
+    const verified = await verifyIsolatedReuseOrDeny(null);
     const plan = isolation.planIsolatedCreateTask({ reuse: verified });
     if (plan.spawnSession && !plan.mintCreateTicket) {
-      await startTaskSession(task.id);
-      await events.audit('task_target_switched_isolated_reuse_running', {
-        taskId: task.id,
-        targetId,
-        probe: verified.probe?.state,
-      });
-      return res.json({
-        taskId: task.id,
-        status: 'running',
-        started: true,
-        switchedTo: 'isolated_desktop',
-        reused: true,
-      });
+      const guard = await guardIsolatedSessionIdentity(verified);
+      if (guard.ok) {
+        await startTaskSession(task.id);
+        await events.audit('task_target_switched_isolated_reuse_running', {
+          taskId: task.id,
+          targetId,
+          probe: verified.probe?.state,
+          instanceId: guard.identity?.instanceId,
+        });
+        return res.json({
+          taskId: task.id,
+          status: 'running',
+          started: true,
+          switchedTo: 'isolated_desktop',
+          reused: true,
+        });
+      }
+      verified.reason = guard.reason || 'identity_recheck_failed';
     }
     // Re-issue the high-risk create/start ticket; task stays Queued (not started).
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
@@ -853,9 +936,12 @@ async function decideApproval(req, res, outcome) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
       return res.status(409).json({ error: 'target_mismatch', status: 'invalidated' });
     }
+    const instanceId = `inst_${crypto.randomUUID()}`;
     const start = await isolation.startIsolatedDesktop({
       targetId: ticketTargetId,
       broker: BROKER,
+      instanceId,
+      approvalId: ticket.id,
     });
     if (!start.ok) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
@@ -868,9 +954,36 @@ async function decideApproval(req, res, outcome) {
         state: 'start_failed',
       });
     }
-    // Wait until http://desktop:8081 is ready before createSession.
+    // Prefer broker status identity when available (full imageId after inspect).
+    let startedIdentity = {
+      targetId: ticketTargetId,
+      instanceId: start.instanceId || instanceId,
+      containerId: start.containerId,
+      imageId: start.imageId || '',
+      configImage: start.configImage || isolation.ALLOWLISTED_IMAGE,
+    };
+    try {
+      const status = await BROKER.status({ targetId: ticketTargetId });
+      if (status?.containerId) {
+        startedIdentity = {
+          targetId: ticketTargetId,
+          instanceId: status.instanceId || startedIdentity.instanceId,
+          containerId: status.containerId,
+          imageId: status.imageId || startedIdentity.imageId,
+          configImage: status.configImage || startedIdentity.configImage,
+        };
+      }
+    } catch {
+      // Keep start() identity; readiness / session guards still fail closed if unbound.
+    }
+    // Wait until isolated health binds targetId + instanceId before createSession.
     const ready = await readiness.waitForIsolatedDesktopReady({
       baseUrl: process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+      expectedIdentity: {
+        targetId: ticketTargetId,
+        instanceId: startedIdentity.instanceId,
+      },
+      requireHealthIdentity: true,
     });
     if (!ready.ok) {
       await markIsolatedStartFailed(ticket.id, ticket.task_id);
@@ -879,6 +992,43 @@ async function decideApproval(req, res, outcome) {
         taskId: ticket.task_id,
         targetId: ticketTargetId,
         reason: ready.reason,
+        status: 'invalidated',
+        state: 'start_failed',
+      });
+    }
+    // Session-creation boundary: probe+health must still match the started identity.
+    // Managed provenance is recorded only after the full approve→start→ready→session chain.
+    const probeBeforeSession = await isolation.probeIsolatedDesktop({ broker: BROKER });
+    if (
+      probeBeforeSession.state !== 'ok' ||
+      !isolation.identitiesMatch(startedIdentity, probeBeforeSession) ||
+      !isolation.imageIsAllowlisted(probeBeforeSession)
+    ) {
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_identity_recheck_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: 'identity_swapped_before_session',
+        status: 'invalidated',
+        state: 'start_failed',
+      });
+    }
+    const healthBeforeSession = await readiness.checkIsolatedDesktopHealthOnce({
+      baseUrl: process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+      expectedIdentity: {
+        targetId: ticketTargetId,
+        instanceId: startedIdentity.instanceId,
+      },
+      requireHealthIdentity: true,
+    });
+    if (healthBeforeSession.ok !== true) {
+      await markIsolatedStartFailed(ticket.id, ticket.task_id);
+      return res.status(502).json({
+        error: 'isolation_identity_recheck_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: healthBeforeSession.reason || 'health_recheck_failed',
         status: 'invalidated',
         state: 'start_failed',
       });
@@ -897,6 +1047,13 @@ async function decideApproval(req, res, outcome) {
         state: 'start_failed',
       });
     }
+    // Only Hamster-approved create/start that fully succeeded writes managed provenance
+    // (never silently adopt an arbitrary externally created same-name runtime).
+    await upsertManagedIsolatedDesktop({
+      ...startedIdentity,
+      approvalId: ticket.id,
+      taskId: ticket.task_id,
+    });
     // Success only: now stamp Approved for this action only (ticket already consumed).
     await query(
       `UPDATE approvals SET decision_note = $2 WHERE id = $1`,
@@ -907,6 +1064,8 @@ async function decideApproval(req, res, outcome) {
       status: outcome,
       note: isolation.APPROVED_ONCE_NOTE,
       taskId: ticket.task_id,
+      instanceId: startedIdentity.instanceId,
+      containerId: startedIdentity.containerId,
     });
   }
   await query(
@@ -1140,17 +1299,35 @@ async function reattachFollowers() {
   }
 }
 
-migrate()
-  .then(() => namedQueries.seedMetrics(pool))
-  .then(() => defaultConversation())
-  .then(() => reattachFollowers())
-  .then(() => {
-    setInterval(sweepExpired, 15000).unref();
-    app.listen(PORT, () => {
+async function bootHttpServer() {
+  await migrate();
+  await namedQueries.seedMetrics(pool);
+  await defaultConversation();
+  await reattachFollowers();
+  setInterval(sweepExpired, 15000).unref();
+  return new Promise((resolve) => {
+    const server = app.listen(PORT, () => {
       console.log(`Hamster control plane listening on port ${PORT}`);
+      resolve(server);
     });
-  })
-  .catch((err) => {
+  });
+}
+
+if (require.main === module) {
+  bootHttpServer().catch((err) => {
     console.error('Fatal boot error', err);
     process.exit(1);
   });
+} else {
+  module.exports = {
+    app,
+    migrate,
+    defaultConversation,
+    setIsolationBrokerForTests,
+    getManagedIsolatedDesktop,
+    upsertManagedIsolatedDesktop,
+    INTERNAL_SECRET,
+    pool,
+    bootHttpServer,
+  };
+}

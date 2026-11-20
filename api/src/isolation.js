@@ -27,6 +27,12 @@ const ISOLATED_CONTAINER_NAME = 'desktop';
 const ISOLATED_NETWORK_NAME = process.env.HAMSTER_ISOLATED_NETWORK || 'hamster_p2';
 const ALLOWLISTED_IMAGE = process.env.HAMSTER_ISOLATED_DESKTOP_IMAGE || 'hamster/worker-isolated:latest';
 
+/** Docker labels proving Hamster-managed provenance (not an arbitrary same-name runtime). */
+const LABEL_MANAGED = 'hamster.managed';
+const LABEL_INSTANCE = 'hamster.instance_id';
+const LABEL_TARGET = 'hamster.target_id';
+const MANAGED_LABEL_VALUE = 'approved';
+
 /** Params for a create/start ticket — always includes targetId + plain-language scope. */
 function createIsolatedDesktopParams(taskId, targetId) {
   return {
@@ -34,6 +40,53 @@ function createIsolatedDesktopParams(taskId, targetId) {
     targetId,
     scope: ISOLATED_DESKTOP_SCOPE,
   };
+}
+
+function containerIdsEqual(a, b) {
+  if (!a || !b || typeof a !== 'string' || typeof b !== 'string') return false;
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
+  if (x === y) return true;
+  // Docker may report full vs short ids.
+  return x.startsWith(y) || y.startsWith(x);
+}
+
+function imageIsAllowlisted(probe, allowlistedImage = ALLOWLISTED_IMAGE) {
+  const cfg = typeof probe?.configImage === 'string' ? probe.configImage.trim() : '';
+  if (cfg && cfg === allowlistedImage) return true;
+  // Some brokers report the allowlisted ref on `.image` when digests are unavailable.
+  const img = typeof probe?.image === 'string' ? probe.image.trim() : '';
+  return Boolean(img && img === allowlistedImage);
+}
+
+/**
+ * Freeze the identity snapshot used across probe → health → session boundary.
+ */
+function freezeIsolatedIdentity({ probe, health, managed } = {}) {
+  return {
+    targetId: ISOLATED_DESKTOP_TARGET_ID,
+    instanceId: managed?.instanceId || probe?.instanceId || health?.instanceId || null,
+    containerId: managed?.containerId || probe?.containerId || null,
+    imageId: managed?.imageId || probe?.imageId || null,
+    configImage: managed?.configImage || probe?.configImage || null,
+    approvalId: managed?.approvalId || null,
+  };
+}
+
+function identitiesMatch(expected, actual) {
+  if (!expected || !actual) return false;
+  if (expected.targetId && actual.targetId && expected.targetId !== actual.targetId) return false;
+  if (expected.instanceId && actual.instanceId && expected.instanceId !== actual.instanceId) {
+    return false;
+  }
+  if (expected.containerId && actual.containerId) {
+    if (!containerIdsEqual(expected.containerId, actual.containerId)) return false;
+  }
+  if (expected.imageId && actual.imageId && expected.imageId !== actual.imageId) return false;
+  if (expected.configImage && actual.configImage && expected.configImage !== actual.configImage) {
+    return false;
+  }
+  return true;
 }
 
 const { execFile } = require('child_process');
@@ -47,7 +100,7 @@ async function defaultDockerRun(args) {
   return firstLine ?? '';
 }
 
-function isolatedWorkerEnvArgs() {
+function isolatedWorkerEnvArgs(extra = {}) {
   // Forward the same model env names the agent path uses (values come from api process env;
   // compose passes placeholders — never commit secrets).
   const env = {
@@ -62,6 +115,7 @@ function isolatedWorkerEnvArgs() {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
     HAMSTER_STEP_DELAY_MS: process.env.HAMSTER_STEP_DELAY_MS || '2000',
+    ...extra,
   };
   const args = [];
   for (const [k, v] of Object.entries(env)) {
@@ -70,48 +124,149 @@ function isolatedWorkerEnvArgs() {
   return args;
 }
 
+function parseInspectStatusLine(text) {
+  const parts = String(text || '').trim().split('\t');
+  const [
+    containerId = '',
+    imageId = '',
+    configImage = '',
+    running = '',
+    instanceId = '',
+    managed = '',
+    targetId = '',
+  ] = parts;
+  return {
+    containerId: containerId || null,
+    imageId: imageId || null,
+    configImage: configImage || null,
+    running: running === 'true',
+    instanceId: instanceId && instanceId !== '<no value>' ? instanceId : null,
+    managed: managed && managed !== '<no value>' ? managed : null,
+    targetId: targetId && targetId !== '<no value>' ? targetId : null,
+  };
+}
+
 /**
  * Minimum-privilege broker: allowlisted image, same host, no docker.sock into the desktop.
  * @param {{ dockerRun?: (args: string[]) => Promise<string> }} [opts]
  */
 function createDockerIsolationBroker(opts = {}) {
   const dockerRun = opts.dockerRun || defaultDockerRun;
+  const allowlistedImage = opts.allowlistedImage || ALLOWLISTED_IMAGE;
+  const inspectFormat = [
+    '{{.Id}}',
+    '{{.Image}}',
+    '{{.Config.Image}}',
+    '{{.State.Running}}',
+    `{{index .Config.Labels "${LABEL_INSTANCE}"}}`,
+    `{{index .Config.Labels "${LABEL_MANAGED}"}}`,
+    `{{index .Config.Labels "${LABEL_TARGET}"}}`,
+  ].join('\t');
+
+  async function inspectNamed() {
+    const raw = await dockerRun(['inspect', '--format', inspectFormat, ISOLATED_CONTAINER_NAME]);
+    return parseInspectStatusLine(raw);
+  }
+
   return {
-    start: async ({ targetId }) => {
+    /**
+     * Create/start only after approval. Never adopts an arbitrary same-name container:
+     * unmanaged name collision → fail closed (does NOT stop/rm live desktop).
+     */
+    start: async ({ targetId, instanceId, approvalId } = {}) => {
       if (targetId && targetId !== ISOLATED_DESKTOP_TARGET_ID) {
         return { ok: false, reason: 'not_isolated_desktop_target' };
       }
-      // Reuse an existing named container when present; otherwise create on hamster_p2.
-      let containerId = null;
+      if (!instanceId || typeof instanceId !== 'string') {
+        return { ok: false, reason: 'instance_id_required' };
+      }
       try {
-        containerId = await dockerRun([
-          'inspect',
-          '--format',
-          '{{.Id}}',
-          ISOLATED_CONTAINER_NAME,
-        ]);
+        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', allowlistedImage]);
+      } catch (err) {
+        return { ok: false, reason: `image_unavailable:${String(err?.message ?? err)}` };
+      }
+
+      let existing = null;
+      try {
+        existing = await inspectNamed();
       } catch {
-        containerId = null;
+        existing = null;
       }
-      if (!containerId) {
-        containerId = await dockerRun([
-          'create',
-          '--name',
-          ISOLATED_CONTAINER_NAME,
-          '--network',
-          ISOLATED_NETWORK_NAME,
-          '--restart',
-          'no',
-          ...isolatedWorkerEnvArgs(),
-          ALLOWLISTED_IMAGE,
-        ]);
+
+      if (existing?.containerId) {
+        // Fail closed: do not silently adopt / replace an unmanaged or foreign instance.
+        // Never docker rm/stop here — live desktop must not be replaced by this path.
+        if (
+          existing.managed !== MANAGED_LABEL_VALUE ||
+          existing.instanceId !== instanceId ||
+          existing.targetId !== ISOLATED_DESKTOP_TARGET_ID ||
+          !imageIsAllowlisted(
+            { configImage: existing.configImage, image: existing.configImage },
+            allowlistedImage,
+          )
+        ) {
+          return {
+            ok: false,
+            reason: 'unmanaged_or_foreign_container_present',
+            containerId: existing.containerId,
+            instanceId: existing.instanceId,
+          };
+        }
+        await dockerRun(['start', existing.containerId]);
+        const after = await inspectNamed();
+        return {
+          ok: true,
+          containerId: after.containerId,
+          imageId: after.imageId,
+          configImage: after.configImage,
+          instanceId: after.instanceId,
+        };
       }
+
+      const containerId = await dockerRun([
+        'create',
+        '--name',
+        ISOLATED_CONTAINER_NAME,
+        '--network',
+        ISOLATED_NETWORK_NAME,
+        '--restart',
+        'no',
+        '--label',
+        `${LABEL_MANAGED}=${MANAGED_LABEL_VALUE}`,
+        '--label',
+        `${LABEL_INSTANCE}=${instanceId}`,
+        '--label',
+        `${LABEL_TARGET}=${ISOLATED_DESKTOP_TARGET_ID}`,
+        ...(approvalId ? ['--label', `hamster.approval_id=${approvalId}`] : []),
+        ...isolatedWorkerEnvArgs({
+          HAMSTER_ISOLATED_INSTANCE_ID: instanceId,
+          HAMSTER_ISOLATED_TARGET_ID: ISOLATED_DESKTOP_TARGET_ID,
+        }),
+        allowlistedImage,
+      ]);
       await dockerRun(['start', containerId || ISOLATED_CONTAINER_NAME]);
-      return { ok: true, containerId: containerId || ISOLATED_CONTAINER_NAME };
+      let afterCreate;
+      try {
+        afterCreate = await inspectNamed();
+      } catch {
+        afterCreate = {
+          containerId: containerId || null,
+          imageId: null,
+          configImage: allowlistedImage,
+          instanceId,
+        };
+      }
+      return {
+        ok: true,
+        containerId: afterCreate.containerId || containerId,
+        imageId: afterCreate.imageId,
+        configImage: afterCreate.configImage || allowlistedImage,
+        instanceId: afterCreate.instanceId || instanceId,
+      };
     },
     status: async () => {
       try {
-        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', ALLOWLISTED_IMAGE]);
+        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', allowlistedImage]);
       } catch (err) {
         return {
           ok: false,
@@ -121,19 +276,32 @@ function createDockerIsolationBroker(opts = {}) {
         };
       }
       try {
-        const running = await dockerRun([
-          'inspect',
-          '--format',
-          '{{.State.Running}}',
-          ISOLATED_CONTAINER_NAME,
-        ]);
-        if (running === 'true') {
-          return { ok: true, running: true, state: 'ok' };
+        const info = await inspectNamed();
+        if (info.running) {
+          return {
+            ok: true,
+            running: true,
+            state: 'ok',
+            containerId: info.containerId,
+            imageId: info.imageId,
+            configImage: info.configImage,
+            instanceId: info.instanceId,
+            managed: info.managed,
+            targetId: info.targetId || ISOLATED_DESKTOP_TARGET_ID,
+          };
         }
-        // Container exists but is not running — not started, not unavailable.
-        return { ok: false, running: false, state: 'not_started' };
+        return {
+          ok: false,
+          running: false,
+          state: 'not_started',
+          containerId: info.containerId,
+          imageId: info.imageId,
+          configImage: info.configImage,
+          instanceId: info.instanceId,
+          managed: info.managed,
+          targetId: info.targetId || ISOLATED_DESKTOP_TARGET_ID,
+        };
       } catch {
-        // No such container: broker/image ok, simply not started.
         return { ok: false, running: false, state: 'not_started' };
       }
     },
@@ -212,21 +380,30 @@ function taskExecutionState(task) {
 
 /**
  * Fail-closed start of the isolated desktop for a target.
- * Returns { ok, reason }; never starts anything it cannot positively resolve.
+ * Returns { ok, reason, ...identity }; never starts anything it cannot positively resolve.
+ * Never stops/replaces an unmanaged live desktop — broker fails closed on name collision.
  */
-async function startIsolatedDesktop({ targetId, broker } = {}) {
+async function startIsolatedDesktop({ targetId, broker, instanceId, approvalId } = {}) {
   if (!isIsolatedDesktopTarget(targetId)) {
     return { ok: false, reason: 'not_isolated_desktop_target' };
   }
   const runner = broker ?? null;
   if (!runner) {
-    // No broker configured / injected => fail closed. Never start without a broker.
     return { ok: false, reason: 'isolation_broker_unavailable' };
   }
+  if (!instanceId || typeof instanceId !== 'string') {
+    return { ok: false, reason: 'instance_id_required' };
+  }
   try {
-    const result = await runner.start({ targetId });
+    const result = await runner.start({ targetId, instanceId, approvalId });
     if (!result?.ok) return { ok: false, reason: result?.reason ?? 'broker_start_failed' };
-    return { ok: true, containerId: result.containerId ?? null };
+    return {
+      ok: true,
+      containerId: result.containerId ?? null,
+      imageId: result.imageId ?? null,
+      configImage: result.configImage ?? null,
+      instanceId: result.instanceId ?? instanceId,
+    };
   } catch (err) {
     return { ok: false, reason: `broker_error:${String(err?.message ?? err)}` };
   }
@@ -237,7 +414,7 @@ async function startIsolatedDesktop({ targetId, broker } = {}) {
  * Fail closed without a working broker. not_started ≠ unavailable (must-fix 4):
  * - unavailable: broker / image / readiness probe failed → block dispatch
  * - not_started: broker+image ok, container simply not up → dispatch issues start approval
- * - ok: container running
+ * - ok: container running (identity fields attached when broker reports them)
  */
 async function probeIsolatedDesktop({ broker } = {}) {
   const runner = broker ?? null;
@@ -250,19 +427,27 @@ async function probeIsolatedDesktop({ broker } = {}) {
       || (status?.ok || status?.running || status?.available ? 'ok' : null)
       || (status?.reason?.startsWith?.('image_unavailable') ? 'unavailable' : null)
       || 'not_started';
+    const identity = {
+      containerId: status?.containerId ?? null,
+      imageId: status?.imageId ?? null,
+      configImage: status?.configImage ?? null,
+      instanceId: status?.instanceId ?? null,
+      managed: status?.managed ?? null,
+      targetId: status?.targetId ?? ISOLATED_DESKTOP_TARGET_ID,
+    };
     if (state === 'unavailable') {
       return {
         ok: false,
         available: false,
         state: 'unavailable',
         reason: status?.reason ?? 'unavailable',
+        ...identity,
       };
     }
     if (state === 'ok') {
-      return { ok: true, available: true, state: 'ok', reason: null };
+      return { ok: true, available: true, state: 'ok', reason: null, ...identity };
     }
-    // not_started (and any non-unavailable idle): dispatchable for the approval chain.
-    return { ok: true, available: true, state: 'not_started', reason: null };
+    return { ok: true, available: true, state: 'not_started', reason: null, ...identity };
   } catch (err) {
     return {
       ok: false,
@@ -275,16 +460,10 @@ async function probeIsolatedDesktop({ broker } = {}) {
 
 /**
  * Pure gate: may createTask skip minting create_isolated_desktop?
- * Never trusts clientClaim (running bit / selector state). Fail closed unless
- * server probe is `ok` AND HTTP health is positively ok.
- * @param {{
- *   probe?: { state?: string, ok?: boolean } | null,
- *   health?: { ok?: boolean } | null,
- *   clientClaim?: unknown,
- * }} [evidence]
+ * Reuse requires previously managed/approved SAME instance identity — not merely
+ * name/image + 2xx. Client claims are ignored.
  */
 function shouldSkipCreateIsolatedDesktopApproval(evidence = {}) {
-  // Explicitly ignore any client-supplied running/health claim.
   void evidence.clientClaim;
   const state = evidence.probe?.state;
   if (state === 'not_started') {
@@ -296,57 +475,176 @@ function shouldSkipCreateIsolatedDesktopApproval(evidence = {}) {
       reason: state === 'unavailable' ? 'unavailable' : 'unavailable_or_unknown',
     };
   }
+
+  const managed = evidence.managed;
+  if (!managed || !managed.instanceId || !managed.containerId) {
+    return { skip: false, reason: 'unmanaged_instance' };
+  }
+  if (managed.targetId && managed.targetId !== ISOLATED_DESKTOP_TARGET_ID) {
+    return { skip: false, reason: 'managed_target_mismatch' };
+  }
+  if (!evidence.probe?.containerId || !containerIdsEqual(managed.containerId, evidence.probe.containerId)) {
+    return { skip: false, reason: 'container_id_mismatch' };
+  }
+  if (!evidence.probe?.instanceId || evidence.probe.instanceId !== managed.instanceId) {
+    return { skip: false, reason: 'instance_id_mismatch' };
+  }
+  if (evidence.probe.managed && evidence.probe.managed !== MANAGED_LABEL_VALUE) {
+    return { skip: false, reason: 'probe_not_managed' };
+  }
+  if (!imageIsAllowlisted(evidence.probe)) {
+    return { skip: false, reason: 'image_not_allowlisted' };
+  }
+  if (managed.configImage && evidence.probe.configImage && managed.configImage !== evidence.probe.configImage) {
+    return { skip: false, reason: 'config_image_mismatch' };
+  }
+  if (managed.imageId && evidence.probe.imageId && managed.imageId !== evidence.probe.imageId) {
+    return { skip: false, reason: 'image_id_mismatch' };
+  }
+
   if (evidence.health?.ok !== true) {
     return { skip: false, reason: 'health_not_ready' };
+  }
+  if (!evidence.health.instanceId || evidence.health.instanceId !== managed.instanceId) {
+    return { skip: false, reason: 'health_instance_mismatch' };
+  }
+  if (!evidence.health.targetId || evidence.health.targetId !== ISOLATED_DESKTOP_TARGET_ID) {
+    return { skip: false, reason: 'health_target_mismatch' };
   }
   return { skip: true, reason: null };
 }
 
 /**
- * Server-side verify for reuse: probe + one-shot (or injected) health.
+ * Server-side verify for reuse: managed provenance + probe identity + bound health.
  * Never calls broker.start — create/start still requires an approval ticket.
- * @param {{
- *   broker?: { status: Function, start?: Function } | null,
- *   waitReady?: (opts?: object) => Promise<{ ok: boolean, reason?: string }>,
- *   baseUrl?: string,
- *   clientClaim?: unknown,
- * }} [opts]
  */
 async function verifyHealthyIsolatedDesktopForReuse(opts = {}) {
   void opts.clientClaim;
+  const getManaged =
+    typeof opts.getManagedInstance === 'function' ? opts.getManagedInstance : async () => null;
+
+  let managed = null;
+  try {
+    managed = await getManaged(ISOLATED_DESKTOP_TARGET_ID);
+  } catch (err) {
+    return {
+      reuse: false,
+      probe: null,
+      health: null,
+      managed: null,
+      identity: null,
+      reason: `managed_lookup_failed:${String(err?.message ?? err)}`,
+    };
+  }
+
   const probe = await probeIsolatedDesktop({ broker: opts.broker });
   if (probe.state !== 'ok') {
     return {
       reuse: false,
       probe,
       health: null,
+      managed,
+      identity: null,
       reason:
         probe.state === 'not_started'
           ? 'not_started'
           : probe.reason || probe.state || 'unavailable',
     };
   }
+
+  const expectedIdentity = managed
+    ? {
+        targetId: ISOLATED_DESKTOP_TARGET_ID,
+        instanceId: managed.instanceId,
+      }
+    : null;
+
   const waitReady =
     opts.waitReady ||
     (async (readyOpts) => {
-      // Lazy require avoids a circular dependency with readiness helpers in tests.
       const readiness = require('./readiness');
       return readiness.checkIsolatedDesktopHealthOnce(readyOpts);
     });
   const health = await waitReady({
     baseUrl: opts.baseUrl || process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+    expectedIdentity,
+    requireHealthIdentity: true,
   });
   const decision = shouldSkipCreateIsolatedDesktopApproval({
     probe,
     health,
+    managed,
     clientClaim: opts.clientClaim,
   });
+  const identity = decision.skip
+    ? freezeIsolatedIdentity({ probe, health, managed })
+    : null;
   return {
     reuse: decision.skip,
     reason: decision.reason,
     probe,
     health,
+    managed,
+    identity,
   };
+}
+
+/**
+ * TOCTOU guard at session-creation boundary: re-probe + re-health must still
+ * match the frozen managed identity. Fail closed → caller mints create/start ticket.
+ */
+async function recheckManagedIsolatedIdentity(opts = {}) {
+  const expected = opts.expected;
+  if (!expected?.instanceId || !expected?.containerId) {
+    return { ok: false, reason: 'expected_identity_missing' };
+  }
+  const probe = await probeIsolatedDesktop({ broker: opts.broker });
+  if (probe.state !== 'ok') {
+    return { ok: false, reason: probe.reason || probe.state || 'probe_failed', probe, health: null };
+  }
+  if (!identitiesMatch(expected, probe)) {
+    return { ok: false, reason: 'identity_swapped', probe, health: null };
+  }
+  if (!imageIsAllowlisted(probe)) {
+    return { ok: false, reason: 'image_not_allowlisted', probe, health: null };
+  }
+
+  const getManaged =
+    typeof opts.getManagedInstance === 'function' ? opts.getManagedInstance : async () => null;
+  let managed = null;
+  try {
+    managed = await getManaged(ISOLATED_DESKTOP_TARGET_ID);
+  } catch (err) {
+    return { ok: false, reason: `managed_lookup_failed:${String(err?.message ?? err)}` };
+  }
+  if (!managed || managed.instanceId !== expected.instanceId) {
+    return { ok: false, reason: 'managed_provenance_lost', probe, managed };
+  }
+  if (!containerIdsEqual(managed.containerId, probe.containerId)) {
+    return { ok: false, reason: 'managed_container_mismatch', probe, managed };
+  }
+
+  const waitReady =
+    opts.waitReady ||
+    (async (readyOpts) => {
+      const readiness = require('./readiness');
+      return readiness.checkIsolatedDesktopHealthOnce(readyOpts);
+    });
+  const health = await waitReady({
+    baseUrl: opts.baseUrl || process.env.EVE_ISOLATED_API_URL || 'http://desktop:8081',
+    expectedIdentity: {
+      targetId: ISOLATED_DESKTOP_TARGET_ID,
+      instanceId: expected.instanceId,
+    },
+    requireHealthIdentity: true,
+  });
+  if (health?.ok !== true) {
+    return { ok: false, reason: health?.reason || 'health_not_ready', probe, health, managed };
+  }
+  if (health.instanceId !== expected.instanceId || health.targetId !== ISOLATED_DESKTOP_TARGET_ID) {
+    return { ok: false, reason: 'health_identity_mismatch', probe, health, managed };
+  }
+  return { ok: true, probe, health, managed };
 }
 
 /**
@@ -371,6 +669,10 @@ module.exports = {
   ISOLATED_CONTAINER_NAME,
   ISOLATED_NETWORK_NAME,
   ALLOWLISTED_IMAGE,
+  LABEL_MANAGED,
+  LABEL_INSTANCE,
+  LABEL_TARGET,
+  MANAGED_LABEL_VALUE,
   createIsolatedDesktopParams,
   createDockerIsolationBroker,
   isKnownTarget,
@@ -380,5 +682,12 @@ module.exports = {
   probeIsolatedDesktop,
   shouldSkipCreateIsolatedDesktopApproval,
   verifyHealthyIsolatedDesktopForReuse,
+  recheckManagedIsolatedIdentity,
   planIsolatedCreateTask,
+  freezeIsolatedIdentity,
+  identitiesMatch,
+  imageIsAllowlisted,
+  containerIdsEqual,
+  parseInspectStatusLine,
 };
+

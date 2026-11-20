@@ -92,6 +92,16 @@ const copy = {
     morePending: (n: number) => (n === 1 ? '1 more pending' : `${n} more pending`),
     openPendingApprovals: 'Open pending approvals',
     approvalTarget: 'Target',
+    runOn: 'Run on',
+    controlPlane: 'Control plane',
+    controlPlaneDefault: 'Default',
+    isolatedDesktop: 'Isolated desktop',
+    isolatedDesktopDescription: 'An isolated container on the same host as this Hamster. The bot cannot use the host itself.',
+    isolatedDesktopUnavailable: 'Isolated desktop is unavailable',
+    isolatedDesktopStartFailed: "Couldn't start the isolated desktop",
+    isolatedDesktopStopped: 'The isolated desktop stopped',
+    useControlPlaneInstead: 'Use the control plane instead',
+    createIsolatedDesktopAction: 'Create or start the isolated desktop',
   },
   zh: {
     brand: 'Hamster',
@@ -143,6 +153,16 @@ const copy = {
     morePending: (n: number) => `还有 ${n} 项待审批`,
     openPendingApprovals: '打开待审批',
     approvalTarget: '目标',
+    runOn: '执行位置',
+    controlPlane: '控制面',
+    controlPlaneDefault: '默认',
+    isolatedDesktop: '隔离桌面',
+    isolatedDesktopDescription: '与此 Hamster 同一主机上的隔离容器。机器人不能使用宿主机本身。',
+    isolatedDesktopUnavailable: '隔离桌面不可用',
+    isolatedDesktopStartFailed: '无法启动隔离桌面',
+    isolatedDesktopStopped: '隔离桌面已停止',
+    useControlPlaneInstead: '改用控制面',
+    createIsolatedDesktopAction: '创建或启动隔离桌面',
   },
 } as const
 
@@ -228,6 +248,8 @@ export function approvalActionLabel(
           : 'Publish this dashboard'
     case 'save_dashboard_page':
       return locale === 'zh' ? '保存 Dashboard 页面' : 'Save the dashboard page'
+    case 'create_isolated_desktop':
+      return locale === 'zh' ? '创建或启动隔离桌面' : 'Create or start the isolated desktop'
     case 'unknown_action':
     case '':
     case undefined:

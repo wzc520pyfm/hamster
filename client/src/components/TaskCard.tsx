@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ControlStatusLabel, TaskStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
+import { taskRunState, taskRunTargetLabel, type TaskRunState } from '@/lib/runTarget'
 import type { TaskDetail } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 
@@ -12,17 +13,24 @@ export function TaskCard({
   onCheckProgress,
   onSteer,
   onCancel,
+  onRetry,
+  onUseControlPlane,
 }: {
   task: TaskDetail
   locale: Locale
   onCheckProgress: (taskId: string) => void
   onSteer: (taskId: string, message: string) => Promise<void>
   onCancel: (taskId: string) => Promise<void>
+  /** Re-attempt the task's execution target (high-risk create/start re-issued as a ticket). */
+  onRetry?: (taskId: string) => Promise<void>
+  /** Explicitly move an unstarted task back to the control plane. Not Steer/Cancel. */
+  onUseControlPlane?: (taskId: string) => Promise<void>
 }) {
   const t = getCopy(locale)
   const [steerText, setSteerText] = useState('')
   const [busy, setBusy] = useState(false)
   const terminal = ['succeeded', 'failed', 'cancelled'].includes(task.status)
+  const runState: TaskRunState = taskRunState(task)
   const latestControl = task.controls.at(-1)
   const failureReason =
     task.failureReason ||
@@ -50,6 +58,77 @@ export function TaskCard({
           <TaskStatusLabel status={task.status} locale={locale} />
         </div>
       </header>
+
+      <div
+        className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+        data-testid="task-run-on"
+      >
+        <span className="text-[var(--color-muted-foreground)]">{t.runOn}:</span>
+        <span className="font-medium" data-testid="task-run-on-label">
+          {taskRunTargetLabel(task, locale)}
+        </span>
+        <span className="font-mono text-[11px] text-[var(--color-muted-foreground)]">{task.targetId}</span>
+      </div>
+
+      {runState === 'start_failed' ? (
+        <div
+          className="mt-2 rounded-md border border-[#e2d3b3] bg-[#f8f1e4] px-2.5 py-2 text-sm text-[#6b5428]"
+          data-testid="task-isolated-start-failed"
+        >
+          <div className="font-medium">{t.isolatedDesktopStartFailed}</div>
+          {!terminal && task.status === 'queued' ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {onRetry ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true)
+                    try {
+                      await onRetry(task.taskId)
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                  data-testid="task-isolated-retry"
+                >
+                  {t.retry}
+                </Button>
+              ) : null}
+              {onUseControlPlane ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true)
+                    try {
+                      await onUseControlPlane(task.taskId)
+                    } finally {
+                      setBusy(false)
+                    }
+                  }}
+                  data-testid="task-use-control-plane"
+                >
+                  {t.useControlPlaneInstead}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {runState === 'stopped' ? (
+        <div
+          className="mt-2 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-2.5 py-2 text-sm text-[var(--color-destructive)]"
+          data-testid="task-isolated-stopped"
+        >
+          {t.isolatedDesktopStopped}
+        </div>
+      ) : null}
 
       {task.status === 'failed' && failureReason ? (
         <div className="mt-3 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-2.5 py-2 text-sm text-[var(--color-destructive)]">

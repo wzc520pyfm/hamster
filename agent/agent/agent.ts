@@ -158,6 +158,10 @@ function scriptedRespond(request: ScriptedRequest) {
     .find((m) => m.startsWith("[hamster-worker"))
     ?.match(/title=([^\]]+)/);
   const title = (titleMatch?.[1] ?? "Weekly metrics dashboard").trim();
+  const targetMatch = userMessages
+    .find((m) => m.startsWith("[hamster-worker"))
+    ?.match(/targetId=([^\]]+)/);
+  const targetId = (targetMatch?.[1] ?? "target_control_plane").trim();
 
   const errored = toolResults.find((r) => r.isError);
   if (errored) {
@@ -211,7 +215,7 @@ function scriptedRespond(request: ScriptedRequest) {
       toolCalls: [
         {
           name: "publish_dashboard",
-          input: { taskId, assetId: String(assetId), channel: "shared workspace" },
+          input: { taskId, assetId: String(assetId), channel: "shared workspace", targetId },
         },
       ],
     };

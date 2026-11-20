@@ -1,0 +1,89 @@
+# Hamster P2 slice 1 — isolated desktop execution-target stack (same host, isolated).
+# Separate compose project from the DeepSeek live stack (hamster-livemodel-20261120) and from
+# the shared dev stack. Isolation baseline for the `desktop` (model worker) service:
+# - the worker runs INSIDE the isolated container, never on the host itself
+# - no docker.sock mounted into the desktop or the model worker
+# - no host-root bind mounts, no privileged / host-pid / host-network flags
+# - allowlisted image only, bridge network (not host networking)
+# - create/start happens only after an approval ticket bound to the targetId
+
+name: hamster-p2-idesk-20261120
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hamster
+      POSTGRES_USER: hamster
+      POSTGRES_PASSWORD: ${HAMSTER_DB_PASSWORD:-changeme}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "25432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hamster -d hamster"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  desktop:
+    image: ${HAMSTER_ISOLATED_DESKTOP_IMAGE:-hamster/worker-isolated:latest}
+    restart: unless-stopped
+    environment:
+      PORT: "8081"
+      HAMSTER_API_URL: http://api:8080
+      HAMSTER_INTERNAL_SECRET: ${HAMSTER_INTERNAL_SECRET:-dev-internal-secret}
+      HAMSTER_AGENT_USERNAME: ${HAMSTER_AGENT_USERNAME:-hamster}
+      HAMSTER_AGENT_PASSWORD: ${HAMSTER_AGENT_PASSWORD:-dev-agent-password}
+      HAMSTER_MODEL_ID: ${HAMSTER_MODEL_ID:-}
+      HAMSTER_MODEL_PROVIDER: ${HAMSTER_MODEL_PROVIDER:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      HAMSTER_STEP_DELAY_MS: ${HAMSTER_STEP_DELAY_MS:-2000}
+    volumes:
+      - eve_data:/app/.eve
+    networks:
+      - hamster_p2
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://hamster:${HAMSTER_DB_PASSWORD:-changeme}@db:5432/hamster
+      SECRET_KEY: ${HAMSTER_SECRET_KEY:-super-secret-change-me}
+      HAMSTER_INTERNAL_SECRET: ${HAMSTER_INTERNAL_SECRET:-dev-internal-secret}
+      EVE_API_URL: http://desktop:8081
+      HAMSTER_AGENT_USERNAME: ${HAMSTER_AGENT_USERNAME:-hamster}
+      HAMSTER_AGENT_PASSWORD: ${HAMSTER_AGENT_PASSWORD:-dev-agent-password}
+      HAMSTER_APPROVAL_TTL_SECONDS: ${HAMSTER_APPROVAL_TTL_SECONDS:-600}
+      HAMSTER_CORS_ORIGIN: ${HAMSTER_CORS_ORIGIN:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+      desktop:
+        condition: service_started
+    ports:
+      - "28080:8080"
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_BASE_URL: ""
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://api:8080}
+      PORT: "3000"
+    ports:
+      - "23000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pg_data:
+  eve_data:
+
+networks:
+  hamster_p2:
+    driver: bridge

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ApprovalStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
 import { approvalActionLabel, approvalDecisionCopy, getCopy, type Locale } from '@/i18n/messages'
+import { approvalRunTargetLabel } from '@/lib/runTarget'
 import type { Approval } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 
@@ -80,6 +81,14 @@ export function ApprovalCard({
         </div>
         <ApprovalStatusLabel status={approval.status} locale={locale} />
       </header>
+
+      <div
+        className="mt-2 text-sm"
+        data-testid="approval-run-on"
+      >
+        <span className="text-[var(--color-muted-foreground)]">{t.runOn}: </span>
+        <span data-testid="approval-run-on-value">{approvalRunTargetLabel(approval, locale)}</span>
+      </div>
 
       <dl className="mt-3 flex flex-col gap-2 text-sm">
         {params.length > 0 ? (

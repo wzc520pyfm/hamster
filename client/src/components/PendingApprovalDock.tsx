@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ApprovalStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
 import { approvalActionLabel, getCopy, type Locale } from '@/i18n/messages'
+import { approvalRunTargetLabel } from '@/lib/runTarget'
 import type { Approval } from '@/lib/api'
 
 /**
@@ -68,6 +69,13 @@ export function PendingApprovalDock({
                 {targetBits.join(' · ')}
               </div>
             ) : null}
+            <div
+              className="mt-1 text-xs leading-snug text-[var(--color-muted-foreground)] whitespace-normal"
+              data-testid="approval-summary-run-on"
+            >
+              <span className="font-medium text-[var(--color-foreground)]">{t.runOn}: </span>
+              {approvalRunTargetLabel(primary, locale)}
+            </div>
           </div>
           <ApprovalStatusLabel status={primary.status} locale={locale} />
         </header>

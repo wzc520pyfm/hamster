@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { PendingApprovalDock } from '@/components/PendingApprovalDock'
 import { TaskCard } from '@/components/TaskCard'
+import { RunTargetSelector } from '@/components/RunTargetSelector'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
 import { api, isNetworkError, type Timeline, type TimelineMessage } from '@/lib/api'
+import { RUN_TARGET_CONTROL_PLANE, RUN_TARGET_ISOLATED_DESKTOP } from '@/lib/runTarget'
 
 export function ConversationPage({
   locale,
@@ -24,14 +26,54 @@ export function ConversationPage({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [kbHeight, setKbHeight] = useState<number | null>(null)
+  const [runTarget, setRunTarget] = useState<string>(RUN_TARGET_CONTROL_PLANE)
+  const [targets, setTargets] = useState<
+    Array<{
+      targetId: string
+      label: string
+      isDefault: boolean
+      available: boolean
+      state: string
+      description?: string | null
+      unavailableReason?: string | null
+    }>
+  >([])
+  const [targetNotice, setTargetNotice] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
+
+  const isolatedTarget = useMemo(
+    () => targets.find((t) => t.targetId === RUN_TARGET_ISOLATED_DESKTOP) ?? null,
+    [targets],
+  )
+  const isolatedAvailable = isolatedTarget?.available ?? false
 
   const refresh = useCallback(async () => {
     if (!conversationId) return
     const next = await api.timeline(conversationId)
     setTimeline(next)
   }, [conversationId])
+
+  const refreshTargets = useCallback(async () => {
+    try {
+      const list = await api.listTargets()
+      setTargets(list.targets)
+    } catch {
+      // Fail closed: without a reachable control plane the selector stays on the default.
+      setTargets([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshTargets()
+  }, [refreshTargets])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void refreshTargets().catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [refreshTargets])
 
   useEffect(() => {
     let cancelled = false
@@ -92,11 +134,19 @@ export function ConversationPage({
     if (!conversationId) return
     const value = raw.trim()
     if (!value) return
+    if (runTarget === RUN_TARGET_ISOLATED_DESKTOP && !isolatedAvailable) {
+      // Fail closed: never dispatch a long task to a not-ready isolated desktop; keep input.
+      setTargetNotice(t.isolatedDesktopUnavailable)
+      return
+    }
     setSending(true)
     setError(null)
+    setTargetNotice(null)
     try {
-      await api.sendMessage(conversationId, value)
+      await api.sendMessage(conversationId, value, runTarget)
       setText('')
+      // After send, and for the next new task, the selector returns to the control plane.
+      setRunTarget(RUN_TARGET_CONTROL_PLANE)
       await refresh()
       onApprovalsChanged()
     } catch (err) {
@@ -149,6 +199,16 @@ export function ConversationPage({
                 await refresh()
                 onApprovalsChanged()
               },
+              onRetry: async (taskId) => {
+                await api.retryTask(taskId)
+                await refresh()
+              },
+              onUseControlPlane: async (taskId) => {
+                // Explicit operator move for a task that has not started; not Steer/Cancel.
+                await api.switchTaskTarget(taskId, RUN_TARGET_CONTROL_PLANE)
+                await refresh()
+                onApprovalsChanged()
+              },
             })}
           </div>
         )}
@@ -174,6 +234,15 @@ export function ConversationPage({
         </div>
       ) : null}
 
+      {targetNotice ? (
+        <div
+          className="shrink-0 rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]"
+          data-testid="run-target-blocked-notice"
+        >
+          {targetNotice}
+        </div>
+      ) : null}
+
       <form
         className="safe-area-bottom shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
         onSubmit={(e) => {
@@ -181,7 +250,14 @@ export function ConversationPage({
           void send(text)
         }}
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <RunTargetSelector
+          value={runTarget}
+          onChange={setRunTarget}
+          available={isolatedAvailable}
+          locale={locale}
+          onRetry={() => void refreshTargets()}
+        />
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
           {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
           <textarea
             className="min-h-[2.75rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
@@ -215,6 +291,8 @@ function renderTimeline(
     onCheckProgress: (taskId: string) => void
     onSteer: (taskId: string, message: string) => Promise<void>
     onCancel: (taskId: string) => Promise<void>
+    onRetry: (taskId: string) => Promise<void>
+    onUseControlPlane: (taskId: string) => Promise<void>
   },
 ) {
   const seenTasks = new Set<string>()
@@ -234,6 +312,8 @@ function renderTimeline(
           onCheckProgress={handlers.onCheckProgress}
           onSteer={handlers.onSteer}
           onCancel={handlers.onCancel}
+          onRetry={handlers.onRetry}
+          onUseControlPlane={handlers.onUseControlPlane}
         />,
       )
       continue
@@ -269,6 +349,8 @@ function renderTimeline(
         onCheckProgress={handlers.onCheckProgress}
         onSteer={handlers.onSteer}
         onCancel={handlers.onCancel}
+        onRetry={handlers.onRetry}
+        onUseControlPlane={handlers.onUseControlPlane}
       />,
     )
   }

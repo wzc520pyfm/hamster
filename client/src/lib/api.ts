@@ -80,6 +80,8 @@ export interface Approval {
   action: string
   params: Record<string, unknown>
   status: ApprovalStatus
+  /** Execution target this ticket is bound to (control plane vs isolated desktop). */
+  targetId?: string | null
   expiresAt?: string
   expires_at?: string
   decidedAt?: string | null
@@ -97,6 +99,8 @@ export interface TaskDetail {
   assetId: string | null
   title: string
   status: TaskStatus
+  /** Stable execution target (control plane vs isolated desktop). */
+  targetId: string
   controlSeq: number
   createdAt: string
   updatedAt: string
@@ -176,10 +180,10 @@ export const api = {
     ),
   timeline: (conversationId: string) =>
     request<Timeline>(`/api/conversations/${encodeURIComponent(conversationId)}/timeline`),
-  sendMessage: (conversationId: string, text: string) =>
+  sendMessage: (conversationId: string, text: string, targetId?: string) =>
     request<{ kind: string; reply?: string; task?: TaskDetail }>(
       `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
-      { method: 'POST', body: JSON.stringify({ text }) },
+      { method: 'POST', body: JSON.stringify({ text, ...(targetId ? { targetId } : {}) }) },
     ),
   getTask: (taskId: string) => request<TaskDetail>(`/api/tasks/${encodeURIComponent(taskId)}`),
   steerTask: (taskId: string, message: string) =>
@@ -191,6 +195,28 @@ export const api = {
     request<{ taskId: string; status: string; controlSeq: number }>(
       `/api/tasks/${encodeURIComponent(taskId)}/cancel`,
       { method: 'POST', body: JSON.stringify({}) },
+    ),
+  listTargets: () =>
+    request<{
+      targets: Array<{
+        targetId: string
+        label: string
+        isDefault: boolean
+        available: boolean
+        state: string
+        description?: string | null
+        unavailableReason?: string | null
+      }>
+    }>('/api/targets'),
+  retryTask: (taskId: string) =>
+    request<{ taskId: string; status: string; approvalId?: string; state?: string }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/retry`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+  switchTaskTarget: (taskId: string, targetId: string) =>
+    request<{ taskId: string; status: string; started?: boolean }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/target`,
+      { method: 'POST', body: JSON.stringify({ targetId }) },
     ),
   listAssets: () => request<AssetSummary[]>('/api/assets'),
   getAsset: (assetId: string) =>

@@ -1,0 +1,34 @@
+{
+  "kind": "node_entrypoint_parity_not_docker_image",
+  "origin": "http://127.0.0.1:3162",
+  "API_UPSTREAM": "http://127.0.0.1:35675",
+  "checks": [
+    {
+      "name": "index_no_cache",
+      "ok": true
+    },
+    {
+      "name": "sw_js_no_cache",
+      "ok": true
+    },
+    {
+      "name": "missing_asset_404_not_spa_html",
+      "ok": true
+    },
+    {
+      "name": "spa_fallback_approvals",
+      "ok": true
+    },
+    {
+      "name": "api_proxy_health",
+      "ok": true
+    },
+    {
+      "name": "internal_not_proxied",
+      "ok": true
+    }
+  ],
+  "pass": true,
+  "bootLogTail": "hamster-client listening on 0.0.0.0:3162 (api → http://127.0.0.1:35675)\n",
+  "note": "This validates Node `server.mjs` entry only. Docker IMAGE build/CMD swap is NOT executed here (IndependentDocker unavailable)."
+}

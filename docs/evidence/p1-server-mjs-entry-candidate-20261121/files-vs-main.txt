@@ -1,0 +1,17 @@
+client/Dockerfile
+client/package.json
+client/scripts/entrypoint-parity-node.mjs
+client/scripts/p1-persist-through-pwa-retry-20261121.mjs
+docker-compose.yml
+docs/evidence/p1-evidence-correction-20261121b/CORRECTED-NOTES.md
+docs/evidence/p1-evidence-correction-20261121b/PRIOR-PAYLOAD-HASHES.txt
+docs/evidence/p1-evidence-correction-20261121b/SHA256SUMS.txt
+docs/evidence/p1-persist-through-pwa-retry-20261121/NOTES.md
+docs/evidence/p1-persist-through-pwa-retry-20261121/SHA256SUMS.txt
+docs/evidence/p1-persist-through-pwa-retry-20261121/api-server.log
+docs/evidence/p1-persist-through-pwa-retry-20261121/ephemeral-pg.json
+docs/evidence/p1-persist-through-pwa-retry-20261121/harness-tools/start-ephemeral-pg.sh
+docs/evidence/p1-persist-through-pwa-retry-20261121/harness-tools/stop-ephemeral-pg.sh
+docs/evidence/p1-persist-through-pwa-retry-20261121/persist-retry-after-reload-20261121.png
+docs/evidence/p1-persist-through-pwa-retry-20261121/persist-retry-timeout-zh-20261121.png
+docs/evidence/p1-persist-through-pwa-retry-20261121/persist-through-pwa-retry-20261121.json

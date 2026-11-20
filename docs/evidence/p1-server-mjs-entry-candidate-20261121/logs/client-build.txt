@@ -1,0 +1,20 @@
+
+> hamster-client@0.0.0 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 151 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.13 kB │ gzip:   0.58 kB
+dist/assets/index-BmyPHK3O.css   21.70 kB │ gzip:   5.12 kB
+dist/assets/index-X01cmGy_.js   523.13 kB │ gzip: 162.86 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 251ms
+[hamster-pwa-build-stamp] 0467ed911aa2

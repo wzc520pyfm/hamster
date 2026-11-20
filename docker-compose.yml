@@ -57,10 +57,16 @@ services:
       - "8080:8080"
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        # Empty → same-origin /api via server.mjs (not baked localhost:8080).
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+      PORT: "3000"
+      DIST_DIR: /app/dist
+      API_UPSTREAM: http://api:8080
     ports:
       - "3000:3000"
     depends_on:

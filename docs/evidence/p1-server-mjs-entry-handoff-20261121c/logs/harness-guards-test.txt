@@ -1,0 +1,19 @@
+
+> hamster-client@0.0.0 test:harness-guards
+> node --test scripts/harness-guards.test.mjs
+
+✔ .env.example recommended path: VITE_API_BASE_URL empty (same-origin proxy) (1.696458ms)
+✔ Dockerfile + compose defaults empty VITE_API_BASE_URL (recommended path) (0.280954ms)
+✔ requireControllerChangeObserved: positive when observed=true (0.133762ms)
+✔ requireControllerChangeObserved NEGATIVE: missing observed must fail (no soft-pass) (0.412276ms)
+✔ assertLiveEphemeralOrThrow NEGATIVE: mismatch throws BEFORE any business query (0.499017ms)
+✔ assertLiveEphemeralOrThrow positive: matching identity allows subsequent business (caller) (0.170049ms)
+✔ historical combined-run JSON: observed=true is positive record; soft-pass line annotated elsewhere (0.285401ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50.141964

@@ -1,0 +1,18 @@
+ client/Dockerfile                                  |  13 +-
+ client/package.json                                |   4 +-
+ client/scripts/entrypoint-parity-node.mjs          | 158 +++++
+ .../p1-persist-through-pwa-retry-20261121.mjs      | 764 +++++++++++++++++++++
+ docker-compose.yml                                 |  10 +-
+ .../CORRECTED-NOTES.md                             |  48 ++
+ .../PRIOR-PAYLOAD-HASHES.txt                       |  23 +
+ .../SHA256SUMS.txt                                 |   2 +
+ .../p1-persist-through-pwa-retry-20261121/NOTES.md |  29 +
+ .../SHA256SUMS.txt                                 |   6 +
+ .../api-server.log                                 |   1 +
+ .../ephemeral-pg.json                              |  17 +
+ .../harness-tools/start-ephemeral-pg.sh            | 135 ++++
+ .../harness-tools/stop-ephemeral-pg.sh             |  27 +
+ .../persist-retry-after-reload-20261121.png        | Bin 0 -> 94838 bytes
+ .../persist-retry-timeout-zh-20261121.png          | Bin 0 -> 102198 bytes
+ .../persist-through-pwa-retry-20261121.json        | 178 +++++
+ 17 files changed, 1409 insertions(+), 6 deletions(-)

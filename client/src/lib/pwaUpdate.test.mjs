@@ -158,6 +158,83 @@ test('production waitForControllerChange timeout: NEVER reload (MUST FIX)', asyn
   assert.equal(listeners.size, 0)
 })
 
+test('after timeout, late controllerchange then retry can reload; no forced reload on timeout', async () => {
+  const storage = memoryStorage({ 'hamster.locale': 'zh' })
+  let reloads = 0
+  let lateFn = null
+  const listeners = new Set()
+  const timedOut = await applyPwaUpdate({
+    registration: {
+      waiting: {
+        postMessage() {},
+      },
+    },
+    storage,
+    whenControllerChanges: () =>
+      waitForControllerChange(8, {
+        hasServiceWorker: true,
+        addEventListener: (_t, fn) => {
+          listeners.add(fn)
+          lateFn = fn
+        },
+        removeEventListener: (_t, fn) => listeners.delete(fn),
+        setTimeout,
+        clearTimeout,
+      }),
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(timedOut.failure, 'timeout')
+  assert.equal(reloads, 0)
+  // Late activation after timeout must not force a reload by itself.
+  if (typeof lateFn === 'function') lateFn()
+  assert.equal(reloads, 0)
+
+  // Explicit retry after a real controllerchange succeeds and may reload.
+  const retryOk = await applyPwaUpdate({
+    registration: {
+      waiting: {
+        postMessage() {},
+      },
+    },
+    storage,
+    whenControllerChanges: async () => ({ ok: true, reason: 'controllerchange' }),
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(retryOk.reloaded, true)
+  assert.equal(reloads, 1)
+  assert.equal(storage.getItem('hamster.locale'), 'zh')
+})
+
+test('no_waiting retry recovers without forced reload', async () => {
+  const storage = memoryStorage({ 'hamster.conversation.demo': 'x' })
+  let reloads = 0
+  const none = await applyPwaUpdate({
+    registration: { waiting: null },
+    storage,
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(none.failure, 'no_waiting')
+  assert.equal(none.reloaded, false)
+  assert.equal(reloads, 0)
+
+  const again = await applyPwaUpdate({
+    registration: {},
+    storage,
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(again.failure, 'no_waiting')
+  assert.equal(reloads, 0)
+  assert.equal(storage.getItem('hamster.conversation.demo'), 'x')
+})
+
 test('i18n exposes EN/ZH update retry copy', () => {
   const messages = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8')
   assert.match(messages, /updateRetryNeeded:/)

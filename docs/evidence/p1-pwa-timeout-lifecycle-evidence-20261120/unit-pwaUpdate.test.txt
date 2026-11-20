@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: production module sync: pwaUpdate.ts imports pwaUpdateCore.ts (no duplicate pure.mjs)
+ok 1 - production module sync: pwaUpdate.ts imports pwaUpdateCore.ts (no duplicate pure.mjs)
+  ---
+  duration_ms: 2.135641
+  type: 'test'
+  ...
+# Subtest: main.tsx registers SW in PROD (ConnectGate path without Shell)
+ok 2 - main.tsx registers SW in PROD (ConnectGate path without Shell)
+  ---
+  duration_ms: 0.181045
+  type: 'test'
+  ...
+# Subtest: register options bypass HTTP cache for sw.js updates
+ok 3 - register options bypass HTTP cache for sw.js updates
+  ---
+  duration_ms: 0.079523
+  type: 'test'
+  ...
+# Subtest: shell cache uses deploy-id suffix (not fixed v1)
+ok 4 - shell cache uses deploy-id suffix (not fixed v1)
+  ---
+  duration_ms: 0.106682
+  type: 'test'
+  ...
+# Subtest: activate deletes prior shell caches but keeps current
+ok 5 - activate deletes prior shell caches but keeps current
+  ---
+  duration_ms: 0.651439
+  type: 'test'
+  ...
+# Subtest: waiting worker does not run activate cleanup (retained assets stay until Reload)
+ok 6 - waiting worker does not run activate cleanup (retained assets stay until Reload)
+  ---
+  duration_ms: 0.150814
+  type: 'test'
+  ...
+# Subtest: stampHamsterPwaBuild: successive deploy ids change sw bytes
+ok 7 - stampHamsterPwaBuild: successive deploy ids change sw bytes
+  ---
+  duration_ms: 0.616588
+  type: 'test'
+  ...
+# Subtest: applyPwaUpdate awaits controllerchange before reload; preserves continuity
+ok 8 - applyPwaUpdate awaits controllerchange before reload; preserves continuity
+  ---
+  duration_ms: 0.612391
+  type: 'test'
+  ...
+# Subtest: production waitForControllerChange timeout: NEVER reload (MUST FIX)
+ok 9 - production waitForControllerChange timeout: NEVER reload (MUST FIX)
+  ---
+  duration_ms: 9.585164
+  type: 'test'
+  ...
+# Subtest: after timeout, late controllerchange then retry can reload; no forced reload on timeout
+ok 10 - after timeout, late controllerchange then retry can reload; no forced reload on timeout
+  ---
+  duration_ms: 8.118732
+  type: 'test'
+  ...
+# Subtest: no_waiting retry recovers without forced reload
+ok 11 - no_waiting retry recovers without forced reload
+  ---
+  duration_ms: 0.294185
+  type: 'test'
+  ...
+# Subtest: i18n exposes EN/ZH update retry copy
+ok 12 - i18n exposes EN/ZH update retry copy
+  ---
+  duration_ms: 0.178407
+  type: 'test'
+  ...
+# Subtest: sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache
+ok 13 - sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache
+  ---
+  duration_ms: 0.216476
+  type: 'test'
+  ...
+# Subtest: isCacheableShellAssetResponse rejects HTML poison for /assets/*.js
+ok 14 - isCacheableShellAssetResponse rejects HTML poison for /assets/*.js
+  ---
+  duration_ms: 0.223198
+  type: 'test'
+  ...
+# Subtest: cacheFirstPutDecision does not store SPA-fallback HTML under JS URL
+ok 15 - cacheFirstPutDecision does not store SPA-fallback HTML under JS URL
+  ---
+  duration_ms: 0.145986
+  type: 'test'
+  ...
+# Subtest: server: missing /assets/*.js is 404, not SPA HTML; shouldSpaFallback
+ok 16 - server: missing /assets/*.js is 404, not SPA HTML; shouldSpaFallback
+  ---
+  duration_ms: 13.97618
+  type: 'test'
+  ...
+# Subtest: shouldOfferUpdateReload + snapshotContinuityStorage
+ok 17 - shouldOfferUpdateReload + snapshotContinuityStorage
+  ---
+  duration_ms: 0.165157
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 127.066332

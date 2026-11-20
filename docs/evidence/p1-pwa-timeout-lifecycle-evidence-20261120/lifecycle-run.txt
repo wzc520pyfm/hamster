@@ -1,0 +1,63 @@
+{
+  "pass": true,
+  "jsonPath": "/agent/repos/hamster/docs/evidence/p1-pwa-timeout-lifecycle-evidence-20261120/lifecycle-timeout-lifecycle.json",
+  "steps": [
+    {
+      "step": "missing_old_asset_is_404_not_html",
+      "ok": true
+    },
+    {
+      "step": "old_140487b_installed",
+      "ok": true
+    },
+    {
+      "step": "retained_old_page_fetches_old_js_mime_before_reload",
+      "ok": true
+    },
+    {
+      "step": "natural_online_reopen_acquires_new_js_and_banner",
+      "ok": true
+    },
+    {
+      "step": "not_now_defers_activation_old_js_fetch_ok",
+      "ok": true
+    },
+    {
+      "step": "banner_en_sample_isolated_vm",
+      "ok": true
+    },
+    {
+      "step": "banner_zh_sample_isolated_vm",
+      "ok": true
+    },
+    {
+      "step": "continuity_before_explicit_reload",
+      "ok": true
+    },
+    {
+      "step": "old_js_fetch_mime_immediately_before_reload_click",
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "ok": true
+    },
+    {
+      "step": "offline_launch_react_html_and_bundle",
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_real_built_assets",
+      "ok": true
+    }
+  ],
+  "assets": {
+    "old": "/assets/index-B2Y4gJPm.js",
+    "new": "/assets/index-vKApQpwO.js",
+    "new2": "/assets/index-B9b-iJZc.js"
+  }
+}

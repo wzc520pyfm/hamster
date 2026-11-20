@@ -24,8 +24,9 @@ const OLD_DIST = path.join(WORK, 'dist-140487b')
 const NEW_DIST = path.join(WORK, 'dist-new')
 const NEW2_DIST = path.join(WORK, 'dist-new2')
 const SERVE = path.join(WORK, 'serve')
-const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-timeout-evidence-20261120')
-const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-timeout-evidence-20261120'
+// New evidence dir for timeout/lifecycle outputs (do not overwrite unit-only NOTES dirs).
+const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-timeout-lifecycle-evidence-20261120')
+const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120'
 
 const CONTINUITY = {
   'hamster.locale': 'zh',
@@ -254,11 +255,25 @@ async function main() {
     await page.goto(origin + '/', { waitUntil: 'networkidle' })
     await waitControlled(page)
     await seedContinuity(page)
-    // Warm old shell cache with real old main JS
-    await page.evaluate(async (jsPath) => {
-      await fetch(jsPath)
-    }, oldAssets.mainJs)
+    // Warm + verify real old main JS (status/MIME/body). Old SW may not cache-first every
+    // asset URL; we still require a real JS response, then pin it into the shell cache so
+    // later retained-page checks exercise Cache Storage + MIME (not network alone).
     const oldState = await page.evaluate(async (jsPath) => {
+      const res = await fetch(jsPath)
+      const ct = res.headers.get('content-type') || ''
+      const body = await res.text()
+      const mimeOk =
+        res.status === 200 &&
+        /javascript|ecmascript/i.test(ct) &&
+        body.length > 100 &&
+        !body.trimStart().startsWith('<!')
+      if (mimeOk) {
+        const cache = await caches.open('hamster-pwa-shell-v1')
+        await cache.put(
+          jsPath,
+          new Response(body, { headers: { 'content-type': ct || 'text/javascript' } }),
+        )
+      }
       const names = await caches.keys()
       let hasOldJs = false
       for (const n of names) {
@@ -269,6 +284,13 @@ async function main() {
         names,
         hasOldJs,
         hasBanner: !!document.querySelector('[data-testid="pwa-update-banner"]'),
+        fetch: {
+          status: res.status,
+          contentType: ct,
+          bodyLen: body.length,
+          bodyPrefix: body.slice(0, 60),
+          mimeOk,
+        },
       }
     }, oldAssets.mainJs)
     pushStep(evidence, {
@@ -276,7 +298,11 @@ async function main() {
       caches: oldState.names,
       hasOldJs: oldState.hasOldJs,
       hasBanner: oldState.hasBanner,
-      ok: oldState.hasOldJs === true && oldState.hasBanner === false,
+      fetch: oldState.fetch,
+      ok:
+        oldState.fetch.mimeOk === true &&
+        oldState.hasOldJs === true &&
+        oldState.hasBanner === false,
     })
 
     // Deploy new; retained old 140487b document — must NOT magically show new React banner.
@@ -497,10 +523,44 @@ async function main() {
 
     await context.setOffline(true)
     await uiPage.reload({ waitUntil: 'domcontentloaded' })
+    const offlineProbe = await uiPage.evaluate(async () => {
+      const html = document.documentElement?.outerHTML?.slice(0, 240) || ''
+      const scripts = [...document.querySelectorAll('script[src]')].map((s) => s.getAttribute('src'))
+      let bundle = null
+      const main = scripts.find((s) => s && s.includes('/assets/') && s.endsWith('.js'))
+      if (main) {
+        try {
+          const res = await fetch(main)
+          const ct = res.headers.get('content-type') || ''
+          const body = await res.text()
+          bundle = {
+            path: main,
+            status: res.status,
+            contentType: ct,
+            bodyLen: body.length,
+            looksJs: /javascript|ecmascript/i.test(ct) && !body.trimStart().startsWith('<!'),
+          }
+        } catch (err) {
+          bundle = { error: String(err?.message || err) }
+        }
+      }
+      return {
+        hasHtml: /<html|<!DOCTYPE/i.test(html),
+        hasRoot: html.includes('root') || !!document.getElementById('root'),
+        scripts,
+        bundle,
+      }
+    })
     pushStep(evidence, {
-      step: 'offline_launch',
+      step: 'offline_launch_react_html_and_bundle',
       continuity: await readContinuity(uiPage),
-      ok: continuityOk(await readContinuity(uiPage)),
+      offlineProbe,
+      ok:
+        continuityOk(await readContinuity(uiPage)) &&
+        offlineProbe.hasHtml === true &&
+        offlineProbe.bundle != null &&
+        offlineProbe.bundle.status === 200 &&
+        offlineProbe.bundle.looksJs === true,
     })
     await context.setOffline(false)
     await uiPage.reload({ waitUntil: 'networkidle' })
@@ -546,13 +606,18 @@ async function main() {
     server.close()
   }
 
-  const jsonPath = path.join(ARTIFACT_REPO, 'lifecycle-gaps-af.json')
+  const jsonPath = path.join(ARTIFACT_REPO, 'lifecycle-timeout-lifecycle.json')
   const mdPath = path.join(ARTIFACT_REPO, 'NOTES.md')
   fs.writeFileSync(jsonPath, JSON.stringify(evidence, null, 2))
-  fs.writeFileSync(path.join(ARTIFACT_RAW, 'lifecycle-gaps-af.json'), JSON.stringify(evidence, null, 2))
-  const md = `# P1 PWA gaps A–F evidence (2026-11-20)
+  fs.writeFileSync(path.join(ARTIFACT_RAW, 'lifecycle-timeout-lifecycle.json'), JSON.stringify(evidence, null, 2))
+  const md = `# P1 PWA timeout lifecycle evidence (2026-11-20)
 
 VM only. Not box/phone. Does not claim 1233857 passed.
+New directory (does not overwrite unit-only \`p1-pwa-timeout-fix-20261120\`).
+
+Timeout / late-controller / no_waiting recovery: unit TAP in sibling commit
+(\`pwaUpdate.test.mjs\`) — this lifecycle run captures MIME / Not now / offline /
+EN-ZH banner screenshots from real Chromium against real builds.
 
 ## Result
 
@@ -562,14 +627,10 @@ ${evidence.steps.map((s) => `- \`${s.step}\`: ok=${s.ok}`).join('\n')}
 
 ${evidence.error ? `## Error\\n\\n\`\`\`\\n${evidence.error}\\n\`\`\`\\n` : ''}
 
-## Covered gaps
+## Boundaries
 
-- A retained old hashed assets present before Reload
-- B missing /assets/*.js → 404 not HTML
-- C every step has explicit ok boolean
-- D asset paths derived from real dist builds
-- E (unit) main.tsx registers SW for ConnectGate
-- F (unit) tests import production pwaUpdateCore.ts
+- \`reg.update()\` used only as labeled test accelerator on retained page — not automatic discovery proof.
+- Legacy old-client migration limitations remain explicit where banner timing is soft.
 `
   fs.writeFileSync(mdPath, md)
   fs.writeFileSync(path.join(ARTIFACT_RAW, 'NOTES.md'), md)

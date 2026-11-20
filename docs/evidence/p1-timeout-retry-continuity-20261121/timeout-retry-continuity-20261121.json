@@ -1,0 +1,165 @@
+{
+  "at": "2026-11-20T16:46:31.256Z",
+  "kind": "p1_timeout_late_retry_continuity",
+  "parentTipHint": "run on feat/p1-deepseek-live-model-20261120 tip",
+  "notBoxPhone": true,
+  "notLiveOrigin": true,
+  "persistenceBoundaries": {
+    "fromSource": [
+      {
+        "key": "hamster.locale",
+        "writer": "client/src/i18n/storage.ts storeLocale via LocaleContext.setLocale / Shell locale buttons",
+        "kind": "react_written_localStorage"
+      },
+      {
+        "key": "hamster.controlBase",
+        "writer": "client/src/App.tsx on successful api.currentConversation mount",
+        "kind": "react_written_localStorage"
+      }
+    ],
+    "notWrittenByReact": [
+      {
+        "keyPattern": "hamster.conversation.*",
+        "note": "No localStorage.setItem for conversation payloads in client/src — prior lifecycle CONTINUITY.demo keys were test seeds, not app persistence"
+      }
+    ],
+    "serverOnly": [
+      "conversationId / title (GET /api/conversations/current → React state)",
+      "timeline / messages (GET /api/conversations/:id/timeline)",
+      "approvals list"
+    ],
+    "offlineExpectation": "Shell HTML+JS may load from SW cache; conversation content requires API — expect connection error / empty timeline offline, not full history"
+  },
+  "fixtureConversation": {
+    "conversationId": "conv_fixture_p1_20261121",
+    "title": "[FIXTURE-LABELLED] P1 timeout-retry continuity conversation",
+    "createdAt": "2026-11-21T00:00:00.000Z",
+    "fixture": true,
+    "fixtureLabel": "local-test-api-seed-not-react-persistence"
+  },
+  "engineeringInjection": {
+    "label": "ENGINEERING_INJECTION",
+    "description": "Suppress navigator.serviceWorker controllerchange listeners for ~5.5s so production waitForControllerChange (4s) times out; production PwaUpdateBanner + applyHamsterPwaUpdate still used",
+    "appliedAt": "2026-11-20T16:46:38.053Z"
+  },
+  "steps": [
+    {
+      "step": "react_wrote_locale_and_controlBase_plus_fixture_conversation_visible",
+      "storageAfterReact": {
+        "hamster.controlBase": "http://127.0.0.1:41543",
+        "hamster.locale": "zh"
+      },
+      "uiConv": {
+        "conversationIdVisible": "conv_fixture_p1_20261121",
+        "bodySample": "主对话\nconversationId: conv_fixture_p1_20261121\nASSISTANT\n[FIXTURE-LABELLED] canned timeline row — server seed, not offline SW store\n执行位置\n控制面 · 默认\n隔离桌面\n发送",
+        "hasFixtureTitle": true
+      },
+      "ok": true,
+      "note": "No hamster.conversation.* keys — conversationId is React state from fixture API",
+      "at": "2026-11-20T16:46:36.826Z"
+    },
+    {
+      "step": "update_banner_visible_prod_react",
+      "bannerBefore": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "ok": true,
+      "at": "2026-11-20T16:46:36.845Z"
+    },
+    {
+      "step": "banner_en_png",
+      "png": "timeout-retry-banner-en-20261121.png",
+      "enText": "A new version of Hamster is available.\nNot now\nReload",
+      "ok": true,
+      "at": "2026-11-20T16:46:37.455Z"
+    },
+    {
+      "step": "banner_zh_png",
+      "png": "timeout-retry-banner-zh-20261121.png",
+      "zhText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "ok": true,
+      "at": "2026-11-20T16:46:38.048Z"
+    },
+    {
+      "step": "timeout_no_forced_reload_retry_ui",
+      "urlAfterTimeout": "http://127.0.0.1:41543/",
+      "originSame": true,
+      "retryText": "更新未完成。当前页面已保留，可以再次尝试重新加载。\n暂不\n再次重新加载",
+      "storageAfterTimeout": {
+        "hamster.controlBase": "http://127.0.0.1:41543",
+        "hamster.locale": "zh"
+      },
+      "injectionMeta": {
+        "label": "ENGINEERING_INJECTION",
+        "purpose": "suppress_controllerchange_until_production_timeout",
+        "blockControllerChangeUntil": 1795193203553,
+        "suppressedCount": 1
+      },
+      "png": "timeout-retry-state-zh-20261121.png",
+      "ok": true,
+      "at": "2026-11-20T16:46:42.387Z"
+    },
+    {
+      "step": "late_activation_waiting_gone_controller_is_active",
+      "swState": {
+        "hasWaiting": false,
+        "controller": "http://127.0.0.1:41543/sw.js",
+        "active": "http://127.0.0.1:41543/sw.js",
+        "same": true
+      },
+      "ok": true,
+      "at": "2026-11-20T16:46:42.694Z"
+    },
+    {
+      "step": "user_retry_reloads_preserves_react_persistence_refetches_fixture_conversation",
+      "storageAfterRetry": {
+        "hamster.controlBase": "http://127.0.0.1:41543",
+        "hamster.locale": "zh"
+      },
+      "uiAfterRetry": {
+        "conversationIdVisible": "conv_fixture_p1_20261121",
+        "bodySample": "主对话\nconversationId: conv_fixture_p1_20261121\nASSISTANT\n[FIXTURE-LABELLED] canned timeline row — server seed, not offline SW store\n执行位置\n控制面 · 默认\n隔离桌面\n发送",
+        "hasFixtureTitle": true
+      },
+      "ok": true,
+      "note": "conversationId after reload comes from fixture API refetch (server seed), not localStorage",
+      "at": "2026-11-20T16:46:43.316Z"
+    },
+    {
+      "step": "offline_shell_react_persist_keys_server_history_not_claimed",
+      "storageOffline": {
+        "hamster.controlBase": "http://127.0.0.1:41543",
+        "hamster.locale": "zh"
+      },
+      "offlineUi": {
+        "rootChildren": 1,
+        "bodySample": "无法连接\n\n重试\nHamster\nPrivate preview\n对话\n主对话\nDashboard 库\n待审批\nEN\n中文\n主对话\n\n还没有消息。可以派发任务或直接提问。\n\n执行位置\n控制面 · 默认\n隔离桌面\n发送",
+        "hasHtml": true
+      },
+      "fixtureApiHitsDuringOffline": 0,
+      "preciseBoundary": "Offline proves React localStorage keys + shell render. Full conversation/message history is server-only — not claimed as offline-persisted. Fixture API hits during Playwright offline must be 0.",
+      "ok": true,
+      "at": "2026-11-20T16:46:44.138Z"
+    },
+    {
+      "step": "reconnect_refetches_fixture_conversation",
+      "afterReconnect": {
+        "conversationIdVisible": "conv_fixture_p1_20261121",
+        "bodySample": "主对话\nconversationId: conv_fixture_p1_20261121\nASSISTANT\n[FIXTURE-LABELLED] canned timeline row — server seed, not offline SW store\n执行位置\n控制面 · 默认\n隔离桌面\n发送",
+        "hasFixtureTitle": true
+      },
+      "ok": true,
+      "at": "2026-11-20T16:46:44.686Z"
+    }
+  ],
+  "pass": true,
+  "builds": {
+    "idA": "c51b2117c166",
+    "idB": "45982a255774"
+  },
+  "origin": "http://127.0.0.1:41543",
+  "fixtureApi": "http://127.0.0.1:45591",
+  "pngSha256": {
+    "timeout-retry-banner-en-20261121.png": "4a106f53ea0513b23a4a2050ad6f93b83c374a13bb2b267ae6e2f55e8464f8a1",
+    "timeout-retry-banner-zh-20261121.png": "ea64f01380a229b857814e280e8330cce390c6a5676bb5a4ca0de234923475d3",
+    "timeout-retry-state-zh-20261121.png": "63772a02ef2280d2be661b97d140dceb89ac1676a7c19d035683581fff7c4ad3"
+  }
+}

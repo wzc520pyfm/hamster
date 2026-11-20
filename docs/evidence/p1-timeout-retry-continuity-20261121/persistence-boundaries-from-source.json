@@ -1,0 +1,26 @@
+{
+  "fromSource": [
+    {
+      "key": "hamster.locale",
+      "writer": "client/src/i18n/storage.ts storeLocale via LocaleContext.setLocale / Shell locale buttons",
+      "kind": "react_written_localStorage"
+    },
+    {
+      "key": "hamster.controlBase",
+      "writer": "client/src/App.tsx on successful api.currentConversation mount",
+      "kind": "react_written_localStorage"
+    }
+  ],
+  "notWrittenByReact": [
+    {
+      "keyPattern": "hamster.conversation.*",
+      "note": "No localStorage.setItem for conversation payloads in client/src — prior lifecycle CONTINUITY.demo keys were test seeds, not app persistence"
+    }
+  ],
+  "serverOnly": [
+    "conversationId / title (GET /api/conversations/current → React state)",
+    "timeline / messages (GET /api/conversations/:id/timeline)",
+    "approvals list"
+  ],
+  "offlineExpectation": "Shell HTML+JS may load from SW cache; conversation content requires API — expect connection error / empty timeline offline, not full history"
+}

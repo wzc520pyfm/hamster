@@ -9,6 +9,7 @@ import {
   RUN_TARGET_CONTROL_PLANE,
   RUN_TARGET_ISOLATED_DESKTOP,
   canDispatchToIsolated,
+  isLongTaskDispatch,
 } from '@/lib/runTarget'
 
 export function ConversationPage({
@@ -135,14 +136,24 @@ export function ConversationPage({
   // Closed approvals still appear in the timeline/history path via TaskCard state; active
   // pending tickets are pinned above the composer so Deny / Approve stay reachable.
 
-  async function send(raw: string) {
+  /**
+   * Composer send. Only new long-task dispatch reads Run-on.
+   * Check progress / Steer / Cancel / ordinary follow-ups must not — and must still work
+   * when Isolated desktop is selected and unavailable.
+   */
+  async function send(raw: string, opts?: { followUp?: boolean }) {
     if (!conversationId) return
     const value = raw.trim()
     if (!value) return
-    if (runTarget === RUN_TARGET_ISOLATED_DESKTOP && !canDispatchToIsolated(isolatedState)) {
-      // Only true unavailability blocks send. not_started may dispatch: that issues the
-      // start/create approval ticket; the task stays Queued; selector does not start the
-      // container; client must not silently switch to the control plane.
+    const followUp = opts?.followUp === true
+    const dispatch = !followUp && isLongTaskDispatch(value)
+    if (
+      dispatch &&
+      runTarget === RUN_TARGET_ISOLATED_DESKTOP &&
+      !canDispatchToIsolated(isolatedState)
+    ) {
+      // Only unstartable/unavailable blocks long-task dispatch. not_started may dispatch:
+      // that issues the start/create approval ticket; the task stays Queued.
       setTargetNotice(t.isolatedDesktopUnavailable)
       return
     }
@@ -150,10 +161,14 @@ export function ConversationPage({
     setError(null)
     setTargetNotice(null)
     try {
-      await api.sendMessage(conversationId, value, runTarget)
-      setText('')
-      // After send, and for the next new task, the selector returns to the control plane.
-      setRunTarget(RUN_TARGET_CONTROL_PLANE)
+      // Follow-ups omit targetId so the server does not re-bind an existing task's run location.
+      const targetForSend = followUp ? undefined : dispatch ? runTarget : undefined
+      await api.sendMessage(conversationId, value, targetForSend)
+      if (!followUp) {
+        setText('')
+        // After send, and for the next new task, the selector returns to the control plane.
+        setRunTarget(RUN_TARGET_CONTROL_PLANE)
+      }
       await refresh()
       onApprovalsChanged()
     } catch (err) {
@@ -196,12 +211,14 @@ export function ConversationPage({
         ) : (
           <div className="flex flex-col gap-3">
             {renderTimeline(timeline.messages, taskById, locale, {
-              onCheckProgress: (taskId) => void send(`progress ${taskId}`),
+              onCheckProgress: (taskId) => void send(`progress ${taskId}`, { followUp: true }),
               onSteer: async (taskId, message) => {
+                // Steer does not read the Run-on selector.
                 await api.steerTask(taskId, message)
                 await refresh()
               },
               onCancel: async (taskId) => {
+                // Cancel does not read the Run-on selector.
                 await api.cancelTask(taskId)
                 await refresh()
                 onApprovalsChanged()
@@ -209,6 +226,7 @@ export function ConversationPage({
               onRetry: async (taskId) => {
                 await api.retryTask(taskId)
                 await refresh()
+                onApprovalsChanged()
               },
               onUseControlPlane: async (taskId) => {
                 // Explicit operator move for a task that has not started; not Steer/Cancel.

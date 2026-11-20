@@ -47,3 +47,30 @@ test('high-risk target binding: ticket must match task execution target', () => 
     false,
   );
 });
+
+test('high-risk target binding: missing params.targetId fails closed (no task fallback)', () => {
+  const taskOnIsolated = { target_id: ISOLATED, status: 'queued' };
+  const missing = policy.highRiskTargetAllows(taskOnIsolated, { taskId: 'task_1', action: 'create_isolated_desktop' });
+  assert.equal(missing.allowed, false);
+  assert.equal(missing.reason, 'target_id_missing');
+  const empty = policy.highRiskTargetAllows(taskOnIsolated, {
+    taskId: 'task_1',
+    action: 'create_isolated_desktop',
+    targetId: '',
+  });
+  assert.equal(empty.allowed, false);
+});
+
+test('schema.sql creates tables before altering them (fresh volume safe)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  const createTasks = schema.indexOf('CREATE TABLE IF NOT EXISTS tasks');
+  const alterTasks = schema.indexOf('ALTER TABLE tasks ADD COLUMN IF NOT EXISTS');
+  const createApprovals = schema.indexOf('CREATE TABLE IF NOT EXISTS approvals');
+  const alterApprovals = schema.indexOf('ALTER TABLE approvals ADD COLUMN IF NOT EXISTS');
+  assert.ok(createTasks >= 0 && alterTasks >= 0);
+  assert.ok(createTasks < alterTasks, 'CREATE tasks must precede ALTER tasks');
+  assert.ok(createApprovals >= 0 && alterApprovals >= 0);
+  assert.ok(createApprovals < alterApprovals, 'CREATE approvals must precede ALTER approvals');
+});

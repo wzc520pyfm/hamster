@@ -11,11 +11,30 @@ const ISOLATED_DESKTOP_TARGET_ID = 'target_isolated_desktop';
 
 const CREATE_ISOLATED_DESKTOP_ACTION = 'create_isolated_desktop';
 
+/** Exact EN copy for create/start key params (direction §3). Do not synonym-rewrite. */
+const ISOLATED_DESKTOP_SCOPE =
+  'An isolated container on the same host as this Hamster. The bot cannot use the host itself.';
+
+const INVALIDATED_NOTE = 'Invalidated — approve again';
+const APPROVED_ONCE_NOTE = 'Approved for this action only';
+
+/** Event kind that marks a mid-run isolated-desktop container stop (not any task failure). */
+const ISOLATED_DESKTOP_STOPPED_KIND = 'isolated_desktop_stopped';
+
 // Aligned with docker-compose.p2.yml service/network names so create/start hits the
 // container the worker actually routes to (must-fix 2).
 const ISOLATED_CONTAINER_NAME = 'desktop';
 const ISOLATED_NETWORK_NAME = process.env.HAMSTER_ISOLATED_NETWORK || 'hamster_p2';
 const ALLOWLISTED_IMAGE = process.env.HAMSTER_ISOLATED_DESKTOP_IMAGE || 'hamster/worker-isolated:latest';
+
+/** Params for a create/start ticket — always includes targetId + plain-language scope. */
+function createIsolatedDesktopParams(taskId, targetId) {
+  return {
+    taskId,
+    targetId,
+    scope: ISOLATED_DESKTOP_SCOPE,
+  };
+}
 
 const { execFile } = require('child_process');
 const { promisify } = require('util');
@@ -165,9 +184,19 @@ function taskExecutionState(task) {
     case 'running':
       // Approved + started; while running the task executes inside the isolated desktop.
       return { targetId, state: 'ok' };
-    case 'failed':
-      // Mid-run container stop => task lifecycle Failed with a known reason, never Succeeded.
-      return { targetId, state: 'stopped' };
+    case 'failed': {
+      // "The isolated desktop stopped" only for a mid-run container stop, detected from
+      // the container (event kind / flag) — never for every isolated task failure.
+      const midRunStop =
+        task.isolatedDesktopStopped === true ||
+        (Array.isArray(task.events) &&
+          task.events.some(
+            (e) =>
+              e?.kind === ISOLATED_DESKTOP_STOPPED_KIND ||
+              e?.kind === 'isolated_desktop_stopped',
+          ));
+      return { targetId, state: midRunStop ? 'stopped' : 'failed' };
+    }
     case 'succeeded':
       return { targetId, state: 'ok' };
     case 'cancelled':
@@ -244,9 +273,14 @@ module.exports = {
   CONTROL_PLANE_TARGET_ID,
   ISOLATED_DESKTOP_TARGET_ID,
   CREATE_ISOLATED_DESKTOP_ACTION,
+  ISOLATED_DESKTOP_SCOPE,
+  INVALIDATED_NOTE,
+  APPROVED_ONCE_NOTE,
+  ISOLATED_DESKTOP_STOPPED_KIND,
   ISOLATED_CONTAINER_NAME,
   ISOLATED_NETWORK_NAME,
   ALLOWLISTED_IMAGE,
+  createIsolatedDesktopParams,
   createDockerIsolationBroker,
   isKnownTarget,
   isIsolatedDesktopTarget,

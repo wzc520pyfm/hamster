@@ -91,7 +91,27 @@ export function ApprovalCard({
       </div>
 
       <dl className="mt-3 flex flex-col gap-2 text-sm">
-        {params.length > 0 ? (
+        {approval.action === 'create_isolated_desktop' ? (
+          <div>
+            <dt className="text-xs text-[var(--color-muted-foreground)]">{t.params}</dt>
+            <dd
+              className="mt-1 rounded-md bg-[var(--color-muted)]/60 px-2.5 py-2 text-xs leading-snug whitespace-normal"
+              data-testid="approval-full-params"
+            >
+              {/* Exact direction copy: same-host isolated container, not the host. */}
+              <div data-param-key="scope" data-testid="approval-isolated-scope">
+                {t.isolatedDesktopDescription}
+              </div>
+              {params
+                .filter((p) => p.key !== 'scope')
+                .map((p) => (
+                  <div key={p.key} className="mt-1 font-mono" data-param-key={p.key}>
+                    {p.key}: {p.value}
+                  </div>
+                ))}
+            </dd>
+          </div>
+        ) : params.length > 0 ? (
           <div>
             <dt className="text-xs text-[var(--color-muted-foreground)]">{t.params}</dt>
             <dd

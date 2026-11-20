@@ -5,6 +5,15 @@ import { getCopy, type Locale } from '@/i18n/messages'
 export const RUN_TARGET_CONTROL_PLANE = 'target_control_plane'
 export const RUN_TARGET_ISOLATED_DESKTOP = 'target_isolated_desktop'
 
+export type TaskRunState =
+  | 'ok'
+  | 'unavailable'
+  | 'start_failed'
+  | 'stopped'
+  | 'pending_approval'
+  | 'failed'
+  | 'cancelled'
+
 /**
  * Must-fix 4: not_started ≠ unavailable.
  * Only unavailable blocks composer dispatch; not_started may send (issues start approval).
@@ -18,14 +27,23 @@ export function mayUseControlPlaneInstead(status: string): boolean {
   return status === 'queued'
 }
 
-export type TaskRunState =
-  | 'ok'
-  | 'unavailable'
-  | 'start_failed'
-  | 'stopped'
-  | 'pending_approval'
-  | 'failed'
-  | 'cancelled'
+/**
+ * Unstarted isolated tasks (pending_approval or start_failed) may Retry / use control plane.
+ * Not only start_failed.
+ */
+export function showUnstartedIsolatedActions(runState: TaskRunState, status: string): boolean {
+  return (
+    mayUseControlPlaneInstead(status) &&
+    (runState === 'start_failed' || runState === 'pending_approval')
+  )
+}
+
+/** Long-task dispatch patterns that read the Run-on selector. Follow-ups must not. */
+export function isLongTaskDispatch(text: string): boolean {
+  return /^(?:start|dispatch|delegate|派发)\s+(?:a\s+)?(?:long[- ]running\s+)?task:?\s*/is.test(
+    text.trim(),
+  )
+}
 
 /**
  * Execution-target state for a task, mirroring the control-plane decision helper.
@@ -50,9 +68,13 @@ export function taskRunState(task: TaskDetail | null | undefined): TaskRunState 
       return 'pending_approval'
     case 'running':
       return 'ok'
-    case 'failed':
-      // Mid-run container stop => task Failed with a known reason, never Succeeded.
-      return 'stopped'
+    case 'failed': {
+      // "The isolated desktop stopped" only for a mid-run container stop, not every failure.
+      const midRunStop =
+        (task as { isolatedDesktopStopped?: boolean }).isolatedDesktopStopped === true ||
+        (task.events ?? []).some((e) => e.kind === 'isolated_desktop_stopped')
+      return midRunStop ? 'stopped' : 'failed'
+    }
     case 'succeeded':
       return 'ok'
     case 'cancelled':

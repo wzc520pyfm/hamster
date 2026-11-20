@@ -6,7 +6,7 @@ import { getCopy, type Locale } from '@/i18n/messages'
 import {
   taskRunState,
   taskRunTargetLabel,
-  mayUseControlPlaneInstead,
+  showUnstartedIsolatedActions,
   type TaskRunState,
 } from '@/lib/runTarget'
 import type { TaskDetail } from '@/lib/api'
@@ -81,47 +81,48 @@ export function TaskCard({
           data-testid="task-isolated-start-failed"
         >
           <div className="font-medium">{t.isolatedDesktopStartFailed}</div>
-          {!terminal && mayUseControlPlaneInstead(task.status) ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {onRetry ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      await onRetry(task.taskId)
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                  data-testid="task-isolated-retry"
-                >
-                  {t.retry}
-                </Button>
-              ) : null}
-              {onUseControlPlane ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true)
-                    try {
-                      await onUseControlPlane(task.taskId)
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                  data-testid="task-use-control-plane"
-                >
-                  {t.useControlPlaneInstead}
-                </Button>
-              ) : null}
-            </div>
+        </div>
+      ) : null}
+
+      {showUnstartedIsolatedActions(runState, task.status) ? (
+        <div className="mt-2 flex flex-wrap gap-2" data-testid="task-unstarted-actions">
+          {onRetry ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await onRetry(task.taskId)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              data-testid="task-isolated-retry"
+            >
+              {t.retry}
+            </Button>
+          ) : null}
+          {onUseControlPlane ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await onUseControlPlane(task.taskId)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              data-testid="task-use-control-plane"
+            >
+              {t.useControlPlaneInstead}
+            </Button>
           ) : null}
         </div>
       ) : null}

@@ -1,9 +1,6 @@
 -- Hamster P0 control-plane schema. Idempotent; applied on API boot.
-
--- Idempotent migrations for deployments created before the isolated-desktop slice.
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS goal TEXT;
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_id TEXT NOT NULL DEFAULT 'target_control_plane';
-ALTER TABLE approvals ADD COLUMN IF NOT EXISTS target_id TEXT;
+-- CREATE TABLE first so a fresh volume (demo-surface 1) succeeds; ALTER afterward
+-- upgrades older deployments that predate the isolated-desktop columns.
 
 CREATE TABLE IF NOT EXISTS conversations (
   id            TEXT PRIMARY KEY,
@@ -131,3 +128,9 @@ CREATE TABLE IF NOT EXISTS metrics_weekly (
   conversion  NUMERIC(5,2) NOT NULL,
   exceptions  INTEGER NOT NULL
 );
+
+-- Idempotent migrations for deployments created before the isolated-desktop slice.
+-- Must run AFTER CREATE TABLE so a fresh database does not ALTER missing relations.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS goal TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_id TEXT NOT NULL DEFAULT 'target_control_plane';
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS target_id TEXT;

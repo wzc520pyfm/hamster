@@ -75,12 +75,32 @@ async function handleApprovalOpened(fact, sessionId) {
   const approvalId = `appr_${data.interactionId}`;
   const ttlSeconds = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
 
-  // Bind the ticket to the task's execution target so a control-plane approval
-  // cannot be consumed on the isolated desktop and vice versa.
+  // Bind the ticket to the task's execution target at issue time. approvals.target_id
+  // is always written; params.targetId is always set so authorize can fail closed if missing.
+  const boundTargetId = task.target_id;
+  if (!boundTargetId) {
+    console.warn('[events] approval opened but task has no target_id; refusing ticket', task.id);
+    return;
+  }
   const ticketParams =
     params && typeof params === 'object' && !Array.isArray(params)
-      ? { ...params, targetId: params.targetId ?? task.target_id }
-      : { targetId: task.target_id };
+      ? { ...params, targetId: boundTargetId }
+      : { targetId: boundTargetId };
+  // Worker-supplied targetId must match the task; otherwise fail closed (no ticket).
+  if (
+    params &&
+    typeof params === 'object' &&
+    typeof params.targetId === 'string' &&
+    params.targetId.trim() &&
+    params.targetId.trim() !== boundTargetId
+  ) {
+    console.warn('[events] approval targetId mismatch; refusing ticket', {
+      taskId: task.id,
+      taskTarget: boundTargetId,
+      paramsTarget: params.targetId,
+    });
+    return;
+  }
   const ticketHash = paramsHash(ticketParams);
   await query(
     `INSERT INTO approvals (id, task_id, action, params, params_hash, status,
@@ -93,7 +113,7 @@ async function handleApprovalOpened(fact, sessionId) {
       action,
       JSON.stringify(ticketParams),
       ticketHash,
-      task.target_id ?? null,
+      boundTargetId,
       data.interactionId,
       sessionId,
       String(ttlSeconds),

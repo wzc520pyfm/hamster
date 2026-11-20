@@ -63,17 +63,41 @@ test('execution targets: running task on isolated is ok (approved + started)', (
   assert.equal(state.state, 'ok');
 });
 
-test('execution targets: mid-run container stop -> task Failed and execution state stopped', () => {
+test('execution targets: ordinary isolated failure is failed, not stopped', () => {
   const state = isolation.taskExecutionState(taskFixture({ status: 'failed', target_id: ISOLATED }));
-  assert.equal(state.state, 'stopped');
+  assert.equal(state.state, 'failed');
+});
+
+test('execution targets: mid-run container stop (detected) -> stopped', () => {
+  const byFlag = isolation.taskExecutionState(
+    taskFixture({ status: 'failed', target_id: ISOLATED, isolatedDesktopStopped: true }),
+  );
+  assert.equal(byFlag.state, 'stopped');
+  const byEvent = isolation.taskExecutionState(
+    taskFixture({
+      status: 'failed',
+      target_id: ISOLATED,
+      events: [{ kind: 'isolated_desktop_stopped', message: 'container exited' }],
+    }),
+  );
+  assert.equal(byEvent.state, 'stopped');
 });
 
 test('execution targets: task lifecycle stays distinct from container state copy', () => {
   // The container-state sentence must never be a task lifecycle word (Failed / Succeeded).
-  const failed = isolation.taskExecutionState(taskFixture({ status: 'failed', target_id: ISOLATED }));
-  assert.notEqual(failed.state, 'failed');
-  const stopped = isolation.taskExecutionState(taskFixture({ status: 'failed', target_id: ISOLATED }));
+  const stopped = isolation.taskExecutionState(
+    taskFixture({ status: 'failed', target_id: ISOLATED, isolatedDesktopStopped: true }),
+  );
   assert.equal(stopped.state, 'stopped');
+  assert.notEqual(stopped.state, 'failed');
+});
+
+test('createIsolatedDesktopParams includes targetId and exact same-host scope copy', () => {
+  const params = isolation.createIsolatedDesktopParams('task_1', ISOLATED);
+  assert.equal(params.taskId, 'task_1');
+  assert.equal(params.targetId, ISOLATED);
+  assert.equal(params.scope, isolation.ISOLATED_DESKTOP_SCOPE);
+  assert.match(params.scope, /cannot use the host itself/i);
 });
 
 test('execution targets: start is fail-closed without broker and rejects non-isolated targets', async () => {

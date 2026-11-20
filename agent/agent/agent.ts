@@ -4,6 +4,7 @@ import { anthropic } from "eve/models/anthropic";
 import { openai } from "eve/models/openai";
 import { createDeepSeekModel } from "../lib/deepseek.js";
 import { planHamsterModel, type HamsterLiveProvider } from "../lib/model.js";
+import { findWorkerHeaderLine, parseWorkerHeader } from "../lib/workerHeader.js";
 
 // Hamster P0 agent.
 //
@@ -150,18 +151,8 @@ function scriptedRespond(request: ScriptedRequest) {
     };
   }
 
-  const taskMatch = userMessages
-    .find((m) => m.startsWith("[hamster-worker"))
-    ?.match(/taskId=(\S+)/);
-  const taskId = taskMatch?.[1] ?? "";
-  const titleMatch = userMessages
-    .find((m) => m.startsWith("[hamster-worker"))
-    ?.match(/title=([^\]]+)/);
-  const title = (titleMatch?.[1] ?? "Weekly metrics dashboard").trim();
-  const targetMatch = userMessages
-    .find((m) => m.startsWith("[hamster-worker"))
-    ?.match(/targetId=([^\]]+)/);
-  const targetId = (targetMatch?.[1] ?? "target_control_plane").trim();
+  // conversationId / runtimeSessionId / targetId / title are separate fields (must-fix 8).
+  const { taskId, title, targetId } = parseWorkerHeader(findWorkerHeaderLine(userMessages));
 
   const errored = toolResults.find((r) => r.isError);
   if (errored) {

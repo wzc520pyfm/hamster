@@ -18,7 +18,7 @@ import { findWorkerHeaderLine, parseWorkerHeader } from "../lib/workerHeader.js"
 //   provider (`anthropic` from "eve/models/anthropic", `openai` from "eve/models/openai"),
 //   or the DeepSeek factory from "lib/deepseek.ts" for the DeepSeek vendor path.
 //   The instance goes provider-direct (no Vercel AI Gateway). HAMSTER_MODEL_ID is a NATIVE
-//   model id (e.g. "claude-sonnet-5", "deepseek-flash"); provider-qualified strings such as
+//   model id (e.g. "claude-sonnet-5", "deepseek-chat"); provider-qualified strings such as
 //   "anthropic/claude-…" are stripped to the native id, and documentation shows native ids only.
 // - With HAMSTER_MODEL_ID set but no provider determinable, the agent fails clearly and
 //   explicitly instead of silently falling back to the AI Gateway.

@@ -45,12 +45,15 @@ test("deepseek factory exposes the deepseek provider label and the native model 
   assert.equal(model.provider, "deepseek.chat");
 });
 
-test("deepseek factory defaults to the recommended deepseek-flash model id", () => {
+test("deepseek factory defaults to deepseek-chat (recent live check id; not an official recommendation)", () => {
   clearProviderEnv();
   process.env.DEEPSEEK_API_KEY = "sk-deepseek-placeholder";
   const model = createDeepSeekModel({ apiKey: "sk-deepseek-placeholder" });
   assert.equal(model.modelId, DEFAULT_DEEPSEEK_MODEL_ID);
-  assert.equal(DEFAULT_DEEPSEEK_MODEL_ID, "deepseek-flash");
+  // Align with docs (21d4c56): deepseek-chat was used in a recent live check and succeeded;
+  // deepseek-flash was not tested. Do not claim any id is officially recommended.
+  assert.equal(DEFAULT_DEEPSEEK_MODEL_ID, "deepseek-chat");
+  assert.notEqual(DEFAULT_DEEPSEEK_MODEL_ID, "deepseek-flash");
 });
 
 test("deepseek factory targets the official DeepSeek OpenAI-compatible endpoint", () => {

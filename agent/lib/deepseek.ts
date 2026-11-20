@@ -25,13 +25,18 @@ export const DEEPSEEK_PROVIDER_ID = "deepseek";
 /** Official DeepSeek OpenAI-compatible base URL (no `/v1` needed; SDK appends the path). */
 export const DEEPSEEK_OFFICIAL_BASE_URL = "https://api.deepseek.com";
 
-/** Default recommended native DeepSeek model id when the planner omits one. */
-export const DEFAULT_DEEPSEEK_MODEL_ID = "deepseek-flash";
+/**
+ * Default native DeepSeek model id when the planner omits one.
+ * Matches the id used in a recent live check that succeeded (deepseek-chat).
+ * deepseek-flash was not tested in that check. This is not an official recommendation
+ * and does not claim any model id is retired or current.
+ */
+export const DEFAULT_DEEPSEEK_MODEL_ID = "deepseek-chat";
 
 export interface DeepSeekModelInput {
   /** DeepSeek API key. Only this credential is ever read for the DeepSeek path. */
   readonly apiKey?: string | null;
-  /** Native DeepSeek model id (e.g. "deepseek-flash"). Defaults to the recommended id. */
+  /** Native DeepSeek model id (e.g. "deepseek-chat"). Defaults to DEFAULT_DEEPSEEK_MODEL_ID. */
   readonly modelId?: string | null;
 }
 

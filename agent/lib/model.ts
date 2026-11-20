@@ -9,7 +9,9 @@
 // - HAMSTER_MODEL_ID set -> live plan via the direct vendor provider helpers
 //   (`anthropic()` / `openai()` from `eve/models/*`, or the DeepSeek factory in
 //   `agent/lib/deepseek.ts`), which bypass the AI Gateway. The model id must be a
-//   NATIVE provider model id (e.g. "claude-sonnet-5", "deepseek-flash").
+//   NATIVE provider model id (e.g. "claude-sonnet-5", "deepseek-chat").
+//   Model-id availability is unverified; a recent live check used deepseek-chat
+//   successfully; deepseek-flash was not tested. No id is treated as officially recommended.
 // - No provider determinable -> explicit error. Never silently fall back to the
 //   Vercel AI Gateway.
 

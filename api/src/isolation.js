@@ -11,43 +11,108 @@ const ISOLATED_DESKTOP_TARGET_ID = 'target_isolated_desktop';
 
 const CREATE_ISOLATED_DESKTOP_ACTION = 'create_isolated_desktop';
 
-const ISOLATED_CONTAINER_NAME = 'hamster-isolated-desktop';
+// Aligned with docker-compose.p2.yml service/network names so create/start hits the
+// container the worker actually routes to (must-fix 2).
+const ISOLATED_CONTAINER_NAME = 'desktop';
+const ISOLATED_NETWORK_NAME = process.env.HAMSTER_ISOLATED_NETWORK || 'hamster_p2';
 const ALLOWLISTED_IMAGE = process.env.HAMSTER_ISOLATED_DESKTOP_IMAGE || 'hamster/worker-isolated:latest';
 
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 
-async function dockerRun(args) {
+async function defaultDockerRun(args) {
   const { stdout } = await execFileAsync('docker', args, { timeout: 120000, maxBuffer: 1024 * 1024 });
   const text = stdout.trim();
   const firstLine = text.split('\n')[0]?.trim();
   return firstLine ?? '';
 }
 
-/** Minimum-privilege broker: allowlisted image, same host, no docker.sock into the desktop. */
-function createDockerIsolationBroker() {
+function isolatedWorkerEnvArgs() {
+  const env = {
+    PORT: '8081',
+    HAMSTER_API_URL: process.env.HAMSTER_ISOLATED_HAMSTER_API_URL || 'http://api:8080',
+    HAMSTER_INTERNAL_SECRET: process.env.HAMSTER_INTERNAL_SECRET || 'dev-internal-secret',
+    HAMSTER_AGENT_USERNAME: process.env.HAMSTER_AGENT_USERNAME || 'hamster',
+    HAMSTER_AGENT_PASSWORD: process.env.HAMSTER_AGENT_PASSWORD || 'dev-agent-password',
+    HAMSTER_MODEL_ID: process.env.HAMSTER_MODEL_ID || '',
+    HAMSTER_MODEL_PROVIDER: process.env.HAMSTER_MODEL_PROVIDER || '',
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+    HAMSTER_STEP_DELAY_MS: process.env.HAMSTER_STEP_DELAY_MS || '2000',
+  };
+  const args = [];
+  for (const [k, v] of Object.entries(env)) {
+    args.push('-e', `${k}=${v}`);
+  }
+  return args;
+}
+
+/**
+ * Minimum-privilege broker: allowlisted image, same host, no docker.sock into the desktop.
+ * @param {{ dockerRun?: (args: string[]) => Promise<string> }} [opts]
+ */
+function createDockerIsolationBroker(opts = {}) {
+  const dockerRun = opts.dockerRun || defaultDockerRun;
   return {
     start: async ({ targetId }) => {
-      const containerId = await dockerRun([
-        'create',
-        '--name',
-        ISOLATED_CONTAINER_NAME,
-        '--network',
-        'hamster_isolated',
-        ALLOWLISTED_IMAGE,
-      ]);
-      await dockerRun(['start', containerId]);
-      return { ok: true, containerId };
+      if (targetId && targetId !== ISOLATED_DESKTOP_TARGET_ID) {
+        return { ok: false, reason: 'not_isolated_desktop_target' };
+      }
+      // Reuse an existing named container when present; otherwise create on hamster_p2.
+      let containerId = null;
+      try {
+        containerId = await dockerRun([
+          'inspect',
+          '--format',
+          '{{.Id}}',
+          ISOLATED_CONTAINER_NAME,
+        ]);
+      } catch {
+        containerId = null;
+      }
+      if (!containerId) {
+        containerId = await dockerRun([
+          'create',
+          '--name',
+          ISOLATED_CONTAINER_NAME,
+          '--network',
+          ISOLATED_NETWORK_NAME,
+          '--restart',
+          'no',
+          ...isolatedWorkerEnvArgs(),
+          ALLOWLISTED_IMAGE,
+        ]);
+      }
+      await dockerRun(['start', containerId || ISOLATED_CONTAINER_NAME]);
+      return { ok: true, containerId: containerId || ISOLATED_CONTAINER_NAME };
     },
     status: async () => {
-      const running = await dockerRun([
-        'inspect',
-        '--format',
-        '{{.State.Running}}',
-        ISOLATED_CONTAINER_NAME,
-      ]);
-      return { ok: running === 'true' };
+      try {
+        await dockerRun(['image', 'inspect', '--format', '{{.Id}}', ALLOWLISTED_IMAGE]);
+      } catch (err) {
+        return {
+          ok: false,
+          running: false,
+          state: 'unavailable',
+          reason: `image_unavailable:${String(err?.message ?? err)}`,
+        };
+      }
+      try {
+        const running = await dockerRun([
+          'inspect',
+          '--format',
+          '{{.State.Running}}',
+          ISOLATED_CONTAINER_NAME,
+        ]);
+        if (running === 'true') {
+          return { ok: true, running: true, state: 'ok' };
+        }
+        // Container exists but is not running — not started, not unavailable.
+        return { ok: false, running: false, state: 'not_started' };
+      } catch {
+        // No such container: broker/image ok, simply not started.
+        return { ok: false, running: false, state: 'not_started' };
+      }
     },
   };
 }
@@ -136,19 +201,42 @@ async function startIsolatedDesktop({ targetId, broker } = {}) {
 
 /**
  * Container availability probe for the isolated desktop (selector state).
- * Fail closed: without a working broker probe the desktop counts as unavailable.
+ * Fail closed without a working broker. not_started ≠ unavailable (must-fix 4):
+ * - unavailable: broker / image / readiness probe failed → block dispatch
+ * - not_started: broker+image ok, container simply not up → dispatch issues start approval
+ * - ok: container running
  */
 async function probeIsolatedDesktop({ broker } = {}) {
   const runner = broker ?? null;
   if (!runner || typeof runner.status !== 'function') {
-    return { ok: false, available: false, reason: 'isolation_broker_unavailable' };
+    return { ok: false, available: false, state: 'unavailable', reason: 'isolation_broker_unavailable' };
   }
   try {
     const status = await runner.status({ targetId: ISOLATED_DESKTOP_TARGET_ID });
-    const available = Boolean(status?.ok ?? status?.running ?? status?.available);
-    return { ok: Boolean(status?.ok ?? status?.running ?? status?.available), available, reason: null };
+    const state = status?.state
+      || (status?.ok || status?.running || status?.available ? 'ok' : null)
+      || (status?.reason?.startsWith?.('image_unavailable') ? 'unavailable' : null)
+      || 'not_started';
+    if (state === 'unavailable') {
+      return {
+        ok: false,
+        available: false,
+        state: 'unavailable',
+        reason: status?.reason ?? 'unavailable',
+      };
+    }
+    if (state === 'ok') {
+      return { ok: true, available: true, state: 'ok', reason: null };
+    }
+    // not_started (and any non-unavailable idle): dispatchable for the approval chain.
+    return { ok: true, available: true, state: 'not_started', reason: null };
   } catch (err) {
-    return { ok: false, available: false, reason: `broker_error:${String(err?.message ?? err)}` };
+    return {
+      ok: false,
+      available: false,
+      state: 'unavailable',
+      reason: `broker_error:${String(err?.message ?? err)}`,
+    };
   }
 }
 
@@ -157,6 +245,7 @@ module.exports = {
   ISOLATED_DESKTOP_TARGET_ID,
   CREATE_ISOLATED_DESKTOP_ACTION,
   ISOLATED_CONTAINER_NAME,
+  ISOLATED_NETWORK_NAME,
   ALLOWLISTED_IMAGE,
   createDockerIsolationBroker,
   isKnownTarget,

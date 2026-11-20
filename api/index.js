@@ -154,25 +154,27 @@ async function createTask(conversationId, title, goal, targetId) {
       // Isolated desktop assignment: creating/starting the desktop is high-risk and is
       // gated by an approval ticket bound to this task's targetId. The task stays Queued
       // (assigned, not started); nothing dispatches to a not-ready container.
+      // Selecting Isolated desktop is NOT approval — only this ticket authorizes create/start.
       const approvalId = `appr_${taskId}_create_${crypto.randomUUID()}`;
       const hash = policy.paramsHash({ taskId, targetId: target });
       await query(
-        `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
-         VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
-        [approvalId, taskId, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId, targetId: target }), hash, String(APPROVAL_TTL_SECONDS)]
+        `INSERT INTO approvals (id, task_id, action, params, params_hash, status, target_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
+        [approvalId, taskId, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId, targetId: target }), hash, target, String(APPROVAL_TTL_SECONDS)]
       );
       await events.audit('task_created_isolated_pending_start', { taskId, approvalId, targetId: target });
       return { task: await taskDetail(taskId) };
     }
     const { sessionId } = await eve.createSession(
-      `[hamster-worker taskId=${taskId} title=${title} targetId=${target}] ${goal}`
+      `[hamster-worker taskId=${taskId} title=${title} targetId=${target}] ${goal}`,
+      { targetId: target }
     );
     await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
       sessionId,
       'running',
       taskId,
     ]);
-    events.attach(`task:${taskId}`, sessionId);
+    events.attach(`task:${taskId}`, sessionId, { targetId: target });
     return { task: await taskDetail(taskId) };
   } catch (err) {
     await query('UPDATE tasks SET status = $1, updated_at = now() WHERE id = $2', ['failed', taskId]);
@@ -323,10 +325,17 @@ async function steerTask(req, res, taskId, message) {
       RETURNING id, eve_interaction_id, eve_session_id`,
     [taskId]
   );
+  const taskTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
-        await eve.answerInteraction(inv.eve_session_id, inv.eve_interaction_id, 'deny', 'Invalidated — approve again');
+        await eve.answerInteraction(
+          inv.eve_session_id,
+          inv.eve_interaction_id,
+          'deny',
+          'Invalidated — approve again',
+          { targetId: taskTargetId }
+        );
       } catch (err) {
         console.warn('[steer] failed to deny invalidated interaction', err.message);
       }
@@ -337,7 +346,8 @@ async function steerTask(req, res, taskId, message) {
     try {
       await eve.sendMessage(
         task.eve_session_id,
-        `[hamster-control] CONTROL-STEER taskId=${taskId} controlSeq=${controlSeq} message=${message}`
+        `[hamster-control] CONTROL-STEER taskId=${taskId} controlSeq=${controlSeq} message=${message}`,
+        { targetId: taskTargetId }
       );
       delivered = true;
     } catch (err) {
@@ -393,10 +403,17 @@ async function cancelTask(req, res, taskId) {
       RETURNING id, eve_interaction_id, eve_session_id`,
     [taskId]
   );
+  const cancelTargetId = task.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
   for (const inv of invalidated.rows) {
     if (inv.eve_interaction_id && inv.eve_session_id) {
       try {
-        await eve.answerInteraction(inv.eve_session_id, inv.eve_interaction_id, 'deny', 'Task cancelled');
+        await eve.answerInteraction(
+          inv.eve_session_id,
+          inv.eve_interaction_id,
+          'deny',
+          'Task cancelled',
+          { targetId: cancelTargetId }
+        );
       } catch (err) {
         console.warn('[cancel] failed to deny interaction', err.message);
       }
@@ -405,7 +422,7 @@ async function cancelTask(req, res, taskId) {
   let sessionCancel = 'not-attempted';
   if (task.eve_session_id) {
     try {
-      await eve.cancelSession(task.eve_session_id);
+      await eve.cancelSession(task.eve_session_id, { targetId: cancelTargetId });
       sessionCancel = 'requested';
     } catch (err) {
       sessionCancel = `failed: ${String(err.message ?? err)}`;
@@ -431,6 +448,8 @@ app.post('/api/tasks/:id/cancel', asyncRoute((req, res) => cancelTask(req, res, 
 // without blocking the control plane.
 app.get('/api/targets', asyncRoute(async (req, res) => {
   const probe = await isolation.probeIsolatedDesktop({ broker: BROKER });
+  // not_started ≠ unavailable: only unavailable blocks composer dispatch.
+  const isolatedState = probe.state ?? (probe.available ? 'ok' : 'unavailable');
   const targets = [
     {
       targetId: isolation.CONTROL_PLANE_TARGET_ID,
@@ -444,11 +463,11 @@ app.get('/api/targets', asyncRoute(async (req, res) => {
       targetId: isolation.ISOLATED_DESKTOP_TARGET_ID,
       label: 'Isolated desktop',
       isDefault: false,
-      available: probe.available,
-      state: probe.available ? 'ok' : 'unavailable',
+      available: isolatedState !== 'unavailable',
+      state: isolatedState,
       description:
         'An isolated container on the same host as this Hamster. The bot cannot use the host itself.',
-      unavailableReason: probe.available ? null : probe.reason ?? 'unavailable',
+      unavailableReason: isolatedState === 'unavailable' ? probe.reason ?? 'unavailable' : null,
     },
   ];
   res.json({ targets });
@@ -471,9 +490,9 @@ app.post('/api/tasks/:id/retry', asyncRoute(async (req, res) => {
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
     const hash = policy.paramsHash({ taskId: task.id, targetId: task.target_id });
     await query(
-      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
-       VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
-      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId: task.target_id }), hash, String(APPROVAL_TTL_SECONDS)]
+      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, target_id, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
+      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId: task.target_id }), hash, task.target_id, String(APPROVAL_TTL_SECONDS)]
     );
     await events.audit('task_retry_requested', { taskId: task.id, approvalId, targetId: task.target_id });
     return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
@@ -500,9 +519,9 @@ app.post('/api/tasks/:id/target', asyncRoute(async (req, res) => {
     const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
     const hash = policy.paramsHash({ taskId: task.id, targetId });
     await query(
-      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
-       VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
-      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId }), hash, String(APPROVAL_TTL_SECONDS)]
+      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, target_id, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, now() + ($7 || ' seconds')::interval)`,
+      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId }), hash, targetId, String(APPROVAL_TTL_SECONDS)]
     );
     await events.audit('task_target_switched_to_isolated', { taskId: task.id, approvalId, targetId });
     return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
@@ -664,9 +683,31 @@ async function decideApproval(req, res, outcome) {
 
   const optionId = outcome === 'approved' ? 'approve' : 'deny';
   const note = outcome === 'approved' ? 'Approved for this action only' : 'Denied';
+  const ticketParams =
+    ticket.params && typeof ticket.params === 'object' && !Array.isArray(ticket.params)
+      ? ticket.params
+      : {};
+  const ticketTargetId =
+    ticket.target_id ||
+    (typeof ticketParams.targetId === 'string' ? ticketParams.targetId : null) ||
+    taskRow?.target_id ||
+    isolation.CONTROL_PLANE_TARGET_ID;
+  // Fail closed: a control-plane ticket must not authorize isolated-desktop work and vice versa.
+  if (
+    taskRow &&
+    !policy.highRiskTargetAllows(taskRow, { ...ticketParams, targetId: ticketTargetId }).allowed
+  ) {
+    return res.status(409).json({ error: 'target_mismatch', status: 'invalid' });
+  }
   if (ticket.eve_interaction_id && ticket.eve_session_id) {
     try {
-      await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, optionId, note);
+      await eve.answerInteraction(
+        ticket.eve_session_id,
+        ticket.eve_interaction_id,
+        optionId,
+        note,
+        { targetId: ticketTargetId }
+      );
     } catch (err) {
       // Fail closed: if the agent cannot be told, the action must not proceed.
       console.error('[approvals] failed to answer interaction', err);
@@ -686,10 +727,13 @@ async function decideApproval(req, res, outcome) {
     // High-risk create/start of the isolated desktop: only reachable after an approved,
     // unexpired, target-bound ticket. Fail closed when the broker cannot start the desktop;
     // the task stays Queued and must not look like it started on the desktop.
-    const ticketTargetId = ticket.target_id ?? taskRow.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+    // Selecting Isolated desktop in the selector is not approval — this ticket is.
     if (policy.paramsHash({ taskId: ticket.task_id, targetId: ticketTargetId }) !== ticket.params_hash) {
       // Ticket is not bound to this task/target pair — fail closed, never start.
       return res.status(409).json({ error: 'no_valid_ticket', status: 'invalid' });
+    }
+    if (!isolation.isIsolatedDesktopTarget(ticketTargetId)) {
+      return res.status(409).json({ error: 'target_mismatch', status: 'invalid' });
     }
     const start = await isolation.startIsolatedDesktop({
       targetId: ticketTargetId,
@@ -719,15 +763,19 @@ async function startTaskSession(taskId) {
   const task = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
   const t = task.rows[0];
   if (!t || t.eve_session_id) return t?.eve_session_id ?? null;
+  const targetId = t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+  // Route the worker to the runtime that belongs to this targetId (must-fix 3).
+  // Control-plane tasks hit EVE_API_URL (agent); isolated tasks hit EVE_ISOLATED_API_URL (desktop).
   const { sessionId } = await eve.createSession(
-    `[hamster-worker taskId=${t.id} title=${t.title} targetId=${t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID}] ${t.goal ?? ''}`
+    `[hamster-worker taskId=${t.id} title=${t.title} targetId=${targetId}] ${t.goal ?? ''}`,
+    { targetId }
   );
   await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
     sessionId,
     'running',
     taskId,
   ]);
-  events.attach(`task:${taskId}`, sessionId);
+  events.attach(`task:${taskId}`, sessionId, { targetId });
   return sessionId;
 }
 
@@ -740,7 +788,14 @@ async function expireTicket(ticket) {
   );
   if (ticket.eve_interaction_id && ticket.eve_session_id) {
     try {
-      await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, 'deny', note);
+      const task = await query('SELECT target_id FROM tasks WHERE id = $1', [ticket.task_id]);
+      const targetId =
+        ticket.target_id ||
+        task.rows[0]?.target_id ||
+        isolation.CONTROL_PLANE_TARGET_ID;
+      await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, 'deny', note, {
+        targetId,
+      });
     } catch (err) {
       console.warn('[approvals] expiry deny not delivered', err.message);
     }
@@ -763,7 +818,18 @@ async function sweepExpired() {
     for (const ticket of rows) {
       if (ticket.eve_interaction_id && ticket.eve_session_id) {
         try {
-          await eve.answerInteraction(ticket.eve_session_id, ticket.eve_interaction_id, 'deny', events.EXPIRY_NOTE);
+          const task = await query('SELECT target_id FROM tasks WHERE id = $1', [ticket.task_id]);
+          const targetId =
+            ticket.target_id ||
+            task.rows[0]?.target_id ||
+            isolation.CONTROL_PLANE_TARGET_ID;
+          await eve.answerInteraction(
+            ticket.eve_session_id,
+            ticket.eve_interaction_id,
+            'deny',
+            events.EXPIRY_NOTE,
+            { targetId }
+          );
         } catch (err) {
           console.warn('[approvals] expiry deny not delivered', err.message);
         }
@@ -884,11 +950,19 @@ app.use((err, req, res, next) => {
 
 async function reattachFollowers() {
   const [tasks, convs] = await Promise.all([
-    query("SELECT id, eve_session_id FROM tasks WHERE eve_session_id IS NOT NULL AND status NOT IN ('succeeded','failed','cancelled')"),
+    query("SELECT id, eve_session_id, target_id FROM tasks WHERE eve_session_id IS NOT NULL AND status NOT IN ('succeeded','failed','cancelled')"),
     query('SELECT id, eve_session_id FROM conversations WHERE eve_session_id IS NOT NULL'),
   ]);
-  for (const t of tasks.rows) events.attach(`task:${t.id}`, t.eve_session_id);
-  for (const c of convs.rows) events.attach(`conv:${c.id}`, c.eve_session_id);
+  for (const t of tasks.rows) {
+    events.attach(`task:${t.id}`, t.eve_session_id, {
+      targetId: t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID,
+    });
+  }
+  for (const c of convs.rows) {
+    events.attach(`conv:${c.id}`, c.eve_session_id, {
+      targetId: isolation.CONTROL_PLANE_TARGET_ID,
+    });
+  }
 }
 
 migrate()

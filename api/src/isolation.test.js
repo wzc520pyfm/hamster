@@ -140,3 +140,83 @@ test('policy: ticket is bound to the task execution target (cross-target approva
   });
   assert.equal(sameTarget.allowed, true);
 });
+
+test('broker names align with compose: container desktop on network hamster_p2', () => {
+  // Must-fix 2: broker create/start must use the same names the stack actually routes to.
+  assert.equal(isolation.ISOLATED_CONTAINER_NAME, 'desktop');
+  assert.equal(isolation.ISOLATED_NETWORK_NAME, 'hamster_p2');
+});
+
+test('probe: not_started is distinct from unavailable (broker ok, container absent)', async () => {
+  const broker = {
+    status: async () => ({ ok: false, running: false, state: 'not_started' }),
+  };
+  const probe = await isolation.probeIsolatedDesktop({ broker });
+  assert.equal(probe.state, 'not_started');
+  // Dispatchable for the start-approval chain; not marked unavailable.
+  assert.equal(probe.available, true);
+  assert.equal(probe.ok, true);
+});
+
+test('probe: unavailable when broker missing or probe fails', async () => {
+  const noBroker = await isolation.probeIsolatedDesktop({});
+  assert.equal(noBroker.state, 'unavailable');
+  assert.equal(noBroker.available, false);
+
+  const broken = await isolation.probeIsolatedDesktop({
+    broker: {
+      status: async () => {
+        throw new Error('docker daemon down');
+      },
+    },
+  });
+  assert.equal(broken.state, 'unavailable');
+  assert.equal(broken.available, false);
+
+  const imageMissing = await isolation.probeIsolatedDesktop({
+    broker: {
+      status: async () => ({ ok: false, running: false, state: 'unavailable', reason: 'image_unavailable' }),
+    },
+  });
+  assert.equal(imageMissing.state, 'unavailable');
+  assert.equal(imageMissing.available, false);
+});
+
+test('probe: running container is ok / available', async () => {
+  const probe = await isolation.probeIsolatedDesktop({
+    broker: { status: async () => ({ ok: true, running: true, state: 'ok' }) },
+  });
+  assert.equal(probe.state, 'ok');
+  assert.equal(probe.available, true);
+});
+
+test('broker start args: allowlisted image, named desktop, hamster_p2, no docker.sock mount', async () => {
+  const calls = [];
+  const broker = isolation.createDockerIsolationBroker({
+    dockerRun: async (args) => {
+      calls.push(args);
+      if (args[0] === 'create') return 'ctr_abc';
+      if (args[0] === 'start') return 'ctr_abc';
+      if (args[0] === 'inspect') {
+        // No existing container — force create path.
+        const err = new Error('No such object: desktop');
+        throw err;
+      }
+      if (args[0] === 'image') return 'ok';
+      return '';
+    },
+  });
+  const result = await broker.start({ targetId: ISOLATED });
+  assert.equal(result.ok, true);
+  const create = calls.find((a) => a[0] === 'create');
+  assert.ok(create, 'expected docker create');
+  assert.ok(create.includes('--name'));
+  assert.equal(create[create.indexOf('--name') + 1], 'desktop');
+  assert.ok(create.includes('--network'));
+  assert.equal(create[create.indexOf('--network') + 1], 'hamster_p2');
+  assert.ok(create.includes(isolation.ALLOWLISTED_IMAGE));
+  const joined = create.join(' ');
+  assert.equal(joined.includes('docker.sock'), false);
+  assert.equal(joined.includes('--privileged'), false);
+  assert.equal(create.includes('host'), false);
+});

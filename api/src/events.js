@@ -72,16 +72,32 @@ async function handleApprovalOpened(fact, sessionId) {
   // Machine id for policy matching; React maps to plain-language card titles.
   const action = resolved.name || 'unknown_action';
   const params = resolved.input ?? {};
-  const hash = paramsHash(params);
   const approvalId = `appr_${data.interactionId}`;
   const ttlSeconds = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
 
+  // Bind the ticket to the task's execution target so a control-plane approval
+  // cannot be consumed on the isolated desktop and vice versa.
+  const ticketParams =
+    params && typeof params === 'object' && !Array.isArray(params)
+      ? { ...params, targetId: params.targetId ?? task.target_id }
+      : { targetId: task.target_id };
+  const ticketHash = paramsHash(ticketParams);
   await query(
     `INSERT INTO approvals (id, task_id, action, params, params_hash, status,
-                            eve_interaction_id, eve_session_id, expires_at)
-     VALUES ($1,$2,$3,$4,$5,'pending',$6,$7, now() + ($8 || ' seconds')::interval)
+                            target_id, eve_interaction_id, eve_session_id, expires_at)
+     VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8, now() + ($9 || ' seconds')::interval)
      ON CONFLICT (eve_interaction_id) DO NOTHING`,
-    [approvalId, task.id, action, JSON.stringify(params), hash, data.interactionId, sessionId, String(ttlSeconds)]
+    [
+      approvalId,
+      task.id,
+      action,
+      JSON.stringify(ticketParams),
+      ticketHash,
+      task.target_id ?? null,
+      data.interactionId,
+      sessionId,
+      String(ttlSeconds),
+    ]
   );
   await query(
     `UPDATE tasks SET status = 'waiting_for_approval', updated_at = now()
@@ -246,5 +262,6 @@ module.exports = {
   appendTaskEvent,
   audit,
   EXPIRY_NOTE,
-  attach: (key, sessionId) => eve.attachFollower(key, sessionId, (fact) => handleFact(key, sessionId, fact)),
+  attach: (key, sessionId, opts = {}) =>
+    eve.attachFollower(key, sessionId, (fact) => handleFact(key, sessionId, fact), opts),
 };

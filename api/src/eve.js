@@ -2,8 +2,12 @@
 
 // Thin client for a self-hosted eve instance (eve build && eve start).
 // No Vercel dependency, no hosted eve service.
+// Control-plane and isolated-desktop workers use distinct base URLs (must-fix 3).
+
+const isolation = require('./isolation');
 
 const EVE_URL = process.env.EVE_API_URL ?? 'http://localhost:8081';
+const EVE_ISOLATED_URL = process.env.EVE_ISOLATED_API_URL ?? 'http://desktop:8081';
 const REQUEST_TIMEOUT_MS = 15000;
 const AGENT_USER = process.env.HAMSTER_AGENT_USERNAME ?? 'hamster';
 const AGENT_PASSWORD = process.env.HAMSTER_AGENT_PASSWORD;
@@ -11,11 +15,23 @@ const BASIC_AUTH = AGENT_PASSWORD
   ? 'Basic ' + Buffer.from(`${AGENT_USER}:${AGENT_PASSWORD}`).toString('base64')
   : null;
 
-async function eveFetch(path, { method = 'GET', body } = {}) {
+/**
+ * Resolve the eve base URL for an execution target.
+ * Isolated desktop must never share the control-plane agent endpoint.
+ */
+function baseUrlForTarget(targetId) {
+  if (isolation.isIsolatedDesktopTarget(targetId)) {
+    return EVE_ISOLATED_URL;
+  }
+  return EVE_URL;
+}
+
+async function eveFetch(path, { method = 'GET', body, baseUrl } = {}) {
+  const root = baseUrl || EVE_URL;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(`${EVE_URL}${path}`, {
+    const res = await fetch(`${root}${path}`, {
       method,
       headers: {
         ...(body ? { 'content-type': 'application/json' } : {}),
@@ -43,30 +59,38 @@ async function eveFetch(path, { method = 'GET', body } = {}) {
   }
 }
 
-const health = () => eveFetch('/eve/v1/health');
+const health = (opts = {}) =>
+  eveFetch('/eve/v1/health', { baseUrl: baseUrlForTarget(opts.targetId) });
 
-async function createSession(message) {
+async function createSession(message, opts = {}) {
   const body = message === undefined ? {} : { message };
-  const res = await eveFetch('/eve/v1/session', { method: 'POST', body });
+  const res = await eveFetch('/eve/v1/session', {
+    method: 'POST',
+    body,
+    baseUrl: baseUrlForTarget(opts.targetId),
+  });
   return { sessionId: res.sessionId, deliveryId: res.deliveryId };
 }
 
-const sendMessage = (sessionId, message) =>
+const sendMessage = (sessionId, message, opts = {}) =>
   eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     body: { message },
+    baseUrl: baseUrlForTarget(opts.targetId),
   });
 
-const answerInteraction = (sessionId, interactionId, optionId, text) =>
+const answerInteraction = (sessionId, interactionId, optionId, text, opts = {}) =>
   eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}`, {
     method: 'POST',
     body: { answers: [{ interactionId, optionId, ...(text ? { text } : {}) }] },
+    baseUrl: baseUrlForTarget(opts.targetId),
   });
 
-const cancelSession = (sessionId) =>
+const cancelSession = (sessionId, opts = {}) =>
   eveFetch(`/eve/v1/session/${encodeURIComponent(sessionId)}/cancel`, {
     method: 'POST',
     body: {},
+    baseUrl: baseUrlForTarget(opts.targetId),
   });
 
 module.exports = {
@@ -77,6 +101,8 @@ module.exports = {
   cancelSession,
   eveFetch,
   EVE_URL,
+  EVE_ISOLATED_URL,
+  baseUrlForTarget,
 };
 
 // ---------------------------------------------------------------------------
@@ -118,17 +144,18 @@ async function* streamLines(url, signal) {
 
 const followers = new Map();
 
-function attachFollower(key, sessionId, onFact) {
+function attachFollower(key, sessionId, onFact, opts = {}) {
   if (followers.has(key)) return;
   const controller = new AbortController();
   followers.set(key, controller);
+  const base = baseUrlForTarget(opts.targetId);
 
   const run = async () => {
     let attempt = 0;
     while (!controller.signal.aborted) {
       try {
         for await (const line of streamLines(
-          `${EVE_URL}/eve/v1/session/${encodeURIComponent(sessionId)}/stream`,
+          `${base}/eve/v1/session/${encodeURIComponent(sessionId)}/stream`,
           controller.signal
         )) {
           attempt = 0;

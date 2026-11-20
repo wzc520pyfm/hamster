@@ -1,11 +1,20 @@
-# Hamster P2 slice 1 — isolated desktop execution-target stack (same host, isolated).
+# Hamster P2 slice 1 — isolated desktop as an optional per-task execution target.
 # Separate compose project from the DeepSeek live stack (hamster-livemodel-20261120) and from
-# the shared dev stack. Isolation baseline for the `desktop` (model worker) service:
+# the shared dev stack.
+#
+# Safe start (no standing desktop, no api→desktop install dependency, no pre-approval start):
+#   docker compose -f docker-compose.p2.yml up -d db agent api client
+# Do NOT start a long-running desktop service before in-app approval.
+# After a targetId-bound create/start ticket is approved, the control-plane broker
+# creates/starts container name `desktop` on network `hamster_p2` (allowlisted image only).
+#
+# Isolation baseline for the broker-created desktop (model worker inside that container):
 # - the worker runs INSIDE the isolated container, never on the host itself
 # - no docker.sock mounted into the desktop or the model worker
 # - no host-root bind mounts, no privileged / host-pid / host-network flags
 # - allowlisted image only, bridge network (not host networking)
 # - create/start happens only after an approval ticket bound to the targetId
+# - Selecting Isolated desktop in the selector is NOT approval
 
 name: hamster-p2-idesk-20261120
 
@@ -26,9 +35,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - hamster_p2
 
-  desktop:
-    image: ${HAMSTER_ISOLATED_DESKTOP_IMAGE:-hamster/worker-isolated:latest}
+  # Default execution location (Control plane). Always the product default.
+  agent:
+    build: ./agent
     restart: unless-stopped
     environment:
       PORT: "8081"
@@ -38,10 +50,13 @@ services:
       HAMSTER_AGENT_PASSWORD: ${HAMSTER_AGENT_PASSWORD:-dev-agent-password}
       HAMSTER_MODEL_ID: ${HAMSTER_MODEL_ID:-}
       HAMSTER_MODEL_PROVIDER: ${HAMSTER_MODEL_PROVIDER:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       HAMSTER_STEP_DELAY_MS: ${HAMSTER_STEP_DELAY_MS:-2000}
     volumes:
       - eve_data:/app/.eve
+    # No docker.sock — control-plane model worker must not receive Docker.
     networks:
       - hamster_p2
 
@@ -53,7 +68,11 @@ services:
       DATABASE_URL: postgres://hamster:${HAMSTER_DB_PASSWORD:-changeme}@db:5432/hamster
       SECRET_KEY: ${HAMSTER_SECRET_KEY:-super-secret-change-me}
       HAMSTER_INTERNAL_SECRET: ${HAMSTER_INTERNAL_SECRET:-dev-internal-secret}
-      EVE_API_URL: http://desktop:8081
+      # Control-plane worker (default). Isolated desktop uses a separate URL after approval.
+      EVE_API_URL: http://agent:8081
+      EVE_ISOLATED_API_URL: http://desktop:8081
+      HAMSTER_ISOLATED_DESKTOP_IMAGE: ${HAMSTER_ISOLATED_DESKTOP_IMAGE:-hamster/worker-isolated:latest}
+      HAMSTER_ISOLATED_NETWORK: hamster_p2
       HAMSTER_AGENT_USERNAME: ${HAMSTER_AGENT_USERNAME:-hamster}
       HAMSTER_AGENT_PASSWORD: ${HAMSTER_AGENT_PASSWORD:-dev-agent-password}
       HAMSTER_APPROVAL_TTL_SECONDS: ${HAMSTER_APPROVAL_TTL_SECONDS:-600}
@@ -61,10 +80,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      desktop:
+      agent:
         condition: service_started
+    # Broker-only: docker.sock on the control plane so create/start can run after approval.
+    # Never mount docker.sock into agent or the broker-created desktop.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "28080:8080"
+    networks:
+      - hamster_p2
 
   client:
     build:
@@ -79,6 +104,8 @@ services:
       - "23000:3000"
     depends_on:
       - api
+    networks:
+      - hamster_p2
 
 volumes:
   pg_data:
@@ -86,4 +113,5 @@ volumes:
 
 networks:
   hamster_p2:
+    name: hamster_p2
     driver: bridge

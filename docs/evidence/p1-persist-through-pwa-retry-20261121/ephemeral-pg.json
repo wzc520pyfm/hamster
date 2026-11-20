@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-20T17:31:42Z",
+  "postgresVersion": "postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "initdbCommand": "/usr/lib/postgresql/16/bin/initdb -D /tmp/hamster-p2-ephemeral-pg-EaDUnK/data --auth-local=trust --auth-host=scram-sha-256 -U postgres --locale=C --encoding=UTF8",
+  "pg_ctlStartCommand": "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/hamster-p2-ephemeral-pg-EaDUnK/data -l /tmp/hamster-p2-ephemeral-pg-EaDUnK/postgres.log -o -p 55084 -h 127.0.0.1 -k /tmp/hamster-p2-ephemeral-pg-EaDUnK start",
+  "pid": 27526,
+  "port": 55084,
+  "dataDir": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/data",
+  "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/data",
+  "instanceToken": "e8adfac76b56536972d97bc796f35c91a44e8c789ddf0d63",
+  "logFile": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/postgres.log",
+  "database": "hamster_p2_ephemeral_27503",
+  "user": "hamster_p2_ephemeral",
+  "listen": "127.0.0.1",
+  "databaseUrlHostPort": "127.0.0.1:55084",
+  "refusedSharedDefaults": ["db:5432", "127.0.0.1:5432", "localhost:5432", "compose service db"]
+}

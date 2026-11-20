@@ -1,0 +1,23 @@
+# Payload file hashes from prior bundles (verified 2026-11-21).
+# This correction does NOT claim that prior SHA256SUMS.txt or NOTES.md hashes passed.
+# Prior defects: (1) SHA256SUMS listed itself + NOTES → self-stale; (2) corrected NOTES said nav 'stays 1' but JSON baseline=2;
+# (3) online NOTES.md content drifted vs listed hash.
+
+## p1-timeout-retry-continuity-20261121 (payload OK; exclude NOTES/SHA256SUMS from pass claim)
+4f9dde05a5eae14fc1c9db75070112fa3e36b911b561f84bce6723c0142ae597  /opt/cursor/artifacts/p1-timeout-retry-continuity-20261121/persistence-boundaries-from-source.json
+4a106f53ea0513b23a4a2050ad6f93b83c374a13bb2b267ae6e2f55e8464f8a1  /opt/cursor/artifacts/p1-timeout-retry-continuity-20261121/timeout-retry-banner-en-20261121.png
+ea64f01380a229b857814e280e8330cce390c6a5676bb5a4ca0de234923475d3  /opt/cursor/artifacts/p1-timeout-retry-continuity-20261121/timeout-retry-banner-zh-20261121.png
+5990db32e9646aaaaa1e12bdec7d6133b61d08fd70f6060663a637901523f5ed  /opt/cursor/artifacts/p1-timeout-retry-continuity-20261121/timeout-retry-continuity-20261121.json
+63772a02ef2280d2be661b97d140dceb89ac1676a7c19d035683581fff7c4ad3  /opt/cursor/artifacts/p1-timeout-retry-continuity-20261121/timeout-retry-state-zh-20261121.png
+
+## p1-timeout-retry-corrected-20261121 (payload OK; NOTES claim 'stays 1' WRONG — see CORRECTED-NOTES.md)
+204fbe03c618fb32f29346c07ca009bd7d70254dd7f12d70755fef23dc3b9870  /opt/cursor/artifacts/p1-timeout-retry-corrected-20261121/corrected-banner-en-20261121.png
+91a440906c3b9adba24fcadd3494098b292c8487c564cdd3837107420c563c60  /opt/cursor/artifacts/p1-timeout-retry-corrected-20261121/corrected-banner-zh-20261121.png
+489cba31b326d8cd7d86460bc2d07f42d1b3d5573d3596961c53ee73ad3b438c  /opt/cursor/artifacts/p1-timeout-retry-corrected-20261121/corrected-timeout-retry-state-zh-20261121.png
+cdbde68389cfee317eb37400d9d211b7fb22ff9087f5645a3d9b6b3de0c7dec6  /opt/cursor/artifacts/p1-timeout-retry-corrected-20261121/timeout-retry-corrected-20261121.json
+
+## p1-online-conversation-persist-20261121 (payload OK; NOTES.md hash was STALE in old SHA256SUMS)
+e650b9575eff26bd68de6370d77a6b6cc4a475260d6b87aa554aeff7730a8fed  /opt/cursor/artifacts/p1-online-conversation-persist-20261121/api-server.log
+192f3d42d3ab2378d4fedfd02d1c012e35965f695e46bf751b481e9ef2f09895  /opt/cursor/artifacts/p1-online-conversation-persist-20261121/ephemeral-pg.json
+b1fae8c085e022126e04075be5b898e5756d33ce4a86b5e6d20bdfab26c28a04  /opt/cursor/artifacts/p1-online-conversation-persist-20261121/online-conversation-persist-20261121.json
+4af90727278951598a2c864c81d3421bf8930c4d296f8e3a02bd18636749963e  /opt/cursor/artifacts/p1-online-conversation-persist-20261121/online-persist-after-refresh-20261121.png

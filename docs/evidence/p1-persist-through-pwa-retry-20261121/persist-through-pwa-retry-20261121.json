@@ -1,0 +1,178 @@
+{
+  "at": "2026-11-20T17:31:41.861Z",
+  "kind": "p1_persist_through_pwa_retry_single_run",
+  "uniqueUserText": "P1-persist-pwa-retry-1795195901858-55cfdcf1",
+  "productionEntry": "node server.mjs (default start:prod / proposed image CMD) — NOT docker image build",
+  "dockerImageClaim": false,
+  "independentDocker": "unavailable",
+  "modelResponseScope": "ACK_STUB_NO_INFERENCE — local fixture Eve acknowledges sessions/messages; no paid model inference.",
+  "engineeringInjection": {
+    "label": "ENGINEERING_INJECTION",
+    "preciseClaim": "Suppresses controllerchange NOTIFICATION only. Does NOT delay actual SW activation. No harness extra SKIP_WAITING.",
+    "appliedAt": "2026-11-20T17:31:48.648Z"
+  },
+  "notClaimed": [
+    "phone/mobile",
+    "offline full conversation history",
+    "live box/stack",
+    "Docker image CMD",
+    "paid inference",
+    "cross-run data continuity from prior separate persist vs timeout checks"
+  ],
+  "steps": [
+    {
+      "step": "ephemeral_pg_live_data_directory_and_marker_match",
+      "live": {
+        "verified": true,
+        "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/data",
+        "markerToken": "e8adfac76b56536972d97bc796f35c91a44e8c789ddf0d63",
+        "expectedDataDir": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/data"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:31:42.727Z"
+    },
+    {
+      "step": "api_generated_conversation_visible",
+      "convBefore": {
+        "conversationIdVisible": "conv_971b67b1-f25a-4178-8f35-6ae749f72b1b",
+        "sample": "Hamster\nPrivate preview\nConversation\nMain conversation\nDashboards\nApprovals\nEN\n中文\nMain conversation\nconversationId: conv_971b67b1-f25a-4178-8f35-6ae749f72b1b\n\nNo messages yet. Dispatch a task or ask a question.\n\nSend"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:31:48.330Z"
+    },
+    {
+      "step": "composer_unique_user_message_persisted_in_pg",
+      "live2": {
+        "verified": true,
+        "liveDataDirectory": "/tmp/hamster-p2-ephemeral-pg-EaDUnK/data"
+      },
+      "userMessage": {
+        "id": "1",
+        "conversation_id": "conv_971b67b1-f25a-4178-8f35-6ae749f72b1b",
+        "role": "user",
+        "content": "P1-persist-pwa-retry-1795195901858-55cfdcf1"
+      },
+      "ok": true,
+      "at": "2026-11-20T17:31:48.435Z"
+    },
+    {
+      "step": "document_stamped_nav_baseline",
+      "doc0": {
+        "nonce": "56cba761-1d2c-4045-a406-93a752a75151",
+        "stampedAt": 1795195908631,
+        "label": "same-document-probe"
+      },
+      "navBaseline": 2,
+      "ok": true,
+      "note": "Baseline is observed count (often 2), not forced to 1",
+      "at": "2026-11-20T17:31:48.632Z"
+    },
+    {
+      "step": "timeout_relative_baseline_unchanged_retry_ui",
+      "docAfterTimeout": {
+        "nonce": "56cba761-1d2c-4045-a406-93a752a75151",
+        "stampedAt": 1795195908631,
+        "label": "same-document-probe"
+      },
+      "sameDocumentNonce": true,
+      "navCount": 2,
+      "navBaseline": 2,
+      "navUnchangedSinceBaseline": true,
+      "navUnchangedSinceReloadClick": true,
+      "retryText": "更新未完成。当前页面已保留，可以再次尝试重新加载。\n暂不\n再次重新加载",
+      "injectionAfterTimeout": {
+        "label": "ENGINEERING_INJECTION",
+        "purpose": "suppress_controllerchange_NOTIFICATION_only_not_activation",
+        "preciseClaim": "Does not delay actual SW activation; only suppresses notification to wrapped listeners",
+        "blockNotifyUntil": 1795195914148,
+        "suppressedCount": 1,
+        "actualControllerChangeAt": 1795195908690,
+        "actualControllerChangeObserved": true,
+        "controllerScriptURLAtChange": "http://127.0.0.1:3298/sw.js",
+        "harnessExtraSkipWaiting": false
+      },
+      "png": "persist-retry-timeout-zh-20261121.png",
+      "ok": true,
+      "at": "2026-11-20T17:31:53.054Z"
+    },
+    {
+      "step": "activation_observed_unaided_no_harness_skip_waiting",
+      "injectionLate": {
+        "label": "ENGINEERING_INJECTION",
+        "purpose": "suppress_controllerchange_NOTIFICATION_only_not_activation",
+        "preciseClaim": "Does not delay actual SW activation; only suppresses notification to wrapped listeners",
+        "blockNotifyUntil": 0,
+        "suppressedCount": 1,
+        "actualControllerChangeAt": 1795195908690,
+        "actualControllerChangeObserved": true,
+        "controllerScriptURLAtChange": "http://127.0.0.1:3298/sw.js",
+        "harnessExtraSkipWaiting": false,
+        "phase": "observe_only_no_harness_skip_waiting"
+      },
+      "navCount": 2,
+      "ok": true,
+      "at": "2026-11-20T17:31:53.061Z"
+    },
+    {
+      "step": "user_retry_same_message_restored_bundle_B",
+      "navBeforeRetry": 2,
+      "navAfterRetry": 3,
+      "navBaseline": 2,
+      "exactlyOneNewNav": true,
+      "relativeBaselineWas": 2,
+      "retryNavIsBaselinePlusOne": true,
+      "uiAfterRetry": {
+        "conversationIdVisible": "conv_971b67b1-f25a-4178-8f35-6ae749f72b1b",
+        "hasUserText": true,
+        "hasBundleBMarker": true,
+        "sample": "Hamster\nPrivate preview · bundle-B-persist-retry-20261121\n对话\nMain conversation\nDashboard 库\n待审批\nEN\n中文\n主对话\nconversationId: conv_971b67b1-f25a-4178-8f35-6ae749f72b1b\nUSER\nP1-persist-pwa-retry-1795195901858-55cfdcf1\n发送"
+      },
+      "conversationIdUnchanged": true,
+      "dbStillHasUniqueText": true,
+      "live3": {
+        "verified": true
+      },
+      "png": "persist-retry-after-reload-20261121.png",
+      "ok": true,
+      "at": "2026-11-20T17:31:53.968Z"
+    }
+  ],
+  "mainFrameNavigations": [
+    {
+      "at": "2026-11-20T17:31:47.611Z",
+      "url": "http://127.0.0.1:3298/"
+    },
+    {
+      "at": "2026-11-20T17:31:47.710Z",
+      "url": "http://127.0.0.1:3298/"
+    },
+    {
+      "at": "2026-11-20T17:31:53.076Z",
+      "url": "http://127.0.0.1:3298/"
+    }
+  ],
+  "pass": true,
+  "fixtureEve": {
+    "baseUrl": "http://127.0.0.1:33811",
+    "label": "ACK_STUB_NO_INFERENCE"
+  },
+  "api": {
+    "port": 18733,
+    "logFile": "/opt/cursor/artifacts/p1-persist-through-pwa-retry-20261121/api-server.log"
+  },
+  "builds": {
+    "idA": "0467ed911aa2",
+    "idB": "3dcdd67bb9b6",
+    "bundleBMarker": "bundle-B-persist-retry-20261121"
+  },
+  "origin": "http://127.0.0.1:3298",
+  "nodeEntryBootTail": "hamster-client listening on 0.0.0.0:3298 (api → http://127.0.0.1:18733)\n",
+  "productionEntryContract": {
+    "cmd": "node server.mjs",
+    "PORT": 3298,
+    "DIST_DIR": "/tmp/hamster-p1-persist-through-pwa-retry-20261121/serve",
+    "API_UPSTREAM": "http://127.0.0.1:18733"
+  },
+  "navBaseline": 2,
+  "conversationId": "conv_971b67b1-f25a-4178-8f35-6ae749f72b1b"
+}

@@ -18,6 +18,16 @@ client/src/lib/pwaUpdate.ts
 client/src/lib/pwaUpdateCore.ts
 client/src/main.tsx
 client/vite.config.ts
+docs/evidence/p1-pwa-candidate-from-main-20261121/DRAFT-PR.md
+docs/evidence/p1-pwa-candidate-from-main-20261121/INTEGRATION-REASON.md
+docs/evidence/p1-pwa-candidate-from-main-20261121/NOTES.md
+docs/evidence/p1-pwa-candidate-from-main-20261121/client-build.txt
+docs/evidence/p1-pwa-candidate-from-main-20261121/client-lint.txt
+docs/evidence/p1-pwa-candidate-from-main-20261121/diffstat-vs-main.txt
+docs/evidence/p1-pwa-candidate-from-main-20261121/files-vs-main.txt
+docs/evidence/p1-pwa-candidate-from-main-20261121/server-safejoin.test.txt
+docs/evidence/p1-pwa-candidate-from-main-20261121/surgical-wiring.diff
+docs/evidence/p1-pwa-candidate-from-main-20261121/unit-pwaUpdate.test.txt
 docs/evidence/p1-pwa-timeout-fix-20261120/NOTES.md
 docs/evidence/p1-pwa-timeout-fix-20261120/unit-pwaUpdate.test.txt
 docs/evidence/p1-pwa-timeout-lifecycle-evidence-20261120/NOTES.md

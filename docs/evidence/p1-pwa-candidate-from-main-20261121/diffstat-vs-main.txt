@@ -18,6 +18,16 @@
  client/src/lib/pwaUpdateCore.ts                    | 224 +++++++
  client/src/main.tsx                                |   6 +
  client/vite.config.ts                              |  20 +-
+ .../DRAFT-PR.md                                    |  45 ++
+ .../INTEGRATION-REASON.md                          |  44 ++
+ .../p1-pwa-candidate-from-main-20261121/NOTES.md   |  23 +
+ .../client-build.txt                               |  20 +
+ .../client-lint.txt                                |  10 +
+ .../diffstat-vs-main.txt                           |  49 ++
+ .../files-vs-main.txt                              |  48 ++
+ .../server-safejoin.test.txt                       |   9 +
+ .../surgical-wiring.diff                           | 140 +++++
+ .../unit-pwaUpdate.test.txt                        |  30 +
  docs/evidence/p1-pwa-timeout-fix-20261120/NOTES.md |  26 +
  .../unit-pwaUpdate.test.txt                        | 100 +++
  .../NOTES.md                                       |  33 +
@@ -46,4 +56,4 @@
  .../p1-pwa-update-review-fix-20261120/NOTES.md     |  28 +
  .../lifecycle-real-artifacts.json                  |  83 +++
  .../unit-pwaUpdate.test.txt                        |  70 +++
- 48 files changed, 3697 insertions(+), 5 deletions(-)
+ 58 files changed, 4115 insertions(+), 5 deletions(-)

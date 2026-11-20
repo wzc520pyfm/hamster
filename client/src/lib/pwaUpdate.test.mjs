@@ -24,6 +24,7 @@ import {
   shouldOfferUpdateReload,
   snapshotContinuityStorage,
   applyPwaUpdate,
+  waitForControllerChange,
   isCacheableShellAssetResponse,
 } from './pwaUpdateCore.ts'
 import { cacheFirstPutDecision } from './pwaSwCache.mjs'
@@ -98,7 +99,7 @@ test('applyPwaUpdate awaits controllerchange before reload; preserves continuity
     'hamster.conversation.demo': '{"id":"c"}',
   })
   const order = []
-  await applyPwaUpdate({
+  const result = await applyPwaUpdate({
     registration: {
       waiting: {
         postMessage() {
@@ -112,7 +113,7 @@ test('applyPwaUpdate awaits controllerchange before reload; preserves continuity
         order.push('wait-armed')
         queueMicrotask(() => {
           order.push('controllerchange')
-          resolve(undefined)
+          resolve({ ok: true, reason: 'controllerchange' })
         })
       }),
     reload: () => {
@@ -120,7 +121,51 @@ test('applyPwaUpdate awaits controllerchange before reload; preserves continuity
     },
   })
   assert.deepEqual(order, ['wait-armed', 'message', 'controllerchange', 'reload'])
+  assert.equal(result.reloaded, true)
   assert.equal(storage.getItem('hamster.locale'), 'zh')
+})
+
+test('production waitForControllerChange timeout: NEVER reload (MUST FIX)', async () => {
+  const storage = memoryStorage({ 'hamster.locale': 'en' })
+  let reloads = 0
+  const listeners = new Set()
+  const result = await applyPwaUpdate({
+    registration: {
+      waiting: {
+        postMessage() {
+          /* no controllerchange will fire */
+        },
+      },
+    },
+    storage,
+    whenControllerChanges: () =>
+      waitForControllerChange(8, {
+        hasServiceWorker: true,
+        addEventListener: (_t, fn) => listeners.add(fn),
+        removeEventListener: (_t, fn) => listeners.delete(fn),
+        setTimeout,
+        clearTimeout,
+      }),
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(result.reloaded, false)
+  assert.equal(result.failure, 'timeout')
+  assert.equal(reloads, 0)
+  assert.equal(storage.getItem('hamster.locale'), 'en')
+  // Listener must be removed after timeout (no leak).
+  assert.equal(listeners.size, 0)
+})
+
+test('i18n exposes EN/ZH update retry copy', () => {
+  const messages = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8')
+  assert.match(messages, /updateRetryNeeded:/)
+  assert.match(messages, /Update did not finish/)
+  assert.match(messages, /更新未完成/)
+  assert.match(messages, /updateRetryAction:/)
+  assert.match(messages, /Try Reload again/)
+  assert.match(messages, /再次重新加载/)
 })
 
 test('sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache', () => {

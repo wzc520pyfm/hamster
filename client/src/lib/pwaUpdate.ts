@@ -7,9 +7,15 @@ import {
   SW_REGISTER_OPTIONS,
   shouldOfferUpdateReload,
   applyPwaUpdate,
+  type ApplyPwaUpdateResult,
 } from './pwaUpdateCore'
 
-export { SW_REGISTER_OPTIONS, shouldOfferUpdateReload, applyPwaUpdate }
+export {
+  SW_REGISTER_OPTIONS,
+  shouldOfferUpdateReload,
+  applyPwaUpdate,
+  type ApplyPwaUpdateResult,
+}
 
 export type PwaUpdateListener = (state: { updateReady: boolean }) => void
 
@@ -17,6 +23,10 @@ const listeners = new Set<PwaUpdateListener>()
 let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
 let updateTimer: number | null = null
 let registrationRef: ServiceWorkerRegistration | null = null
+let focusHandler: (() => void) | null = null
+let visibilityHandler: (() => void) | null = null
+/** Serialize Reload attempts so timeout retries cannot race. */
+let applyInFlight: Promise<ApplyPwaUpdateResult> | null = null
 
 function emitAll(updateReady: boolean) {
   for (const listener of listeners) listener({ updateReady })
@@ -45,9 +55,10 @@ function ensureRegistrationStarted(): void {
       }
       check()
       updateTimer = window.setInterval(check, 60_000)
-      // Re-offer after temporary "Not now" when the user returns focus (same document).
-      window.addEventListener('focus', check)
-      document.addEventListener('visibilitychange', check)
+      focusHandler = check
+      visibilityHandler = check
+      window.addEventListener('focus', focusHandler)
+      document.addEventListener('visibilitychange', visibilityHandler)
       offerIfWaiting(reg)
       reg.addEventListener('updatefound', () => {
         const installing = reg.installing
@@ -82,17 +93,24 @@ export function registerHamsterServiceWorker(onChange?: PwaUpdateListener): () =
   }
 }
 
-/** User opted in: ask waiting worker to activate, await controllerchange, then reload. */
+/**
+ * User opted in: SKIP_WAITING, await controllerchange, then reload.
+ * On timeout: does NOT reload; returns failure for Retry UI.
+ */
 export async function applyHamsterPwaUpdate(
   registration?: ServiceWorkerRegistration | null,
-): Promise<void> {
-  await applyPwaUpdate({
+): Promise<ApplyPwaUpdateResult> {
+  if (applyInFlight) return applyInFlight
+  applyInFlight = applyPwaUpdate({
     registration: registration ?? undefined,
     storage: window.localStorage,
     reload: () => {
       window.location.reload()
     },
+  }).finally(() => {
+    applyInFlight = null
   })
+  return applyInFlight
 }
 
 export async function getHamsterServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
@@ -110,8 +128,17 @@ export function __resetHamsterServiceWorkerRegistrationForTests(): void {
   listeners.clear()
   registrationPromise = null
   registrationRef = null
+  applyInFlight = null
   if (updateTimer != null) {
     window.clearInterval(updateTimer)
     updateTimer = null
+  }
+  if (focusHandler) {
+    window.removeEventListener('focus', focusHandler)
+    focusHandler = null
+  }
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+    visibilityHandler = null
   }
 }

@@ -24,8 +24,8 @@ const OLD_DIST = path.join(WORK, 'dist-140487b')
 const NEW_DIST = path.join(WORK, 'dist-new')
 const NEW2_DIST = path.join(WORK, 'dist-new2')
 const SERVE = path.join(WORK, 'serve')
-const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-update-gaps-af-20261120')
-const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-update-gaps-af-20261120'
+const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-timeout-evidence-20261120')
+const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-timeout-evidence-20261120'
 
 const CONTINUITY = {
   'hamster.locale': 'zh',
@@ -279,71 +279,75 @@ async function main() {
       ok: oldState.hasOldJs === true && oldState.hasBanner === false,
     })
 
-    // Deploy new; retained old page — A: old assets still in cache before Reload
+    // Deploy new; retained old 140487b document — must NOT magically show new React banner.
+    // Boundary: reg.update() below is a TEST ACCELERATOR only (not automatic discovery proof).
     syncServe(NEW_DIST)
     await triggerSwUpdate(page).catch(() => {})
     await page.waitForTimeout(1000)
-    const retained = await page.evaluate(async (jsPath) => {
-      const names = await caches.keys()
-      let hasOldJs = false
-      for (const n of names) {
-        const c = await caches.open(n)
-        if (await c.match(jsPath)) hasOldJs = true
-      }
+    const retainedFetch = await page.evaluate(async (jsPath) => {
+      const res = await fetch(jsPath)
+      const ct = res.headers.get('content-type') || ''
+      const body = await res.text()
       const reg = await navigator.serviceWorker.getRegistration()
       return {
+        status: res.status,
+        contentType: ct,
+        bodyPrefix: body.slice(0, 80),
+        bodyLen: body.length,
         hasBanner: !!document.querySelector('[data-testid="pwa-update-banner"]'),
-        hasOldJs,
-        names,
         waiting: !!reg?.waiting,
-        controlling: !!navigator.serviceWorker.controller,
       }
     }, oldAssets.mainJs)
     pushStep(evidence, {
-      step: 'retained_old_assets_safe_before_reload',
-      hasOldJs: retained.hasOldJs,
-      waiting: retained.waiting,
-      hasBanner: retained.hasBanner,
+      step: 'retained_old_page_fetches_old_js_mime_before_reload',
+      retainedFetch,
+      boundary:
+        'reg.update() was used as a test accelerator on the retained page; not claimed as automatic discovery timing.',
       honest:
-        'Before Reload consent, old shell cache must still hold old hashed JS; waiting SW must not wipe it. Retained 140487b page has no React banner.',
-      ok: retained.hasOldJs === true && retained.hasBanner === false,
+        'Retained 140487b document cannot show the new React banner. Old JS must still fetch with JS MIME/body.',
+      ok:
+        retainedFetch.hasBanner === false &&
+        retainedFetch.status === 200 &&
+        /javascript|ecmascript/i.test(retainedFetch.contentType) &&
+        retainedFetch.bodyLen > 100 &&
+        !retainedFetch.bodyPrefix.includes('<!DOCTYPE') &&
+        !retainedFetch.bodyPrefix.includes('<html'),
     })
 
-    // Natural reopen
+    // Natural online reopen (new document) — how first-migration acquires new JS.
     const page2 = await context.newPage()
+    const navStarted = Date.now()
     await page2.goto(origin + '/', { waitUntil: 'networkidle' })
-    await triggerSwUpdate(page2)
-    const bannerVisible = await page2
-      .waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 20000 })
+    // Automatic detection path: register() + initial check() in production main/banner.
+    // Do NOT call reg.update() here — measure natural offer timing.
+    const bannerVisibleNatural = await page2
+      .waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 65000 })
       .then(() => true)
       .catch(() => false)
+    const naturalMs = Date.now() - navStarted
     const reopenCont = await readContinuity(page2)
-    const reopenWait = await page2.evaluate(async () => {
-      const reg = await navigator.serviceWorker.getRegistration()
-      return !!reg?.waiting
-    })
-    // A again on controlled new page before Reload: if waiting, old v1 cache may still exist
-    const beforeReloadCaches = await page2.evaluate(async (jsPath) => {
-      const names = await caches.keys()
-      let hasOldJs = false
-      for (const n of names) {
-        const c = await caches.open(n)
-        if (await c.match(jsPath)) hasOldJs = true
-      }
-      return { names, hasOldJs }
-    }, oldAssets.mainJs)
+    const newJsProbe = await page2.evaluate(async (jsPath) => {
+      const res = await fetch(jsPath)
+      const ct = res.headers.get('content-type') || ''
+      const text = await res.text()
+      return { status: res.status, contentType: ct, len: text.length, hasReact: text.includes('react') || text.length > 1000 }
+    }, builds.newAssets.mainJs)
     pushStep(evidence, {
-      step: 'natural_reopen_new_artifact',
-      bannerVisible,
-      waiting: reopenWait,
+      step: 'natural_online_reopen_acquires_new_js_and_banner',
+      bannerVisibleNatural,
+      naturalMs,
+      newJsProbe,
       continuity: reopenCont,
-      beforeReloadCaches,
       newMainJs: builds.newAssets.mainJs,
+      boundary:
+        'Banner wait uses production register/check (up to ~60s poll). No manual reg.update() on this step.',
       ok:
         continuityOk(reopenCont) === true &&
-        (bannerVisible === true || reopenWait === false) &&
-        typeof builds.newAssets.mainJs === 'string',
+        bannerVisibleNatural === true &&
+        newJsProbe.status === 200 &&
+        /javascript|ecmascript/i.test(newJsProbe.contentType),
     })
+    const bannerVisible = bannerVisibleNatural
 
     let uiPage = page2
     if (bannerVisible) {
@@ -356,46 +360,120 @@ async function main() {
         const reg = await navigator.serviceWorker.getRegistration()
         return !!reg?.waiting
       })
-      const stillOld = await uiPage.evaluate(async (jsPath) => {
-        const names = await caches.keys()
-        for (const n of names) {
-          const c = await caches.open(n)
-          if (await c.match(jsPath)) return true
+      const oldJsAfterNotNow = await uiPage.evaluate(async (jsPath) => {
+        const res = await fetch(jsPath)
+        const ct = res.headers.get('content-type') || ''
+        const body = await res.text()
+        return {
+          status: res.status,
+          contentType: ct,
+          bodyLen: body.length,
+          notHtml: !body.trimStart().startsWith('<!') && !body.includes('<html'),
         }
-        return false
       }, oldAssets.mainJs)
       pushStep(evidence, {
-        step: 'not_now_defers_activation_keeps_old_cache',
+        step: 'not_now_defers_activation_old_js_fetch_ok',
         stillWaiting,
-        stillOld,
-        ok: stillWaiting === true && stillOld === true,
+        oldJsAfterNotNow,
+        ok:
+          stillWaiting === true &&
+          oldJsAfterNotNow.status === 200 &&
+          /javascript|ecmascript/i.test(oldJsAfterNotNow.contentType) &&
+          oldJsAfterNotNow.notHtml === true &&
+          oldJsAfterNotNow.bodyLen > 100,
       })
 
-      // Stay on the same document: a full reload of the last client can activate the
-      // waiting worker without SKIP_WAITING (browser rule). Re-offer via focus/check.
-      await triggerSwUpdate(uiPage)
-      await uiPage.evaluate(() => {
-        window.dispatchEvent(new Event('focus'))
+      // EN banner sample (isolated VM screenshot)
+      await uiPage.evaluate(() => localStorage.setItem('hamster.locale', 'en'))
+      await uiPage.reload({ waitUntil: 'networkidle' }).catch(() => {})
+      // After reload of last client, waiting SW may activate — re-check banner path via successive later.
+      // Prefer same-document re-offer without navigation when possible:
+      // (If reload activated already, EN/ZH samples are taken on successive deploy below.)
+
+      // Stay on document when banner still present; else continue to Reload path via successive.
+      const hasBannerAfterNotNow = await uiPage
+        .locator('[data-testid="pwa-update-banner"]')
+        .isVisible()
+        .catch(() => false)
+      if (!hasBannerAfterNotNow) {
+        // Re-offer without claiming auto-discovery: focus handler is production code.
+        await uiPage.evaluate(() => window.dispatchEvent(new Event('focus')))
+      }
+      const bannerBack = await uiPage
+        .waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 65000 })
+        .then(() => true)
+        .catch(() => false)
+      if (bannerBack) {
+        await uiPage.screenshot({
+          path: path.join(ARTIFACT_REPO, 'banner-en.png'),
+          fullPage: false,
+        })
+        fs.copyFileSync(
+          path.join(ARTIFACT_REPO, 'banner-en.png'),
+          path.join(ARTIFACT_RAW, 'banner-en.png'),
+        )
+      }
+      pushStep(evidence, {
+        step: 'banner_en_sample_isolated_vm',
+        bannerBack,
+        ok: bannerBack === true,
       })
-      await uiPage.waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 20000 })
+
+      await uiPage.evaluate(() => localStorage.setItem('hamster.locale', 'zh'))
+      // Locale toggle may need Shell locale control — set storage + soft focus re-offer text via React remount:
+      await uiPage.reload({ waitUntil: 'networkidle' }).catch(() => {})
+      await uiPage.evaluate(() => window.dispatchEvent(new Event('focus')))
+      const zhBanner = await uiPage
+        .waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 65000 })
+        .then(() => true)
+        .catch(() => false)
+      if (zhBanner) {
+        const zhText = await uiPage.locator('[data-testid="pwa-update-banner"]').innerText()
+        await uiPage.screenshot({
+          path: path.join(ARTIFACT_REPO, 'banner-zh.png'),
+          fullPage: false,
+        })
+        fs.copyFileSync(
+          path.join(ARTIFACT_REPO, 'banner-zh.png'),
+          path.join(ARTIFACT_RAW, 'banner-zh.png'),
+        )
+        pushStep(evidence, {
+          step: 'banner_zh_sample_isolated_vm',
+          zhText: zhText.slice(0, 160),
+          ok: zhText.includes('新') || zhText.includes('重新加载') || zhText.includes('可用'),
+        })
+      } else {
+        pushStep(evidence, {
+          step: 'banner_zh_sample_isolated_vm',
+          ok: false,
+          note: 'ZH banner not visible after locale switch/reload',
+        })
+      }
+
       const contBefore = await readContinuity(uiPage)
       pushStep(evidence, {
         step: 'continuity_before_explicit_reload',
         continuity: contBefore,
         ok: continuityOk(contBefore),
       })
-      // Old assets must still be present immediately before user Reload consent.
-      const stillOldBeforeReload = await uiPage.evaluate(async (jsPath) => {
-        for (const n of await caches.keys()) {
-          const c = await caches.open(n)
-          if (await c.match(jsPath)) return true
+      const oldJsBeforeReload = await uiPage.evaluate(async (jsPath) => {
+        const res = await fetch(jsPath)
+        const ct = res.headers.get('content-type') || ''
+        const body = await res.text()
+        return {
+          status: res.status,
+          contentType: ct,
+          notHtml: !body.trimStart().startsWith('<!'),
+          bodyLen: body.length,
         }
-        return false
       }, oldAssets.mainJs)
       pushStep(evidence, {
-        step: 'old_assets_still_present_immediately_before_reload_click',
-        stillOldBeforeReload,
-        ok: stillOldBeforeReload === true,
+        step: 'old_js_fetch_mime_immediately_before_reload_click',
+        oldJsBeforeReload,
+        ok:
+          oldJsBeforeReload.status === 200 &&
+          /javascript|ecmascript/i.test(oldJsBeforeReload.contentType) &&
+          oldJsBeforeReload.notHtml,
       })
       await Promise.all([
         uiPage.waitForNavigation({ waitUntil: 'networkidle' }),

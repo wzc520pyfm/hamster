@@ -6,6 +6,21 @@
 /** Registration options so HTTP cache cannot hide a new sw.js for an hour. */
 export const SW_REGISTER_OPTIONS = Object.freeze({ updateViaCache: 'none' as const })
 
+export const CONTROLLER_CHANGE_TIMEOUT_MS = 4000
+
+export type ControllerChangeWaitResult =
+  | { ok: true; reason: 'controllerchange' }
+  | { ok: false; reason: 'timeout' | 'no_sw' }
+
+export type ApplyPwaUpdateResult = {
+  preserved: Record<string, string>
+  /** True only when controller switched and reload was invoked. */
+  reloaded: boolean
+  /** Why apply stopped without reloading (timeout / no SW / no waiting worker). */
+  failure?: 'timeout' | 'no_sw' | 'no_waiting'
+  waitReason?: string
+}
+
 export function shouldOfferUpdateReload(state: {
   hadController: boolean
   controllerChanged: boolean
@@ -31,58 +46,117 @@ export function snapshotContinuityStorage(storage: Storage): Record<string, stri
   return out
 }
 
-function defaultWhenControllerChanges(timeoutMs = 4000): Promise<string> {
+/**
+ * Wait for controllerchange. On timeout: resolve ok:false and remove the listener
+ * — never treat timeout as success. Caller must NOT reload on failure.
+ */
+export function waitForControllerChange(
+  timeoutMs = CONTROLLER_CHANGE_TIMEOUT_MS,
+  opts: {
+    addEventListener?: (type: string, fn: () => void) => void
+    removeEventListener?: (type: string, fn: () => void) => void
+    setTimeout?: (fn: () => void, ms: number) => unknown
+    clearTimeout?: (id: unknown) => void
+    hasServiceWorker?: boolean
+  } = {},
+): Promise<ControllerChangeWaitResult> {
+  const hasSw =
+    opts.hasServiceWorker ??
+    (typeof navigator !== 'undefined' && Boolean(navigator.serviceWorker))
+  if (!hasSw) {
+    return Promise.resolve({ ok: false, reason: 'no_sw' })
+  }
+
+  const add =
+    opts.addEventListener ??
+    ((type, fn) => navigator.serviceWorker.addEventListener(type, fn as EventListener))
+  const remove =
+    opts.removeEventListener ??
+    ((type, fn) => navigator.serviceWorker.removeEventListener(type, fn as EventListener))
+  const schedule = opts.setTimeout ?? ((fn: () => void, ms: number) => setTimeout(fn, ms))
+  const clear = opts.clearTimeout ?? ((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>))
+
   return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.serviceWorker) {
-      resolve('no_sw')
-      return
-    }
     let done = false
-    const finish = (why: string) => {
+    let timer: unknown
+    const finish = (result: ControllerChangeWaitResult) => {
       if (done) return
       done = true
-      navigator.serviceWorker.removeEventListener('controllerchange', onChange)
-      resolve(why)
+      remove('controllerchange', onChange)
+      if (timer != null) clear(timer)
+      resolve(result)
     }
-    const onChange = () => finish('controllerchange')
-    navigator.serviceWorker.addEventListener('controllerchange', onChange)
-    setTimeout(() => finish('timeout'), timeoutMs)
+    const onChange = () => finish({ ok: true, reason: 'controllerchange' })
+    add('controllerchange', onChange)
+    timer = schedule(() => finish({ ok: false, reason: 'timeout' }), timeoutMs)
   })
 }
 
+/**
+ * SKIP_WAITING, await controller switch, then reload ONLY on success.
+ * Timeout preserves the current page (no reload) so the UI can offer Retry.
+ */
 export async function applyPwaUpdate(opts: {
   registration?: { waiting?: { postMessage: (msg: unknown) => void } | null } | null
   reload?: () => void
   storage?: Storage
-  whenControllerChanges?: () => Promise<unknown>
+  whenControllerChanges?: () => Promise<ControllerChangeWaitResult | { ok: boolean; reason?: string }>
   controllerChangeTimeoutMs?: number
-} = {}): Promise<{ preserved: Record<string, string> }> {
+} = {}): Promise<ApplyPwaUpdateResult> {
   const storage = opts.storage ?? globalThis.localStorage
   const before = snapshotContinuityStorage(storage)
   const waiting = opts.registration?.waiting
+
+  if (!waiting || typeof waiting.postMessage !== 'function') {
+    const after = snapshotContinuityStorage(storage)
+    assertContinuity(before, after)
+    return { preserved: before, reloaded: false, failure: 'no_waiting' }
+  }
+
   const whenControllerChanges =
     opts.whenControllerChanges ??
-    (() => defaultWhenControllerChanges(opts.controllerChangeTimeoutMs ?? 4000))
+    (() => waitForControllerChange(opts.controllerChangeTimeoutMs ?? CONTROLLER_CHANGE_TIMEOUT_MS))
 
-  if (waiting && typeof waiting.postMessage === 'function') {
-    const controllerWait = whenControllerChanges()
-    waiting.postMessage({ type: 'SKIP_WAITING' })
-    await controllerWait
-  }
+  const waitPromise = whenControllerChanges()
+  waiting.postMessage({ type: 'SKIP_WAITING' })
+  const waitResult = await waitPromise
+  const ok = waitResult && (waitResult as { ok?: boolean }).ok === true
 
   const after = snapshotContinuityStorage(storage)
-  for (const [k, v] of Object.entries(before)) {
-    if (after[k] !== v) {
-      throw new Error(`applyPwaUpdate must not alter continuity key ${k}`)
+  assertContinuity(before, after)
+
+  if (!ok) {
+    const reason =
+      (waitResult as { reason?: string })?.reason === 'no_sw'
+        ? 'no_sw'
+        : 'timeout'
+    return {
+      preserved: before,
+      reloaded: false,
+      failure: reason,
+      waitReason: String((waitResult as { reason?: string })?.reason ?? 'timeout'),
     }
   }
+
   const reload =
     opts.reload ??
     (() => {
       if (typeof globalThis.location?.reload === 'function') globalThis.location.reload()
     })
   reload()
-  return { preserved: before }
+  return {
+    preserved: before,
+    reloaded: true,
+    waitReason: 'controllerchange',
+  }
+}
+
+function assertContinuity(before: Record<string, string>, after: Record<string, string>) {
+  for (const [k, v] of Object.entries(before)) {
+    if (after[k] !== v) {
+      throw new Error(`applyPwaUpdate must not alter continuity key ${k}`)
+    }
+  }
 }
 
 type Headerish = { get?: (name: string) => string | null }

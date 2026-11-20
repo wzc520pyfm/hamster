@@ -5,6 +5,19 @@ import { getCopy, type Locale } from '@/i18n/messages'
 export const RUN_TARGET_CONTROL_PLANE = 'target_control_plane'
 export const RUN_TARGET_ISOLATED_DESKTOP = 'target_isolated_desktop'
 
+/**
+ * Must-fix 4: not_started ≠ unavailable.
+ * Only unavailable blocks composer dispatch; not_started may send (issues start approval).
+ */
+export function canDispatchToIsolated(state: string): boolean {
+  return state === 'ok' || state === 'not_started'
+}
+
+/** `Use the control plane instead` only for tasks that have not started. */
+export function mayUseControlPlaneInstead(status: string): boolean {
+  return status === 'queued'
+}
+
 export type TaskRunState =
   | 'ok'
   | 'unavailable'

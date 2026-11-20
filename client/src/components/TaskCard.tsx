@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom'
 import { ControlStatusLabel, TaskStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { taskRunState, taskRunTargetLabel, type TaskRunState } from '@/lib/runTarget'
+import {
+  taskRunState,
+  taskRunTargetLabel,
+  mayUseControlPlaneInstead,
+  type TaskRunState,
+} from '@/lib/runTarget'
 import type { TaskDetail } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 
@@ -76,7 +81,7 @@ export function TaskCard({
           data-testid="task-isolated-start-failed"
         >
           <div className="font-medium">{t.isolatedDesktopStartFailed}</div>
-          {!terminal && task.status === 'queued' ? (
+          {!terminal && mayUseControlPlaneInstead(task.status) ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {onRetry ? (
                 <Button

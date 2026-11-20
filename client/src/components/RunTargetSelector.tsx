@@ -1,31 +1,36 @@
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { RUN_TARGET_CONTROL_PLANE, RUN_TARGET_ISOLATED_DESKTOP } from '@/lib/runTarget'
+import {
+  RUN_TARGET_CONTROL_PLANE,
+  RUN_TARGET_ISOLATED_DESKTOP,
+  canDispatchToIsolated,
+} from '@/lib/runTarget'
 
 /**
  * Per-task execution target selector (composer field "Run on" / "执行位置").
  * Only two options exist in this slice: the default Control plane / 控制面 and the
  * optional Isolated desktop / 隔离桌面. The host machine is never offered.
  * Selecting Isolated desktop is NOT approval and never starts the container.
+ * not_started ≠ unavailable: only unavailable shows the unavailable sentence + Retry.
  */
 export function RunTargetSelector({
   value,
   onChange,
-  available,
+  isolatedState = 'unavailable',
   locale,
   onRetry,
 }: {
   value: string
   onChange: (targetId: string) => void
-  /** Isolated desktop availability probe result (fail closed when unknown). */
-  available: boolean
+  /** Probe state: ok | not_started | unavailable (must-fix 4). */
+  isolatedState?: string
   locale: Locale
   onRetry?: () => void
 }) {
   const t = getCopy(locale)
   const selectedIsolated = value === RUN_TARGET_ISOLATED_DESKTOP
-  const showUnavailable = selectedIsolated && !available
-  const showDescription = selectedIsolated && available
+  const showUnavailable = selectedIsolated && isolatedState === 'unavailable'
+  const showDescription = selectedIsolated && canDispatchToIsolated(isolatedState)
 
   return (
     <div className="flex flex-col gap-2" data-testid="run-target-selector">

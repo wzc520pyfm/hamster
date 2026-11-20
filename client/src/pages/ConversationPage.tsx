@@ -5,7 +5,11 @@ import { RunTargetSelector } from '@/components/RunTargetSelector'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
 import { api, isNetworkError, type Timeline, type TimelineMessage } from '@/lib/api'
-import { RUN_TARGET_CONTROL_PLANE, RUN_TARGET_ISOLATED_DESKTOP } from '@/lib/runTarget'
+import {
+  RUN_TARGET_CONTROL_PLANE,
+  RUN_TARGET_ISOLATED_DESKTOP,
+  canDispatchToIsolated,
+} from '@/lib/runTarget'
 
 export function ConversationPage({
   locale,
@@ -46,7 +50,8 @@ export function ConversationPage({
     () => targets.find((t) => t.targetId === RUN_TARGET_ISOLATED_DESKTOP) ?? null,
     [targets],
   )
-  const isolatedAvailable = isolatedTarget?.available ?? false
+  // not_started ≠ unavailable. Missing probe defaults to unavailable (fail closed).
+  const isolatedState = isolatedTarget?.state ?? 'unavailable'
 
   const refresh = useCallback(async () => {
     if (!conversationId) return
@@ -134,8 +139,10 @@ export function ConversationPage({
     if (!conversationId) return
     const value = raw.trim()
     if (!value) return
-    if (runTarget === RUN_TARGET_ISOLATED_DESKTOP && !isolatedAvailable) {
-      // Fail closed: never dispatch a long task to a not-ready isolated desktop; keep input.
+    if (runTarget === RUN_TARGET_ISOLATED_DESKTOP && !canDispatchToIsolated(isolatedState)) {
+      // Only true unavailability blocks send. not_started may dispatch: that issues the
+      // start/create approval ticket; the task stays Queued; selector does not start the
+      // container; client must not silently switch to the control plane.
       setTargetNotice(t.isolatedDesktopUnavailable)
       return
     }
@@ -253,7 +260,7 @@ export function ConversationPage({
         <RunTargetSelector
           value={runTarget}
           onChange={setRunTarget}
-          available={isolatedAvailable}
+          isolatedState={isolatedState}
           locale={locale}
           onRetry={() => void refreshTargets()}
         />

@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: register options bypass HTTP cache for sw.js updates
+ok 1 - register options bypass HTTP cache for sw.js updates
+  ---
+  duration_ms: 0.636593
+  type: 'test'
+  ...
+# Subtest: shell cache uses deploy-id suffix (not fixed v1)
+ok 2 - shell cache uses deploy-id suffix (not fixed v1)
+  ---
+  duration_ms: 0.153366
+  type: 'test'
+  ...
+# Subtest: activate deletes prior shell caches but keeps current
+ok 3 - activate deletes prior shell caches but keeps current
+  ---
+  duration_ms: 0.514291
+  type: 'test'
+  ...
+# Subtest: stampHamsterPwaBuild: successive deploy ids change sw bytes
+ok 4 - stampHamsterPwaBuild: successive deploy ids change sw bytes
+  ---
+  duration_ms: 0.534508
+  type: 'test'
+  ...
+# Subtest: applyPwaUpdate awaits controllerchange before reload; preserves continuity
+ok 5 - applyPwaUpdate awaits controllerchange before reload; preserves continuity
+  ---
+  duration_ms: 0.326213
+  type: 'test'
+  ...
+# Subtest: old→new cache cleanup + reload awaits controller; continuity survives
+ok 6 - old→new cache cleanup + reload awaits controller; continuity survives
+  ---
+  duration_ms: 0.320912
+  type: 'test'
+  ...
+# Subtest: sw.js: no install skipWaiting; SKIP_WAITING message; build placeholder; cleanup
+ok 7 - sw.js: no install skipWaiting; SKIP_WAITING message; build placeholder; cleanup
+  ---
+  duration_ms: 0.27604
+  type: 'test'
+  ...
+# Subtest: server serves sw.js with no-cache (not max-age=3600)
+ok 8 - server serves sw.js with no-cache (not max-age=3600)
+  ---
+  duration_ms: 12.825841
+  type: 'test'
+  ...
+# Subtest: shouldOfferUpdateReload: only after prior controller
+ok 9 - shouldOfferUpdateReload: only after prior controller
+  ---
+  duration_ms: 0.222591
+  type: 'test'
+  ...
+# Subtest: snapshotContinuityStorage keeps hamster.* keys
+ok 10 - snapshotContinuityStorage keeps hamster.* keys
+  ---
+  duration_ms: 0.278039
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 64.902275

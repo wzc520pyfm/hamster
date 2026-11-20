@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: safeJoinDist rejects prefix and traversal escapes
+ok 1 - safeJoinDist rejects prefix and traversal escapes
+  ---
+  duration_ms: 1.068348
+  type: 'test'
+  ...
+# Subtest: production module sync: pwaUpdate.ts imports pwaUpdateCore.ts (no duplicate pure.mjs)
+ok 2 - production module sync: pwaUpdate.ts imports pwaUpdateCore.ts (no duplicate pure.mjs)
+  ---
+  duration_ms: 0.99691
+  type: 'test'
+  ...
+# Subtest: main.tsx registers SW in PROD (ConnectGate path without Shell)
+ok 3 - main.tsx registers SW in PROD (ConnectGate path without Shell)
+  ---
+  duration_ms: 0.985598
+  type: 'test'
+  ...
+# Subtest: register options bypass HTTP cache for sw.js updates
+ok 4 - register options bypass HTTP cache for sw.js updates
+  ---
+  duration_ms: 0.082887
+  type: 'test'
+  ...
+# Subtest: shell cache uses deploy-id suffix (not fixed v1)
+ok 5 - shell cache uses deploy-id suffix (not fixed v1)
+  ---
+  duration_ms: 0.106212
+  type: 'test'
+  ...
+# Subtest: activate deletes prior shell caches but keeps current
+ok 6 - activate deletes prior shell caches but keeps current
+  ---
+  duration_ms: 0.487786
+  type: 'test'
+  ...
+# Subtest: waiting worker does not run activate cleanup (retained assets stay until Reload)
+ok 7 - waiting worker does not run activate cleanup (retained assets stay until Reload)
+  ---
+  duration_ms: 0.123172
+  type: 'test'
+  ...
+# Subtest: stampHamsterPwaBuild: successive deploy ids change sw bytes
+ok 8 - stampHamsterPwaBuild: successive deploy ids change sw bytes
+  ---
+  duration_ms: 0.460645
+  type: 'test'
+  ...
+# Subtest: applyPwaUpdate awaits controllerchange before reload; preserves continuity
+ok 9 - applyPwaUpdate awaits controllerchange before reload; preserves continuity
+  ---
+  duration_ms: 0.329174
+  type: 'test'
+  ...
+# Subtest: sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache
+ok 10 - sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache
+  ---
+  duration_ms: 0.349301
+  type: 'test'
+  ...
+# Subtest: isCacheableShellAssetResponse rejects HTML poison for /assets/*.js
+ok 11 - isCacheableShellAssetResponse rejects HTML poison for /assets/*.js
+  ---
+  duration_ms: 0.368617
+  type: 'test'
+  ...
+# Subtest: cacheFirstPutDecision does not store SPA-fallback HTML under JS URL
+ok 12 - cacheFirstPutDecision does not store SPA-fallback HTML under JS URL
+  ---
+  duration_ms: 0.198119
+  type: 'test'
+  ...
+# Subtest: server: missing /assets/*.js is 404, not SPA HTML; shouldSpaFallback
+ok 13 - server: missing /assets/*.js is 404, not SPA HTML; shouldSpaFallback
+  ---
+  duration_ms: 13.060364
+  type: 'test'
+  ...
+# Subtest: shouldOfferUpdateReload + snapshotContinuityStorage
+ok 14 - shouldOfferUpdateReload + snapshotContinuityStorage
+  ---
+  duration_ms: 0.154921
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 103.830911

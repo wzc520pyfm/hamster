@@ -1,0 +1,83 @@
+{
+  "at": "2026-11-20T15:10:34.788Z",
+  "origin": "http://127.0.0.1:37679",
+  "note": "VM isolated-origin engineering evidence only. Not box/phone. Not a pass claim for 1233857.",
+  "deployIds": {
+    "id1": "e483734d4a9f",
+    "id2": "c321a7c3d38c"
+  },
+  "steps": [
+    {
+      "step": "old_140487b_installed",
+      "ok": true,
+      "hasBanner": false,
+      "caches": [],
+      "detail": "Parent artifact has no PwaUpdateBanner (expected hasBanner=false)."
+    },
+    {
+      "step": "retained_old_page_after_new_deploy",
+      "hasBanner": false,
+      "ok": true,
+      "honest": "First-migration retained 140487b page cannot instantly offer the new React banner; old JS never included it."
+    },
+    {
+      "step": "natural_reopen_new_artifact",
+      "bannerVisible": true,
+      "waiting": true,
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true,
+      "detail": "Natural reopen loads new index (network-first). Banner expected when a waiting worker exists; if no waiting worker (edge), continuity still required."
+    },
+    {
+      "step": "not_now_defers_activation",
+      "stillWaiting": true,
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "cachesAfter": [
+        "hamster-pwa-shell-e483734d4a9f"
+      ],
+      "ok": true
+    },
+    {
+      "step": "offline_launch",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_bundle_only_triggers_banner",
+      "bannerText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "swHasNewId": true,
+      "ok": true
+    }
+  ],
+  "pass": true
+}

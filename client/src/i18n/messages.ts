@@ -80,6 +80,12 @@ const copy = {
     failureReason: 'Failure reason',
     openMenu: 'Menu',
     closeMenu: 'Close menu',
+    updateAvailable: 'A new version of Hamster is available.',
+    reloadToUpdate: 'Reload',
+    dismissUpdate: 'Not now',
+    updateRetryNeeded:
+      'Update did not finish. Your current page was kept. You can try Reload again.',
+    updateRetryAction: 'Try Reload again',
   },
   zh: {
     brand: 'Hamster',
@@ -119,6 +125,11 @@ const copy = {
     failureReason: '失败原因',
     openMenu: '菜单',
     closeMenu: '关闭菜单',
+    updateAvailable: 'Hamster 有新版本可用。',
+    reloadToUpdate: '重新加载',
+    dismissUpdate: '暂不',
+    updateRetryNeeded: '更新未完成。当前页面已保留，可以再次尝试重新加载。',
+    updateRetryAction: '再次重新加载',
   },
 } as const
 

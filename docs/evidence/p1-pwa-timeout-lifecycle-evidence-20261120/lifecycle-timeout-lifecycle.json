@@ -1,0 +1,197 @@
+{
+  "at": "2026-11-20T15:48:05.386Z",
+  "origin": "http://127.0.0.1:37111",
+  "note": "VM isolated-origin only. Not box/phone. Not a pass claim for 1233857.",
+  "oldAssets": {
+    "names": [
+      "index-B2Y4gJPm.js",
+      "index-DLVVUNbP.css"
+    ],
+    "mainJs": "/assets/index-B2Y4gJPm.js",
+    "mainJsFile": "index-B2Y4gJPm.js",
+    "css": [
+      "/assets/index-DLVVUNbP.css"
+    ]
+  },
+  "newAssets": {
+    "names": [
+      "index-DhZ4vJki.css",
+      "index-vKApQpwO.js"
+    ],
+    "mainJs": "/assets/index-vKApQpwO.js",
+    "mainJsFile": "index-vKApQpwO.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "new2Assets": {
+    "names": [
+      "index-B9b-iJZc.js",
+      "index-DhZ4vJki.css"
+    ],
+    "mainJs": "/assets/index-B9b-iJZc.js",
+    "mainJsFile": "index-B9b-iJZc.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "deployIds": {
+    "id1": "9a7cc2432fb2",
+    "id2": "fbc29cf57bc8"
+  },
+  "steps": [
+    {
+      "step": "missing_old_asset_is_404_not_html",
+      "status": 404,
+      "oldAsset": "/assets/index-B2Y4gJPm.js",
+      "ok": true
+    },
+    {
+      "step": "old_140487b_installed",
+      "caches": [
+        "hamster-pwa-shell-v1"
+      ],
+      "hasOldJs": true,
+      "hasBanner": false,
+      "fetch": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyLen": 539960,
+        "bodyPrefix": "var e=Object.create,t=Object.defineProperty,n=Object.getOwnP",
+        "mimeOk": true
+      },
+      "ok": true
+    },
+    {
+      "step": "retained_old_page_fetches_old_js_mime_before_reload",
+      "retainedFetch": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyPrefix": "var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=",
+        "bodyLen": 539960,
+        "hasBanner": false,
+        "waiting": true
+      },
+      "boundary": "reg.update() was used as a test accelerator on the retained page; not claimed as automatic discovery timing.",
+      "honest": "Retained 140487b document cannot show the new React banner. Old JS must still fetch with JS MIME/body.",
+      "ok": true
+    },
+    {
+      "step": "natural_online_reopen_acquires_new_js_and_banner",
+      "bannerVisibleNatural": true,
+      "naturalMs": 684,
+      "newJsProbe": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "len": 544106,
+        "hasReact": true
+      },
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "newMainJs": "/assets/index-vKApQpwO.js",
+      "boundary": "Banner wait uses production register/check (up to ~60s poll). No manual reg.update() on this step.",
+      "ok": true
+    },
+    {
+      "step": "not_now_defers_activation_old_js_fetch_ok",
+      "stillWaiting": true,
+      "oldJsAfterNotNow": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyLen": 539960,
+        "notHtml": true
+      },
+      "ok": true
+    },
+    {
+      "step": "banner_en_sample_isolated_vm",
+      "bannerBack": true,
+      "ok": true
+    },
+    {
+      "step": "banner_zh_sample_isolated_vm",
+      "zhText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "ok": true
+    },
+    {
+      "step": "continuity_before_explicit_reload",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "old_js_fetch_mime_immediately_before_reload_click",
+      "oldJsBeforeReload": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "notHtml": true,
+        "bodyLen": 539960
+      },
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "cachesAfter": [
+        "hamster-pwa-shell-9a7cc2432fb2"
+      ],
+      "ok": true
+    },
+    {
+      "step": "offline_launch_react_html_and_bundle",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "offlineProbe": {
+        "hasHtml": true,
+        "hasRoot": true,
+        "scripts": [
+          "/assets/index-vKApQpwO.js"
+        ],
+        "bundle": {
+          "path": "/assets/index-vKApQpwO.js",
+          "status": 200,
+          "contentType": "text/javascript; charset=utf-8",
+          "bodyLen": 544106,
+          "looksJs": true
+        }
+      },
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_real_built_assets",
+      "bannerText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "new2MainJs": "/assets/index-B9b-iJZc.js",
+      "new2JsStatus": 200,
+      "swId": "fbc29cf57bc8",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

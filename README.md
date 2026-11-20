@@ -56,15 +56,15 @@ HAMSTER_MODEL_ID=claude-sonnet-5
 HAMSTER_MODEL_PROVIDER=anthropic   # or "openai" or "deepseek"
 
 # DeepSeek (official OpenAI-compatible endpoint https://api.deepseek.com):
-HAMSTER_MODEL_ID=deepseek-flash
+HAMSTER_MODEL_ID=<native DeepSeek model id>
 HAMSTER_MODEL_PROVIDER=deepseek
 DEEPSEEK_API_KEY=sk-...              # DeepSeek key; passed only to the agent service
 ```
 
-- `HAMSTER_MODEL_ID` must be a **native** provider model id (e.g. `claude-sonnet-5`, the eve helper default for Anthropic; `deepseek-flash` for DeepSeek). Provider-qualified strings such as `anthropic/claude-…` are not part of this path.
+- `HAMSTER_MODEL_ID` must be a **native** provider model id (e.g. `claude-sonnet-5`, the eve helper default for Anthropic; a native DeepSeek id when using DeepSeek). Provider-qualified strings such as `anthropic/claude-…` are not part of this path.
 - With `HAMSTER_MODEL_PROVIDER` unset, the agent selects the provider from the first matching key: `ANTHROPIC_API_KEY` → Anthropic, `OPENAI_API_KEY` → OpenAI, `DEEPSEEK_API_KEY` → DeepSeek.
 - The agent passes the resolved model instance through eve's official direct callers (`import { anthropic } from "eve/models/anthropic"` / `import { openai } from "eve/models/openai"`), or through the Hamster DeepSeek factory (`import { createDeepSeekModel } from "../lib/deepseek.js"` in the agent), which calls the official DeepSeek OpenAI-compatible endpoint (`https://api.deepseek.com`, Chat Completions) with the DeepSeek key only and labels the provider as `deepseek`. Neither path goes through the Vercel AI Gateway.
-- DeepSeek: default recommended model id is `deepseek-flash` (DeepSeek-V4.1-Flash-1017). The ids `deepseek-chat` and `deepseek-reasoner` were retired after 2026-07-24 and must not be used. DeepSeek keys must **never** be written into `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
+- DeepSeek model id availability is unverified in this repository's documentation. A recent live-model check used configured id `deepseek-chat` and that round succeeded; `deepseek-flash` was not tested in that check. Do not treat prior or third-party docs as proof that any id is retired, current, or officially recommended. DeepSeek keys must **never** be written into `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
 - If `HAMSTER_MODEL_ID` is set but no provider can be determined, the agent fails with a clear error instead of falling back to the Gateway.
 - Leave `HAMSTER_MODEL_ID` empty for the fixture path.
 

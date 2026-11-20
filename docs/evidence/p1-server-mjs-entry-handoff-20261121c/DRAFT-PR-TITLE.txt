@@ -1,0 +1,1 @@
+P1: default client production entry uses server.mjs

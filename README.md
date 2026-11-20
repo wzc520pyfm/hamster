@@ -27,7 +27,9 @@ cp .env.example .env   # optional overrides; defaults are placeholders only
 sudo docker compose up --build
 ```
 
-Then open `http://localhost:3000` (API at `http://localhost:8080` via `VITE_API_BASE_URL`).
+Then open `http://localhost:3000`. Recommended: leave `VITE_API_BASE_URL` empty so the
+browser uses same-origin `/api` via `server.mjs` (`API_UPSTREAM=http://api:8080`).
+Set `VITE_API_BASE_URL` only for an explicit cross-origin bake override.
 
 Default placeholder env values (overridable; not real secrets):
 

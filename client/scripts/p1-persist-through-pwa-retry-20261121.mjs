@@ -23,6 +23,10 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { chromium } from 'playwright'
+import {
+  assertLiveEphemeralOrThrow,
+  requireControllerChangeObserved,
+} from './lib/harnessGuards.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const REPO = path.join(__dirname, '../..')
@@ -122,23 +126,6 @@ function stopEphemeralPg(env) {
     encoding: 'utf8',
     env: { ...process.env, ...env },
   })
-}
-
-async function assertLiveEphemeral(pool, env) {
-  const dirRes = await pool.query('SHOW data_directory')
-  const liveDataDirectory = dirRes.rows[0].data_directory
-  const markerRes = await pool.query('SELECT token, data_directory FROM hamster_ephemeral_marker LIMIT 1')
-  const marker = markerRes.rows[0]
-  const ok =
-    liveDataDirectory === env.HAMSTER_P2_PG_DATADIR &&
-    marker?.token === env.HAMSTER_P2_PG_INSTANCE_TOKEN &&
-    String(liveDataDirectory).includes('hamster-p2-ephemeral-pg-')
-  return {
-    verified: ok,
-    liveDataDirectory,
-    markerToken: marker?.token || null,
-    expectedDataDir: env.HAMSTER_P2_PG_DATADIR,
-  }
 }
 
 function startFixtureEve() {
@@ -380,7 +367,8 @@ async function main() {
     const apiRequire = createRequire(path.join(REPO, 'api/package.json'))
     const { Pool } = apiRequire('pg')
     pool = new Pool({ connectionString: pg.env.DATABASE_URL })
-    const live = await assertLiveEphemeral(pool, pg.env)
+    // Throws on mismatch BEFORE any business SQL.
+    const live = await assertLiveEphemeralOrThrow(pool, pg.env)
     pushStep(evidence, {
       step: 'ephemeral_pg_live_data_directory_and_marker_match',
       live,
@@ -454,7 +442,7 @@ async function main() {
       { timeout: 20000 },
     )
 
-    const live2 = await assertLiveEphemeral(pool, pg.env)
+    const live2 = await assertLiveEphemeralOrThrow(pool, pg.env)
     const dbMsgs = await pool.query(
       `SELECT id, conversation_id, role, content FROM messages WHERE content = $1 ORDER BY id ASC`,
       [UNIQUE_TEXT],
@@ -493,6 +481,7 @@ async function main() {
 
     // Deploy B via DIST_DIR swap (server.mjs reads filesystem; SW update picks new sw.js)
     syncServe(DIST_B)
+    // Explicit reg.update() — not automatic SW discovery alone.
     await page.evaluate(async () => {
       const reg = await navigator.serviceWorker.getRegistration()
       await reg?.update()
@@ -600,6 +589,8 @@ async function main() {
       { timeout: 15000 },
     )
     const injectionLate = await page.evaluate(() => window.__HAMSTER_EVIDENCE_INJECTION || null)
+    // Hard require — no soft-pass `(observed === true || true)`.
+    requireControllerChangeObserved(injectionLate)
     pushStep(evidence, {
       step: 'activation_observed_unaided_no_harness_skip_waiting',
       injectionLate,
@@ -607,7 +598,7 @@ async function main() {
       ok:
         injectionLate?.harnessExtraSkipWaiting === false &&
         mainNavs.length === navBaseline &&
-        (injectionLate?.actualControllerChangeObserved === true || true),
+        injectionLate?.actualControllerChangeObserved === true,
     })
 
     // Explicit user Retry — one new nav; SAME unique message must restore from API/DB
@@ -639,7 +630,7 @@ async function main() {
       }
     }, UNIQUE_TEXT)
 
-    const live3 = await assertLiveEphemeral(pool, pg.env)
+    const live3 = await assertLiveEphemeralOrThrow(pool, pg.env)
     const dbAfter = await pool.query(
       `SELECT id, conversation_id, role, content FROM messages WHERE content = $1`,
       [UNIQUE_TEXT],

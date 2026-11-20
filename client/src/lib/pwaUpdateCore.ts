@@ -14,11 +14,27 @@ export type ControllerChangeWaitResult =
 
 export type ApplyPwaUpdateResult = {
   preserved: Record<string, string>
-  /** True only when controller switched and reload was invoked. */
+  /** True only when controller switched (or already controlling) and reload was invoked. */
   reloaded: boolean
   /** Why apply stopped without reloading (timeout / no SW / no waiting worker). */
   failure?: 'timeout' | 'no_sw' | 'no_waiting'
   waitReason?: string
+}
+
+type SwLike = { scriptURL?: string } | null | undefined
+
+/** True when the active controller is already the registration's active worker (late activation). */
+export function isAlreadyControllingExpected(opts: {
+  controller?: SwLike
+  active?: SwLike
+}): boolean {
+  const controller = opts.controller
+  const active = opts.active
+  if (!controller || !active) return false
+  if (controller === active) return true
+  const a = typeof controller.scriptURL === 'string' ? controller.scriptURL : ''
+  const b = typeof active.scriptURL === 'string' ? active.scriptURL : ''
+  return Boolean(a && b && a === b)
 }
 
 export function shouldOfferUpdateReload(state: {
@@ -95,19 +111,47 @@ export function waitForControllerChange(
 /**
  * SKIP_WAITING, await controller switch, then reload ONLY on success.
  * Timeout preserves the current page (no reload) so the UI can offer Retry.
+ *
+ * Late-activation recovery: after timeout the waiting worker may already have
+ * activated (waiting gone). Retry must recognize the expected active controller
+ * and reload — without reinserting a waiting worker or forcing a blind reload.
  */
 export async function applyPwaUpdate(opts: {
-  registration?: { waiting?: { postMessage: (msg: unknown) => void } | null } | null
+  registration?: {
+    waiting?: { postMessage: (msg: unknown) => void } | null
+    active?: SwLike
+  } | null
   reload?: () => void
   storage?: Storage
   whenControllerChanges?: () => Promise<ControllerChangeWaitResult | { ok: boolean; reason?: string }>
   controllerChangeTimeoutMs?: number
+  /** Injected for tests; defaults to navigator.serviceWorker.controller. */
+  getController?: () => SwLike
 } = {}): Promise<ApplyPwaUpdateResult> {
   const storage = opts.storage ?? globalThis.localStorage
   const before = snapshotContinuityStorage(storage)
   const waiting = opts.registration?.waiting
+  const reload =
+    opts.reload ??
+    (() => {
+      if (typeof globalThis.location?.reload === 'function') globalThis.location.reload()
+    })
 
   if (!waiting || typeof waiting.postMessage !== 'function') {
+    const controller =
+      opts.getController?.() ??
+      (typeof navigator !== 'undefined' ? navigator.serviceWorker?.controller : null)
+    const active = opts.registration?.active
+    if (isAlreadyControllingExpected({ controller, active })) {
+      const after = snapshotContinuityStorage(storage)
+      assertContinuity(before, after)
+      reload()
+      return {
+        preserved: before,
+        reloaded: true,
+        waitReason: 'already_controlling',
+      }
+    }
     const after = snapshotContinuityStorage(storage)
     assertContinuity(before, after)
     return { preserved: before, reloaded: false, failure: 'no_waiting' }
@@ -138,11 +182,6 @@ export async function applyPwaUpdate(opts: {
     }
   }
 
-  const reload =
-    opts.reload ??
-    (() => {
-      if (typeof globalThis.location?.reload === 'function') globalThis.location.reload()
-    })
   reload()
   return {
     preserved: before,

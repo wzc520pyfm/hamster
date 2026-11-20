@@ -26,6 +26,7 @@ import {
   applyPwaUpdate,
   waitForControllerChange,
   isCacheableShellAssetResponse,
+  isAlreadyControllingExpected,
 } from './pwaUpdateCore.ts'
 import { cacheFirstPutDecision } from './pwaSwCache.mjs'
 
@@ -209,11 +210,12 @@ test('after timeout, late controllerchange then retry can reload; no forced relo
   assert.equal(storage.getItem('hamster.locale'), 'zh')
 })
 
-test('no_waiting retry recovers without forced reload', async () => {
+test('no_waiting with no controller stays no_waiting (real empty waiting state)', async () => {
   const storage = memoryStorage({ 'hamster.conversation.demo': 'x' })
   let reloads = 0
   const none = await applyPwaUpdate({
-    registration: { waiting: null },
+    registration: { waiting: null, active: null },
+    getController: () => null,
     storage,
     reload: () => {
       reloads += 1
@@ -225,6 +227,7 @@ test('no_waiting retry recovers without forced reload', async () => {
 
   const again = await applyPwaUpdate({
     registration: {},
+    getController: () => null,
     storage,
     reload: () => {
       reloads += 1
@@ -233,6 +236,64 @@ test('no_waiting retry recovers without forced reload', async () => {
   assert.equal(again.failure, 'no_waiting')
   assert.equal(reloads, 0)
   assert.equal(storage.getItem('hamster.conversation.demo'), 'x')
+})
+
+test('timeout→late activation→waiting gone→retry recovers via already_controlling (no reinsert waiting)', async () => {
+  const storage = memoryStorage({
+    'hamster.locale': 'zh',
+    'hamster.conversation.demo': '{"id":"c"}',
+  })
+  let reloads = 0
+  const timedOut = await applyPwaUpdate({
+    registration: {
+      waiting: { postMessage() {} },
+      active: { scriptURL: 'https://h.test/sw.js?old' },
+    },
+    getController: () => ({ scriptURL: 'https://h.test/sw.js?old' }),
+    storage,
+    whenControllerChanges: async () => ({ ok: false, reason: 'timeout' }),
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(timedOut.failure, 'timeout')
+  assert.equal(reloads, 0)
+
+  // Real post-activation state: waiting cleared; controller already the new active.
+  const newWorker = { scriptURL: 'https://h.test/sw.js?new' }
+  assert.equal(
+    isAlreadyControllingExpected({ controller: newWorker, active: newWorker }),
+    true,
+  )
+  const retry = await applyPwaUpdate({
+    registration: {
+      waiting: null, // do NOT reinsert waiting — mimics real activated SW
+      active: newWorker,
+    },
+    getController: () => newWorker,
+    storage,
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(retry.reloaded, true)
+  assert.equal(retry.waitReason, 'already_controlling')
+  assert.equal(reloads, 1)
+  assert.equal(storage.getItem('hamster.locale'), 'zh')
+  assert.equal(storage.getItem('hamster.conversation.demo'), '{"id":"c"}')
+
+  // Mismatched controller must NOT reload (no blind forced reload).
+  const mismatch = await applyPwaUpdate({
+    registration: { waiting: null, active: newWorker },
+    getController: () => ({ scriptURL: 'https://h.test/sw.js?other' }),
+    storage,
+    reload: () => {
+      reloads += 1
+    },
+  })
+  assert.equal(mismatch.failure, 'no_waiting')
+  assert.equal(mismatch.reloaded, false)
+  assert.equal(reloads, 1)
 })
 
 test('i18n exposes EN/ZH update retry copy', () => {

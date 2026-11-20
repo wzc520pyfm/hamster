@@ -104,6 +104,7 @@ export async function applyHamsterPwaUpdate(
   applyInFlight = applyPwaUpdate({
     registration: registration ?? undefined,
     storage: window.localStorage,
+    getController: () => navigator.serviceWorker?.controller ?? null,
     reload: () => {
       window.location.reload()
     },

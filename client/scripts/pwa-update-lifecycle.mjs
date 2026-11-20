@@ -24,9 +24,9 @@ const OLD_DIST = path.join(WORK, 'dist-140487b')
 const NEW_DIST = path.join(WORK, 'dist-new')
 const NEW2_DIST = path.join(WORK, 'dist-new2')
 const SERVE = path.join(WORK, 'serve')
-// New evidence dir for timeout/lifecycle outputs (do not overwrite unit-only NOTES dirs).
-const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-timeout-lifecycle-evidence-20261120')
-const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120'
+// New evidence dir for this MUST-FIX pass (do not overwrite prior lifecycle evidence).
+const ARTIFACT_REPO = path.join(REPO, 'docs/evidence/p1-pwa-timeout-lifecycle-evidence-20261120b')
+const ARTIFACT_RAW = '/opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b'
 
 const CONTINUITY = {
   'hamster.locale': 'zh',
@@ -258,6 +258,8 @@ async function main() {
     // Warm + verify real old main JS (status/MIME/body). Old SW may not cache-first every
     // asset URL; we still require a real JS response, then pin it into the shell cache so
     // later retained-page checks exercise Cache Storage + MIME (not network alone).
+    // DISCLOSE: cache.put below is fixture preparation for retained-page MIME checks —
+    // not proof that the old SW naturally cache-firsted the asset.
     const oldState = await page.evaluate(async (jsPath) => {
       const res = await fetch(jsPath)
       const ct = res.headers.get('content-type') || ''
@@ -269,6 +271,7 @@ async function main() {
         !body.trimStart().startsWith('<!')
       if (mimeOk) {
         const cache = await caches.open('hamster-pwa-shell-v1')
+        // FIXTURE PREP ONLY (disclosed): seed Cache Storage for later offline/MIME probes.
         await cache.put(
           jsPath,
           new Response(body, { headers: { 'content-type': ct || 'text/javascript' } }),
@@ -295,6 +298,9 @@ async function main() {
     }, oldAssets.mainJs)
     pushStep(evidence, {
       step: 'old_140487b_installed',
+      cachePutIsFixturePrep: true,
+      disclose:
+        'cache.put is fixture preparation for retained MIME/offline checks — not natural SW cache-first proof',
       caches: oldState.names,
       hasOldJs: oldState.hasOldJs,
       hasBanner: oldState.hasBanner,
@@ -429,19 +435,19 @@ async function main() {
         .waitForSelector('[data-testid="pwa-update-banner"]', { timeout: 65000 })
         .then(() => true)
         .catch(() => false)
+      const enPng = 'banner-en-react-visible-20261120b.png'
+      const zhPng = 'banner-zh-react-visible-20261120b.png'
       if (bannerBack) {
         await uiPage.screenshot({
-          path: path.join(ARTIFACT_REPO, 'banner-en.png'),
+          path: path.join(ARTIFACT_REPO, enPng),
           fullPage: false,
         })
-        fs.copyFileSync(
-          path.join(ARTIFACT_REPO, 'banner-en.png'),
-          path.join(ARTIFACT_RAW, 'banner-en.png'),
-        )
+        fs.copyFileSync(path.join(ARTIFACT_REPO, enPng), path.join(ARTIFACT_RAW, enPng))
       }
       pushStep(evidence, {
         step: 'banner_en_sample_isolated_vm',
         bannerBack,
+        png: enPng,
         ok: bannerBack === true,
       })
 
@@ -456,21 +462,20 @@ async function main() {
       if (zhBanner) {
         const zhText = await uiPage.locator('[data-testid="pwa-update-banner"]').innerText()
         await uiPage.screenshot({
-          path: path.join(ARTIFACT_REPO, 'banner-zh.png'),
+          path: path.join(ARTIFACT_REPO, zhPng),
           fullPage: false,
         })
-        fs.copyFileSync(
-          path.join(ARTIFACT_REPO, 'banner-zh.png'),
-          path.join(ARTIFACT_RAW, 'banner-zh.png'),
-        )
+        fs.copyFileSync(path.join(ARTIFACT_REPO, zhPng), path.join(ARTIFACT_RAW, zhPng))
         pushStep(evidence, {
           step: 'banner_zh_sample_isolated_vm',
           zhText: zhText.slice(0, 160),
+          png: zhPng,
           ok: zhText.includes('新') || zhText.includes('重新加载') || zhText.includes('可用'),
         })
       } else {
         pushStep(evidence, {
           step: 'banner_zh_sample_isolated_vm',
+          png: zhPng,
           ok: false,
           note: 'ZH banner not visible after locale switch/reload',
         })
@@ -523,8 +528,23 @@ async function main() {
 
     await context.setOffline(true)
     await uiPage.reload({ waitUntil: 'domcontentloaded' })
+    // Wait for React module execution + render (not fetch-only).
+    let offlineRootMounted = false
+    try {
+      await uiPage.waitForFunction(
+        () => {
+          const root = document.getElementById('root')
+          return Boolean(root && root.childElementCount > 0)
+        },
+        { timeout: 20000 },
+      )
+      offlineRootMounted = true
+    } catch {
+      offlineRootMounted = false
+    }
     const offlineProbe = await uiPage.evaluate(async () => {
       const html = document.documentElement?.outerHTML?.slice(0, 240) || ''
+      const root = document.getElementById('root')
       const scripts = [...document.querySelectorAll('script[src]')].map((s) => s.getAttribute('src'))
       let bundle = null
       const main = scripts.find((s) => s && s.includes('/assets/') && s.endsWith('.js'))
@@ -546,17 +566,24 @@ async function main() {
       }
       return {
         hasHtml: /<html|<!DOCTYPE/i.test(html),
-        hasRoot: html.includes('root') || !!document.getElementById('root'),
+        hasRoot: !!root,
+        rootChildCount: root ? root.childElementCount : 0,
+        rootTextSample: root?.innerText?.slice(0, 160) || '',
+        reactRendered: Boolean(root && root.childElementCount > 0),
         scripts,
         bundle,
       }
     })
     pushStep(evidence, {
-      step: 'offline_launch_react_html_and_bundle',
+      step: 'offline_react_module_execution_and_render',
       continuity: await readContinuity(uiPage),
+      offlineRootMounted,
       offlineProbe,
+      note: 'Asserts #root children after offline reload (React executed), not fetch-only',
       ok:
         continuityOk(await readContinuity(uiPage)) &&
+        offlineRootMounted === true &&
+        offlineProbe.reactRendered === true &&
         offlineProbe.hasHtml === true &&
         offlineProbe.bundle != null &&
         offlineProbe.bundle.status === 200 &&
@@ -606,18 +633,23 @@ async function main() {
     server.close()
   }
 
-  const jsonPath = path.join(ARTIFACT_REPO, 'lifecycle-timeout-lifecycle.json')
+  fs.mkdirSync(ARTIFACT_REPO, { recursive: true })
+  fs.mkdirSync(ARTIFACT_RAW, { recursive: true })
+  const jsonPath = path.join(ARTIFACT_REPO, 'lifecycle-timeout-lifecycle-20261120b.json')
   const mdPath = path.join(ARTIFACT_REPO, 'NOTES.md')
   fs.writeFileSync(jsonPath, JSON.stringify(evidence, null, 2))
-  fs.writeFileSync(path.join(ARTIFACT_RAW, 'lifecycle-timeout-lifecycle.json'), JSON.stringify(evidence, null, 2))
-  const md = `# P1 PWA timeout lifecycle evidence (2026-11-20)
+  fs.writeFileSync(path.join(ARTIFACT_RAW, 'lifecycle-timeout-lifecycle-20261120b.json'), JSON.stringify(evidence, null, 2))
+  const md = `# P1 PWA timeout lifecycle evidence (2026-11-20b)
 
 VM only. Not box/phone. Does not claim 1233857 passed.
-New directory (does not overwrite unit-only \`p1-pwa-timeout-fix-20261120\`).
+New directory (does not overwrite \`p1-pwa-timeout-lifecycle-evidence-20261120\`).
 
-Timeout / late-controller / no_waiting recovery: unit TAP in sibling commit
-(\`pwaUpdate.test.mjs\`) — this lifecycle run captures MIME / Not now / offline /
-EN-ZH banner screenshots from real Chromium against real builds.
+Timeout / late-controller / no_waiting→already_controlling recovery: unit TAP
+(\`pwaUpdate.test.mjs\`) — this lifecycle run captures MIME / Not now / offline
+**React module execution+render** / EN-ZH banner screenshots from real Chromium.
+
+**Disclose:** \`cache.put\` in old-install step is fixture preparation for retained
+MIME/offline probes — not natural SW cache-first proof.
 
 ## Result
 
@@ -631,6 +663,7 @@ ${evidence.error ? `## Error\\n\\n\`\`\`\\n${evidence.error}\\n\`\`\`\\n` : ''}
 
 - \`reg.update()\` used only as labeled test accelerator on retained page — not automatic discovery proof.
 - Legacy old-client migration limitations remain explicit where banner timing is soft.
+- Offline step asserts \`#root\` children (React executed), not fetch-only.
 `
   fs.writeFileSync(mdPath, md)
   fs.writeFileSync(path.join(ARTIFACT_RAW, 'NOTES.md'), md)

@@ -1,0 +1,6 @@
+f4ceb25777cf1919e58f396863e97d543aceb331ce6e53f6055043d7e9174cd3  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/banner-en-react-visible-20261120b.png
+b20e2e05caac439a3652496c864d60c409812ddc5f30e35d483197b1e0825311  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/banner-zh-react-visible-20261120b.png
+9e84a79a8d23c9513f689a9354f1d3d3877d95da514bd86ad6e06c3e794e389f  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/lifecycle-timeout-lifecycle-20261120b.json
+aafeb4f1fe379e7bf1d3a1ae660d762a0889cbcbf597273f7f9fb6db7783bece  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/SHA256SUMS.txt
+d59235f3ca163d08066cdb9e2182e817e01c6f398be47a78b80cb6c3c24b5e2f  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/unit-pwaUpdate-already-controlling.txt
+ba82d86d40b88520a0ad2743aba592d4cf33f07f11c5c83e387176b40066ea56  /opt/cursor/artifacts/p1-pwa-timeout-lifecycle-evidence-20261120b/NOTES.md

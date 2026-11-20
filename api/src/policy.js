@@ -2,9 +2,12 @@
 
 const crypto = require('crypto');
 const { query } = require('./db');
+const { isKnownTarget, ISOLATED_DESKTOP_TARGET_ID } = require('./isolation');
 
-const HIGH_RISK_ACTIONS = new Set(['publish_dashboard']);
+const HIGH_RISK_ACTIONS = new Set(['publish_dashboard', 'create_isolated_desktop']);
 const LOW_RISK_ACTIONS = new Set(['record_task_event', 'save_dashboard_page', 'acknowledge_control']);
+
+const CREATE_ISOLATED_DESKTOP_ACTION = 'create_isolated_desktop';
 
 function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -17,6 +20,27 @@ function paramsHash(params) {
   return crypto.createHash('sha256').update(canonicalJson(params ?? {})).digest('hex');
 }
 
+function isHighRiskAction(action) {
+  return HIGH_RISK_ACTIONS.has(action);
+}
+
+/**
+ * High-risk tickets are bound to the execution target the action runs on.
+ * A control-plane approval must not authorize an isolated-desktop action and vice
+ * versa: the ticket's targetId must equal the task's assigned execution target.
+ * Returns { allowed, reason } — fail closed on anything ambiguous.
+ */
+function highRiskTargetAllows(task, params) {
+  const taskTargetId = task?.target_id ?? null;
+  if (!taskTargetId) return { allowed: false, reason: 'task_target_missing' };
+  if (!isKnownTarget(taskTargetId)) return { allowed: false, reason: 'unknown_target' };
+  const ticketTargetId = params?.targetId ?? taskTargetId;
+  if (ticketTargetId !== taskTargetId) {
+    return { allowed: false, reason: 'target_mismatch' };
+  }
+  return { allowed: true };
+}
+
 async function getTask(taskId) {
   const { rows } = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
   return rows[0] ?? null;
@@ -26,7 +50,8 @@ async function getTask(taskId) {
 // - Unknown actions are denied.
 // - Any action for a cancelled task is denied (forbids later new tool calls).
 // - High-risk actions require an approved, unexpired, unused ticket whose params_hash
-//   matches exactly; approval is consumed exactly once.
+//   matches exactly; approval is consumed exactly once. The ticket must also be bound
+//   to the task's execution target (control plane vs isolated desktop).
 async function authorize(taskId, action, params) {
   if (!HIGH_RISK_ACTIONS.has(action) && !LOW_RISK_ACTIONS.has(action)) {
     return { allow: false, reason: `unknown_action:${action}` };
@@ -52,7 +77,16 @@ async function authorize(taskId, action, params) {
     return { allow: true };
   }
 
-  // publish_dashboard: consume one matching approved ticket.
+  // High-risk: the ticket must be bound to this task's execution target (control plane vs
+  // isolated desktop). Cross-target approvals are denied before any ticket consumption.
+  if (HIGH_RISK_ACTIONS.has(action)) {
+    const targetDecision = highRiskTargetAllows(task, params);
+    if (!targetDecision.allowed) {
+      return { allow: false, reason: targetDecision.reason };
+    }
+  }
+
+  // publish_dashboard / create_isolated_desktop: consume one matching approved ticket.
   const hash = paramsHash(params);
   const { rows } = await query(
     `UPDATE approvals
@@ -74,4 +108,13 @@ async function authorize(taskId, action, params) {
   return { allow: true, ticketId: rows[0].id };
 }
 
-module.exports = { authorize, paramsHash, canonicalJson, HIGH_RISK_ACTIONS };
+module.exports = {
+  authorize,
+  paramsHash,
+  canonicalJson,
+  HIGH_RISK_ACTIONS,
+  LOW_RISK_ACTIONS,
+  CREATE_ISOLATED_DESKTOP_ACTION,
+  isHighRiskAction,
+  highRiskTargetAllows,
+};

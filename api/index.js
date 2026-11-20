@@ -11,11 +11,13 @@ const policy = require('./src/policy');
 const eve = require('./src/eve');
 const events = require('./src/events');
 const assets = require('./src/assets');
+const isolation = require('./src/isolation');
 
 const PORT = Number(process.env.PORT ?? 8080);
 const INTERNAL_SECRET = process.env.HAMSTER_INTERNAL_SECRET ?? 'dev-internal-secret';
 const APPROVAL_TTL_SECONDS = Number(process.env.HAMSTER_APPROVAL_TTL_SECONDS ?? '600');
 const CORS_ORIGIN = process.env.HAMSTER_CORS_ORIGIN ?? 'http://localhost:3000';
+const BROKER = isolation.createDockerIsolationBroker();
 
 const app = express();
 app.use((req, res, next) => {
@@ -57,6 +59,9 @@ function taskJson(t) {
     assetId: t.asset_id,
     title: t.title,
     status: t.status,
+    // Stable execution target (control plane vs isolated desktop). Isolated desktop is a
+    // same-host container id, never the host machine itself.
+    targetId: t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID,
     controlSeq: t.control_seq,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
@@ -137,15 +142,30 @@ app.get('/api/conversations/:id/timeline', asyncRoute(async (req, res) => {
 // Create a task and wake the worker in one step. Idempotency is not required by
 // the P0 UI (single click) but a client retry could double-create; acceptable
 // for P0, documented.
-async function createTask(conversationId, title, goal) {
+async function createTask(conversationId, title, goal, targetId) {
   const taskId = `task_${crypto.randomUUID()}`;
+  const target = targetId ?? isolation.CONTROL_PLANE_TARGET_ID;
   const ins = await query(
-    'INSERT INTO tasks (id, conversation_id, title, status) VALUES ($1, $2, $3, $4) RETURNING *',
-    [taskId, conversationId, title, 'queued']
+    'INSERT INTO tasks (id, conversation_id, title, status, target_id, goal) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+    [taskId, conversationId, title, 'queued', target, goal]
   );
   try {
+    if (target === isolation.ISOLATED_DESKTOP_TARGET_ID) {
+      // Isolated desktop assignment: creating/starting the desktop is high-risk and is
+      // gated by an approval ticket bound to this task's targetId. The task stays Queued
+      // (assigned, not started); nothing dispatches to a not-ready container.
+      const approvalId = `appr_${taskId}_create_${crypto.randomUUID()}`;
+      const hash = policy.paramsHash({ taskId, targetId: target });
+      await query(
+        `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
+        [approvalId, taskId, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId, targetId: target }), hash, String(APPROVAL_TTL_SECONDS)]
+      );
+      await events.audit('task_created_isolated_pending_start', { taskId, approvalId, targetId: target });
+      return { task: await taskDetail(taskId) };
+    }
     const { sessionId } = await eve.createSession(
-      `[hamster-worker taskId=${taskId} title=${title}] ${goal}`
+      `[hamster-worker taskId=${taskId} title=${title} targetId=${target}] ${goal}`
     );
     await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
       sessionId,
@@ -195,7 +215,11 @@ app.post('/api/conversations/:id/messages', asyncRoute(async (req, res) => {
   if (startMatch) {
     const goal = startMatch[1].trim();
     const title = goal.length > 80 ? `${goal.slice(0, 77)}…` : goal;
-    const { task, spawnError } = await createTask(conversationId, title, goal);
+    const targetId = isolation.isKnownTarget(req.body?.targetId) ? req.body.targetId : isolation.CONTROL_PLANE_TARGET_ID;
+    if (req.body?.targetId != null && !isolation.isKnownTarget(req.body.targetId)) {
+      return res.status(400).json({ error: 'unknown_target' });
+    }
+    const { task, spawnError } = await createTask(conversationId, title, goal, targetId);
     const reply = spawnError
       ? `Task ${task.taskId} created but the worker could not be reached: ${spawnError}`
       : `Task ${task.taskId} started. Ask progress, steer, or cancel from its card.`;
@@ -400,6 +424,94 @@ async function cancelTask(req, res, taskId) {
 
 app.post('/api/tasks/:id/cancel', asyncRoute((req, res) => cancelTask(req, res, req.params.id)));
 
+// ---------------------------------------------------------------- execution targets
+
+// GET /api/targets — execution-target surface (control plane default + isolated desktop).
+// The isolated desktop is optional, never the host; unavailable => selector marks it so,
+// without blocking the control plane.
+app.get('/api/targets', asyncRoute(async (req, res) => {
+  const probe = await isolation.probeIsolatedDesktop({ broker: BROKER });
+  const targets = [
+    {
+      targetId: isolation.CONTROL_PLANE_TARGET_ID,
+      label: 'Control plane',
+      isDefault: true,
+      available: true,
+      state: 'ok',
+      description: null,
+    },
+    {
+      targetId: isolation.ISOLATED_DESKTOP_TARGET_ID,
+      label: 'Isolated desktop',
+      isDefault: false,
+      available: probe.available,
+      state: probe.available ? 'ok' : 'unavailable',
+      description:
+        'An isolated container on the same host as this Hamster. The bot cannot use the host itself.',
+      unavailableReason: probe.available ? null : probe.reason ?? 'unavailable',
+    },
+  ];
+  res.json({ targets });
+}));
+
+async function taskRowById(taskId) {
+  const { rows } = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+  return rows[0] ?? null;
+}
+
+// Retry: only for tasks that have not started. Isolated-desktop tasks re-issue the
+// high-risk create/start ticket (task stays Queued); control-plane tasks re-wake the worker.
+app.post('/api/tasks/:id/retry', asyncRoute(async (req, res) => {
+  const task = await taskRowById(req.params.id);
+  if (!task) return res.status(404).json({ error: 'task not found' });
+  if (task.status !== 'queued') {
+    return res.status(409).json({ error: 'task_already_started' });
+  }
+  if (task.target_id === isolation.ISOLATED_DESKTOP_TARGET_ID) {
+    const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
+    const hash = policy.paramsHash({ taskId: task.id, targetId: task.target_id });
+    await query(
+      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
+      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId: task.target_id }), hash, String(APPROVAL_TTL_SECONDS)]
+    );
+    await events.audit('task_retry_requested', { taskId: task.id, approvalId, targetId: task.target_id });
+    return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
+  }
+  await startTaskSession(task.id);
+  return res.json({ taskId: task.id, status: 'running', started: true });
+}));
+
+// Switch execution target for a task that has not started (Queued). Changing run location
+// is NOT Steer and NOT Cancel; running tasks have no migrate-to-control-plane path.
+app.post('/api/tasks/:id/target', asyncRoute(async (req, res) => {
+  const task = await taskRowById(req.params.id);
+  if (!task) return res.status(404).json({ error: 'task not found' });
+  if (task.status !== 'queued') {
+    return res.status(409).json({ error: 'task_already_started' });
+  }
+  const targetId = req.body?.targetId;
+  if (!isolation.isKnownTarget(targetId)) {
+    return res.status(400).json({ error: 'unknown_target' });
+  }
+  await query('UPDATE tasks SET target_id = $1, updated_at = now() WHERE id = $2', [targetId, task.id]);
+  if (targetId === isolation.ISOLATED_DESKTOP_TARGET_ID) {
+    // Re-issue the high-risk create/start ticket; task stays Queued (not started).
+    const approvalId = `appr_${task.id}_create_${crypto.randomUUID()}`;
+    const hash = policy.paramsHash({ taskId: task.id, targetId });
+    await query(
+      `INSERT INTO approvals (id, task_id, action, params, params_hash, status, expires_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', now() + ($6 || ' seconds')::interval)`,
+      [approvalId, task.id, isolation.CREATE_ISOLATED_DESKTOP_ACTION, JSON.stringify({ taskId: task.id, targetId }), hash, String(APPROVAL_TTL_SECONDS)]
+    );
+    await events.audit('task_target_switched_to_isolated', { taskId: task.id, approvalId, targetId });
+    return res.json({ taskId: task.id, status: 'queued', approvalId, state: 'pending_approval' });
+  }
+  // Switched to the control plane explicitly; only an unstarted task may do this.
+  await startTaskSession(task.id);
+  return res.json({ taskId: task.id, status: 'running', started: true, switchedTo: 'control_plane' });
+}));
+
 // ------------------------------------------------------------------- assets
 
 app.get('/api/assets', asyncRoute(async (req, res) => {
@@ -570,12 +682,53 @@ async function decideApproval(req, res, outcome) {
     [outcome, req.body?.decidedBy ?? 'local-user', note, ticket.id]
   );
   await events.audit(`approval_${outcome}`, { approvalId: ticket.id, taskId: ticket.task_id }, req.body?.decidedBy ?? 'local-user');
+  if (outcome === 'approved' && ticket.action === isolation.CREATE_ISOLATED_DESKTOP_ACTION) {
+    // High-risk create/start of the isolated desktop: only reachable after an approved,
+    // unexpired, target-bound ticket. Fail closed when the broker cannot start the desktop;
+    // the task stays Queued and must not look like it started on the desktop.
+    const ticketTargetId = ticket.target_id ?? taskRow.target_id ?? isolation.CONTROL_PLANE_TARGET_ID;
+    if (policy.paramsHash({ taskId: ticket.task_id, targetId: ticketTargetId }) !== ticket.params_hash) {
+      // Ticket is not bound to this task/target pair — fail closed, never start.
+      return res.status(409).json({ error: 'no_valid_ticket', status: 'invalid' });
+    }
+    const start = await isolation.startIsolatedDesktop({
+      targetId: ticketTargetId,
+      broker: BROKER,
+    });
+    if (!start.ok) {
+      // Fail closed: task stays Queued; never look like it started on the desktop.
+      return res.status(502).json({
+        error: 'isolation_start_failed',
+        taskId: ticket.task_id,
+        targetId: ticketTargetId,
+        reason: start.reason,
+      });
+    }
+    await startTaskSession(ticket.task_id);
+    return res.json({ id: ticket.id, status: outcome, note, taskId: ticket.task_id });
+  }
   await query(
     `UPDATE tasks SET status = 'running', updated_at = now()
       WHERE id = $1 AND status = 'waiting_for_approval'`,
     [ticket.task_id]
   );
   return res.json({ id: ticket.id, status: outcome, note, taskId: ticket.task_id });
+}
+
+async function startTaskSession(taskId) {
+  const task = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
+  const t = task.rows[0];
+  if (!t || t.eve_session_id) return t?.eve_session_id ?? null;
+  const { sessionId } = await eve.createSession(
+    `[hamster-worker taskId=${t.id} title=${t.title} targetId=${t.target_id ?? isolation.CONTROL_PLANE_TARGET_ID}] ${t.goal ?? ''}`
+  );
+  await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
+    sessionId,
+    'running',
+    taskId,
+  ]);
+  events.attach(`task:${taskId}`, sessionId);
+  return sessionId;
 }
 
 async function expireTicket(ticket) {

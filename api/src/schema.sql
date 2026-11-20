@@ -1,5 +1,10 @@
 -- Hamster P0 control-plane schema. Idempotent; applied on API boot.
 
+-- Idempotent migrations for deployments created before the isolated-desktop slice.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS goal TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_id TEXT NOT NULL DEFAULT 'target_control_plane';
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS target_id TEXT;
+
 CREATE TABLE IF NOT EXISTS conversations (
   id            TEXT PRIMARY KEY,
   title         TEXT NOT NULL,
@@ -24,6 +29,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   title              TEXT NOT NULL,
   status             TEXT NOT NULL DEFAULT 'queued'
                      CHECK (status IN ('queued','running','waiting_for_approval','succeeded','failed','cancelled')),
+  target_id          TEXT NOT NULL DEFAULT 'target_control_plane', -- execution target (stable targetId); isolated desktop is NOT the host
+  goal               TEXT,
   eve_session_id     TEXT,                            -- runtimeSessionId, distinct from taskId
   asset_id           TEXT,                            -- set when the worker saves a dashboard page
   control_seq        INTEGER NOT NULL DEFAULT 0,      -- monotonically increasing per task
@@ -96,6 +103,7 @@ CREATE TABLE IF NOT EXISTS approvals (
   params_hash     TEXT NOT NULL,                    -- sha256 of canonical JSON of params
   status          TEXT NOT NULL DEFAULT 'pending'
                   CHECK (status IN ('pending','approved','denied','expired','invalidated')),
+  target_id       TEXT,                               -- execution target this ticket is bound to (task's targetId at issue time)
   eve_interaction_id TEXT UNIQUE,                   -- linked eve approval interaction, if any
   eve_session_id  TEXT,
   requested_at    TIMESTAMPTZ NOT NULL DEFAULT now(),

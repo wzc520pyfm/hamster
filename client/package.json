@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "start:prod": "node server.mjs",
-    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs"
+    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs",
+    "test:pwa": "node --experimental-strip-types --test src/lib/pwaUpdate.test.mjs",
+    "test:pwa-lifecycle": "node scripts/pwa-update-lifecycle.mjs"
   },
   "dependencies": {
     "@openuidev/react-lang": "^1.1.1",

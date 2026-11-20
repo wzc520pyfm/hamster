@@ -50,6 +50,19 @@ export function cacheControlForPath(urlPathOrFilePath) {
   return 'public, max-age=3600'
 }
 
+/**
+ * Missing paths that must NOT SPA-fallback to index.html (would 200 HTML for a
+ * JS URL and poison cache-first SW storage).
+ * Exported for unit tests.
+ */
+export function shouldSpaFallback(pathname) {
+  const p = String(pathname || '')
+  if (p.startsWith('/assets/')) return false
+  if (p === '/sw.js' || p.endsWith('/sw.js')) return false
+  if (/\.(js|mjs|css|map|webmanifest|png|svg|ico|woff2|json)$/i.test(p)) return false
+  return true
+}
+
 function isProxyPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/')
 }
@@ -105,14 +118,22 @@ function safeJoinDist(urlPath) {
   return safeJoinDistWithRoot(DIST, urlPath)
 }
 
-async function serveStatic(req, res) {
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
-  let filePath = safeJoinDist(url.pathname)
+/**
+ * Resolve a static response for tests (and serveStatic).
+ * @param {string} distRoot
+ * @param {string} pathname
+ * @returns {{ status: number, contentType: string, cacheControl: string, filePath: string | null }}
+ */
+export function resolveStaticResponse(distRoot, pathname) {
+  let filePath = safeJoinDistWithRoot(distRoot, pathname)
   if (!filePath) {
-    res.writeHead(400).end('bad path')
-    return
+    return {
+      status: 400,
+      contentType: 'text/plain; charset=utf-8',
+      cacheControl: 'no-cache',
+      filePath: null,
+    }
   }
-
   let stat
   try {
     stat = fs.statSync(filePath)
@@ -120,21 +141,51 @@ async function serveStatic(req, res) {
     stat = null
   }
   if (!stat || !stat.isFile()) {
-    // SPA fallback
-    filePath = path.join(DIST, 'index.html')
+    if (!shouldSpaFallback(pathname)) {
+      return {
+        status: 404,
+        contentType: 'text/plain; charset=utf-8',
+        cacheControl: 'no-cache',
+        filePath: null,
+      }
+    }
+    filePath = path.join(path.resolve(distRoot), 'index.html')
     try {
       stat = fs.statSync(filePath)
     } catch {
-      res.writeHead(404).end('not found')
-      return
+      return {
+        status: 404,
+        contentType: 'text/plain; charset=utf-8',
+        cacheControl: 'no-cache',
+        filePath: null,
+      }
     }
+  }
+  return {
+    status: 200,
+    contentType: contentType(filePath),
+    cacheControl: cacheControlForPath(filePath),
+    filePath,
+  }
+}
+
+async function serveStatic(req, res) {
+  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+  const resolved = resolveStaticResponse(DIST, url.pathname)
+  if (resolved.status !== 200 || !resolved.filePath) {
+    res.writeHead(resolved.status, {
+      'content-type': resolved.contentType,
+      'cache-control': resolved.cacheControl,
+    })
+    res.end(resolved.status === 400 ? 'bad path' : 'not found')
+    return
   }
 
   res.writeHead(200, {
-    'content-type': contentType(filePath),
-    'cache-control': cacheControlForPath(filePath),
+    'content-type': resolved.contentType,
+    'cache-control': resolved.cacheControl,
   })
-  await pipeline(fs.createReadStream(filePath), res)
+  await pipeline(fs.createReadStream(resolved.filePath), res)
 }
 
 export function createClientServer() {

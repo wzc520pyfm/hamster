@@ -1,163 +1,84 @@
 /**
  * Register the Hamster PWA service worker and surface a user-controlled update.
- * Does not force reload and does not clear conversation / locale storage.
- * Reload awaits controllerchange after SKIP_WAITING.
- *
- * Pure helpers mirrored in pwaUpdate.pure.mjs for node --test fixtures — keep in sync.
+ * Pure helpers live in pwaUpdateCore.ts (single production source; node tests import it).
  */
 
-/** Registration options so HTTP cache cannot hide a new sw.js for an hour. */
-export const SW_REGISTER_OPTIONS = Object.freeze({ updateViaCache: 'none' as const })
+import {
+  SW_REGISTER_OPTIONS,
+  shouldOfferUpdateReload,
+  applyPwaUpdate,
+} from './pwaUpdateCore'
 
-/**
- * After a new worker takes control, should we offer a user-controlled reload?
- * First control (no prior controller) must not interrupt a fresh launch.
- */
-export function shouldOfferUpdateReload(state: {
-  hadController: boolean
-  controllerChanged: boolean
-}): boolean {
-  return Boolean(state.hadController && state.controllerChanged)
-}
-
-function snapshotContinuityStorage(storage: Storage): Record<string, string> {
-  const out: Record<string, string> = {}
-  if (!storage || typeof storage.length !== 'number') return out
-  for (let i = 0; i < storage.length; i++) {
-    const key = storage.key(i)
-    if (!key) continue
-    if (
-      key.startsWith('hamster.') ||
-      key.startsWith('hamster-') ||
-      key.includes('conversation') ||
-      key.includes('locale')
-    ) {
-      out[key] = storage.getItem(key) ?? ''
-    }
-  }
-  return out
-}
-
-function whenControllerChanges(timeoutMs = 4000): Promise<string> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.serviceWorker) {
-      resolve('no_sw')
-      return
-    }
-    let done = false
-    const finish = (why: string) => {
-      if (done) return
-      done = true
-      navigator.serviceWorker.removeEventListener('controllerchange', onChange)
-      resolve(why)
-    }
-    const onChange = () => finish('controllerchange')
-    navigator.serviceWorker.addEventListener('controllerchange', onChange)
-    window.setTimeout(() => finish('timeout'), timeoutMs)
-  })
-}
-
-/**
- * Apply update: SKIP_WAITING, await controller switch, then reload. Must not wipe storage.
- */
-export async function applyPwaUpdate(opts: {
-  registration?: { waiting?: { postMessage: (msg: unknown) => void } | null } | null
-  reload?: () => void
-  storage?: Storage
-  whenControllerChanges?: () => Promise<unknown>
-  controllerChangeTimeoutMs?: number
-} = {}): Promise<{ preserved: Record<string, string> }> {
-  const storage = opts.storage ?? window.localStorage
-  const before = snapshotContinuityStorage(storage)
-  const waiting = opts.registration?.waiting
-  const waitFn =
-    opts.whenControllerChanges ??
-    (() => whenControllerChanges(opts.controllerChangeTimeoutMs ?? 4000))
-
-  if (waiting && typeof waiting.postMessage === 'function') {
-    const waitPromise = waitFn()
-    waiting.postMessage({ type: 'SKIP_WAITING' })
-    await waitPromise
-  }
-
-  const after = snapshotContinuityStorage(storage)
-  for (const [k, v] of Object.entries(before)) {
-    if (after[k] !== v) {
-      throw new Error(`applyPwaUpdate must not alter continuity key ${k}`)
-    }
-  }
-  const reload =
-    opts.reload ??
-    (() => {
-      window.location.reload()
-    })
-  reload()
-  return { preserved: before }
-}
+export { SW_REGISTER_OPTIONS, shouldOfferUpdateReload, applyPwaUpdate }
 
 export type PwaUpdateListener = (state: { updateReady: boolean }) => void
 
-/**
- * Register `/sw.js` with updateViaCache: 'none', poll for updates, and notify when
- * a waiting worker is ready so the UI can offer Reload (activation stays deferred).
- */
-export function registerHamsterServiceWorker(onChange?: PwaUpdateListener): () => void {
-  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
-    return () => {}
-  }
+const listeners = new Set<PwaUpdateListener>()
+let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
+let updateTimer: number | null = null
+let registrationRef: ServiceWorkerRegistration | null = null
 
-  let cancelled = false
-  let registration: ServiceWorkerRegistration | null = null
+function emitAll(updateReady: boolean) {
+  for (const listener of listeners) listener({ updateReady })
+}
 
-  const emit = (updateReady: boolean) => {
-    if (!cancelled) onChange?.({ updateReady })
-  }
+function offerIfWaiting(reg: ServiceWorkerRegistration) {
+  if (reg.waiting && navigator.serviceWorker.controller) emitAll(true)
+}
 
-  void navigator.serviceWorker
+function ensureRegistrationStarted(): void {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+  if (registrationPromise) return
+
+  registrationPromise = navigator.serviceWorker
     .register('/sw.js', SW_REGISTER_OPTIONS)
     .then((reg) => {
-      if (cancelled) return
-      registration = reg
-      const offerIfWaiting = () => {
-        if (reg.waiting && navigator.serviceWorker.controller) emit(true)
-      }
+      registrationRef = reg
       const check = () => {
         void reg
           .update()
           .catch(() => {})
           .finally(() => {
-            offerIfWaiting()
+            offerIfWaiting(reg)
           })
-        // Also surface an already-waiting worker (e.g. after temporary "Not now").
-        offerIfWaiting()
+        offerIfWaiting(reg)
       }
       check()
-      const timer = window.setInterval(check, 60_000)
-      ;(reg as ServiceWorkerRegistration & { __hamsterUpdateTimer?: number }).__hamsterUpdateTimer =
-        timer
-
-      offerIfWaiting()
+      updateTimer = window.setInterval(check, 60_000)
+      // Re-offer after temporary "Not now" when the user returns focus (same document).
+      window.addEventListener('focus', check)
+      document.addEventListener('visibilitychange', check)
+      offerIfWaiting(reg)
       reg.addEventListener('updatefound', () => {
         const installing = reg.installing
         if (!installing) return
         installing.addEventListener('statechange', () => {
           if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-            emit(true)
+            emitAll(true)
           }
         })
       })
+      return reg
     })
     .catch((err) => {
       console.warn('Hamster service worker registration failed', err)
+      registrationPromise = null
+      return null
     })
+}
 
+/**
+ * Ensure `/sw.js` is registered (PROD callers). Safe to call from ConnectGate and Shell.
+ * Optional onChange receives update-ready signals for the Reload banner.
+ */
+export function registerHamsterServiceWorker(onChange?: PwaUpdateListener): () => void {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return () => {}
+  }
+  if (onChange) listeners.add(onChange)
+  ensureRegistrationStarted()
   return () => {
-    cancelled = true
-    const timed = registration as
-      | (ServiceWorkerRegistration & { __hamsterUpdateTimer?: number })
-      | null
-    const timer = timed?.__hamsterUpdateTimer
-    if (timer) window.clearInterval(timer)
+    if (onChange) listeners.delete(onChange)
   }
 }
 
@@ -177,8 +98,20 @@ export async function applyHamsterPwaUpdate(
 export async function getHamsterServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null
   try {
+    if (registrationRef) return registrationRef
     return (await navigator.serviceWorker.getRegistration()) ?? null
   } catch {
     return null
+  }
+}
+
+/** Test helper: reset singleton registration state. */
+export function __resetHamsterServiceWorkerRegistrationForTests(): void {
+  listeners.clear()
+  registrationPromise = null
+  registrationRef = null
+  if (updateTimer != null) {
+    window.clearInterval(updateTimer)
+    updateTimer = null
   }
 }

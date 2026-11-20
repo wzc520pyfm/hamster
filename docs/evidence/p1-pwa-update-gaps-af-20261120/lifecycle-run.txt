@@ -1,0 +1,55 @@
+{
+  "pass": true,
+  "jsonPath": "/agent/repos/hamster/docs/evidence/p1-pwa-update-gaps-af-20261120/lifecycle-gaps-af.json",
+  "steps": [
+    {
+      "step": "missing_old_asset_is_404_not_html",
+      "ok": true
+    },
+    {
+      "step": "old_140487b_installed",
+      "ok": true
+    },
+    {
+      "step": "retained_old_assets_safe_before_reload",
+      "ok": true
+    },
+    {
+      "step": "natural_reopen_new_artifact",
+      "ok": true
+    },
+    {
+      "step": "not_now_defers_activation_keeps_old_cache",
+      "ok": true
+    },
+    {
+      "step": "continuity_before_explicit_reload",
+      "ok": true
+    },
+    {
+      "step": "old_assets_still_present_immediately_before_reload_click",
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "ok": true
+    },
+    {
+      "step": "offline_launch",
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_real_built_assets",
+      "ok": true
+    }
+  ],
+  "assets": {
+    "old": "/assets/index-B2Y4gJPm.js",
+    "new": "/assets/index-B2_i4K10.js",
+    "new2": "/assets/index-DHyggqPd.js"
+  }
+}

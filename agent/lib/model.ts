@@ -6,13 +6,14 @@
 //
 // Contract (P0 hard constraint: no Vercel hosted service / AI Gateway):
 // - HAMSTER_MODEL_ID empty -> fixture plan (eve mockModel / scriptedRespond).
-// - HAMSTER_MODEL_ID set -> live plan via eve's official direct provider helpers
-//   (`anthropic()` / `openai()` from `eve/models/*`), which bypass the AI Gateway.
-//   The model id must be a NATIVE provider model id (e.g. "claude-sonnet-5").
+// - HAMSTER_MODEL_ID set -> live plan via the direct vendor provider helpers
+//   (`anthropic()` / `openai()` from `eve/models/*`, or the DeepSeek factory in
+//   `agent/lib/deepseek.ts`), which bypass the AI Gateway. The model id must be a
+//   NATIVE provider model id (e.g. "claude-sonnet-5", "deepseek-flash").
 // - No provider determinable -> explicit error. Never silently fall back to the
 //   Vercel AI Gateway.
 
-export type HamsterLiveProvider = "anthropic" | "openai";
+export type HamsterLiveProvider = "anthropic" | "openai" | "deepseek";
 
 export type HamsterModelPlan =
   | { readonly kind: "fixture" }
@@ -24,6 +25,7 @@ export interface HamsterModelEnvInput {
   readonly provider?: string | null;
   readonly anthropicApiKey?: string | null;
   readonly openaiApiKey?: string | null;
+  readonly deepseekApiKey?: string | null;
 }
 
 const FIXTURE_PLAN: HamsterModelPlan = { kind: "fixture" };
@@ -33,13 +35,17 @@ function trimmed(value: string | null | undefined): string {
 }
 
 /**
- * Strips a legacy `anthropic/` or `openai/` prefix from a model id and returns
- * the native id. Returns null when nothing usable remains or when a further "/"
- * remains in the value (provider-qualified ids beyond the single prefix are invalid
- * native ids for this path).
+ * Strips a legacy `anthropic/`, `openai/`, or `deepseek/` prefix from a model id and
+ * returns the native id. Returns null when nothing usable remains or when a further "/"
+ * remains in the value (provider-qualified ids beyond the single prefix are invalid native ids
+ * for this path).
  */
 function stripProviderPrefix(modelId: string): string | null {
-  const native = modelId.replace(/^anthropic\//i, "").replace(/^openai\//i, "").trim();
+  const native = modelId
+    .replace(/^anthropic\//i, "")
+    .replace(/^openai\//i, "")
+    .replace(/^deepseek\//i, "")
+    .trim();
   if (!native || native.includes("/")) return null;
   return native;
 }
@@ -47,13 +53,15 @@ function stripProviderPrefix(modelId: string): string | null {
 function resolveLiveProvider(env: HamsterModelEnvInput): HamsterLiveProvider | null {
   const requested = trimmed(env.provider).toLowerCase();
   if (requested) {
-    if (requested !== "anthropic" && requested !== "openai") return null;
+    if (requested !== "anthropic" && requested !== "openai" && requested !== "deepseek") return null;
     return requested;
   }
   const anthropicKey = trimmed(env.anthropicApiKey);
   const openaiKey = trimmed(env.openaiApiKey);
+  const deepseekKey = trimmed(env.deepseekApiKey);
   if (anthropicKey) return "anthropic";
   if (openaiKey) return "openai";
+  if (deepseekKey) return "deepseek";
   return null;
 }
 
@@ -77,14 +85,14 @@ export function planHamsterModel(env: HamsterModelEnvInput): HamsterModelPlan {
     if (requested) {
       return {
         kind: "error",
-        message: `HAMSTER_MODEL_PROVIDER "${requested}" is not supported. Set HAMSTER_MODEL_PROVIDER to "anthropic" or "openai".`,
+        message: `HAMSTER_MODEL_PROVIDER "${requested}" is not supported. Set HAMSTER_MODEL_PROVIDER to "anthropic", "openai", or "deepseek".`,
       };
     }
     return {
       kind: "error",
       message:
         `HAMSTER_MODEL_ID "${modelId}" is set but no model provider could be determined. ` +
-        "Set HAMSTER_MODEL_PROVIDER=anthropic or HAMSTER_MODEL_PROVIDER=openai, or configure the matching provider key. " +
+        'Set HAMSTER_MODEL_PROVIDER to "anthropic", "openai", or "deepseek", or configure the matching provider key (ANTHROPIC_API_KEY, OPENAI_API_KEY, or DEEPSEEK_API_KEY). ' +
         "Refusing to fall back to the Vercel AI Gateway.",
     };
   }

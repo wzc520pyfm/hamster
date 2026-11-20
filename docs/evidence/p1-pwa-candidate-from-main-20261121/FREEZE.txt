@@ -1,0 +1,13 @@
+candidateBranch=cursor/p1-pwa-candidate-182b
+productionCommitFullSha=9da1cfe75287a247c2cf549d5edc4ab52ef64371
+baseBranch=main
+baseFullSha=ed8f1c6d901e75485f9d7296728df7ad35345740
+sourceTipReviewed=1623bfaefc3374fa9faac520149819ce240657ab
+featDevBranchUntouched=feat/p1-deepseek-live-model-20261120
+featDevTipAtPrep=1dba605b1ed0a5ffc2dd54a437bca1349e2e9081
+authorCommitter=wzc520pyfm <wzc520pyfm@users.noreply.github.com>
+noPrCreated=true
+noMergeDeployReleasePaid=true
+ciLimitation=no .github/workflows in repo; local unit/build only
+verification=npm run test:pwa 18 pass; server.safejoin 1 pass; npm run build stamp 4d2b1d330e4f
+candidateHeadFullSha=d6a7fa4d4829f2443c59c91f2dd4e3dc5901a0f7

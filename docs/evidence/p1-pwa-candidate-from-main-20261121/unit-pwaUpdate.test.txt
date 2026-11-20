@@ -1,0 +1,30 @@
+
+> hamster-client@0.0.0 test:pwa
+> node --experimental-strip-types --test src/lib/pwaUpdate.test.mjs
+
+✔ production module sync: pwaUpdate.ts imports pwaUpdateCore.ts (no duplicate pure.mjs) (0.918669ms)
+✔ main.tsx registers SW in PROD (ConnectGate path without Shell) (0.154664ms)
+✔ register options bypass HTTP cache for sw.js updates (0.071358ms)
+✔ shell cache uses deploy-id suffix (not fixed v1) (0.095769ms)
+✔ activate deletes prior shell caches but keeps current (0.562401ms)
+✔ waiting worker does not run activate cleanup (retained assets stay until Reload) (0.13181ms)
+✔ stampHamsterPwaBuild: successive deploy ids change sw bytes (0.518887ms)
+✔ applyPwaUpdate awaits controllerchange before reload; preserves continuity (0.435382ms)
+✔ production waitForControllerChange timeout: NEVER reload (MUST FIX) (9.356838ms)
+✔ after timeout, late controllerchange then retry can reload; no forced reload on timeout (9.011269ms)
+✔ no_waiting with no controller stays no_waiting (real empty waiting state) (0.382952ms)
+✔ timeout→late activation→waiting gone→retry recovers via already_controlling (no reinsert waiting) (0.198409ms)
+✔ i18n exposes EN/ZH update retry copy (0.164027ms)
+✔ sw.js: no install skipWaiting; SKIP_WAITING message; rejects HTML asset cache (0.182682ms)
+✔ isCacheableShellAssetResponse rejects HTML poison for /assets/*.js (0.171224ms)
+✔ cacheFirstPutDecision does not store SPA-fallback HTML under JS URL (0.172754ms)
+✔ server: missing /assets/*.js is 404, not SPA HTML; shouldSpaFallback (14.871969ms)
+✔ shouldOfferUpdateReload + snapshotContinuityStorage (0.111894ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 133.300529

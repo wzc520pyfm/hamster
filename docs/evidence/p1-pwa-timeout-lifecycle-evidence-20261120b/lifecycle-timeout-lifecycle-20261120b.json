@@ -1,0 +1,206 @@
+{
+  "at": "2026-11-20T16:06:00.730Z",
+  "origin": "http://127.0.0.1:43463",
+  "note": "VM isolated-origin only. Not box/phone. Not a pass claim for 1233857.",
+  "oldAssets": {
+    "names": [
+      "index-B2Y4gJPm.js",
+      "index-DLVVUNbP.css"
+    ],
+    "mainJs": "/assets/index-B2Y4gJPm.js",
+    "mainJsFile": "index-B2Y4gJPm.js",
+    "css": [
+      "/assets/index-DLVVUNbP.css"
+    ]
+  },
+  "newAssets": {
+    "names": [
+      "index-DGzXwgNP.js",
+      "index-DhZ4vJki.css"
+    ],
+    "mainJs": "/assets/index-DGzXwgNP.js",
+    "mainJsFile": "index-DGzXwgNP.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "new2Assets": {
+    "names": [
+      "index-DhZ4vJki.css",
+      "index-DktMTU4K.js"
+    ],
+    "mainJs": "/assets/index-DktMTU4K.js",
+    "mainJsFile": "index-DktMTU4K.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "deployIds": {
+    "id1": "85a98029d75f",
+    "id2": "17e9c4090a52"
+  },
+  "steps": [
+    {
+      "step": "missing_old_asset_is_404_not_html",
+      "status": 404,
+      "oldAsset": "/assets/index-B2Y4gJPm.js",
+      "ok": true
+    },
+    {
+      "step": "old_140487b_installed",
+      "cachePutIsFixturePrep": true,
+      "disclose": "cache.put is fixture preparation for retained MIME/offline checks — not natural SW cache-first proof",
+      "caches": [
+        "hamster-pwa-shell-v1"
+      ],
+      "hasOldJs": true,
+      "hasBanner": false,
+      "fetch": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyLen": 539960,
+        "bodyPrefix": "var e=Object.create,t=Object.defineProperty,n=Object.getOwnP",
+        "mimeOk": true
+      },
+      "ok": true
+    },
+    {
+      "step": "retained_old_page_fetches_old_js_mime_before_reload",
+      "retainedFetch": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyPrefix": "var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=",
+        "bodyLen": 539960,
+        "hasBanner": false,
+        "waiting": true
+      },
+      "boundary": "reg.update() was used as a test accelerator on the retained page; not claimed as automatic discovery timing.",
+      "honest": "Retained 140487b document cannot show the new React banner. Old JS must still fetch with JS MIME/body.",
+      "ok": true
+    },
+    {
+      "step": "natural_online_reopen_acquires_new_js_and_banner",
+      "bannerVisibleNatural": true,
+      "naturalMs": 702,
+      "newJsProbe": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "len": 544604,
+        "hasReact": true
+      },
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "newMainJs": "/assets/index-DGzXwgNP.js",
+      "boundary": "Banner wait uses production register/check (up to ~60s poll). No manual reg.update() on this step.",
+      "ok": true
+    },
+    {
+      "step": "not_now_defers_activation_old_js_fetch_ok",
+      "stillWaiting": true,
+      "oldJsAfterNotNow": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "bodyLen": 539960,
+        "notHtml": true
+      },
+      "ok": true
+    },
+    {
+      "step": "banner_en_sample_isolated_vm",
+      "bannerBack": true,
+      "png": "banner-en-react-visible-20261120b.png",
+      "ok": true
+    },
+    {
+      "step": "banner_zh_sample_isolated_vm",
+      "zhText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "png": "banner-zh-react-visible-20261120b.png",
+      "ok": true
+    },
+    {
+      "step": "continuity_before_explicit_reload",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "old_js_fetch_mime_immediately_before_reload_click",
+      "oldJsBeforeReload": {
+        "status": 200,
+        "contentType": "text/javascript; charset=utf-8",
+        "notHtml": true,
+        "bodyLen": 539960
+      },
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "cachesAfter": [
+        "hamster-pwa-shell-85a98029d75f"
+      ],
+      "ok": true
+    },
+    {
+      "step": "offline_react_module_execution_and_render",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "offlineRootMounted": true,
+      "offlineProbe": {
+        "hasHtml": true,
+        "hasRoot": true,
+        "rootChildCount": 1,
+        "rootTextSample": "Hamster\nPrivate preview\n对话\n主对话\nDashboard 库\n待审批\nEN\n中文\n主对话\n\n还没有消息。可以派发任务或直接提问。\n\n执行位置\n控制面 · 默认\n隔离桌面\n发送",
+        "reactRendered": true,
+        "scripts": [
+          "/assets/index-DGzXwgNP.js"
+        ],
+        "bundle": {
+          "path": "/assets/index-DGzXwgNP.js",
+          "status": 200,
+          "contentType": "text/javascript; charset=utf-8",
+          "bodyLen": 544604,
+          "looksJs": true
+        }
+      },
+      "note": "Asserts #root children after offline reload (React executed), not fetch-only",
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_real_built_assets",
+      "bannerText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "new2MainJs": "/assets/index-DktMTU4K.js",
+      "new2JsStatus": 200,
+      "swId": "17e9c4090a52",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

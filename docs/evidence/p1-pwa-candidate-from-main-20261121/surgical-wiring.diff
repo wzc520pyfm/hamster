@@ -1,0 +1,140 @@
+diff --git a/client/index.html b/client/index.html
+index 2e88b39..54d8e51 100644
+--- a/client/index.html
++++ b/client/index.html
+@@ -2,9 +2,13 @@
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
++    <meta name="theme-color" content="#2c4f73" />
++    <meta name="description" content="Hamster — provisional private-preview self-hosted task client." />
+     <title>Hamster</title>
+     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
++    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
++    <link rel="manifest" href="/manifest.webmanifest" />
+     <link rel="preconnect" href="https://fonts.googleapis.com" />
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+     <link
+diff --git a/client/package.json b/client/package.json
+index 2265ac9..9e4b20f 100644
+--- a/client/package.json
++++ b/client/package.json
+@@ -8,7 +8,10 @@
+     "build": "tsc -b && vite build",
+     "lint": "oxlint",
+     "preview": "vite preview",
+-    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs"
++    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs",
++    "start:prod": "node server.mjs",
++    "test:pwa": "node --experimental-strip-types --test src/lib/pwaUpdate.test.mjs",
++    "test:pwa-lifecycle": "node scripts/pwa-update-lifecycle.mjs"
+   },
+   "dependencies": {
+     "@openuidev/react-lang": "^1.1.1",
+diff --git a/client/src/components/Shell.tsx b/client/src/components/Shell.tsx
+index 69cb720..7e0d74c 100644
+--- a/client/src/components/Shell.tsx
++++ b/client/src/components/Shell.tsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useId, useState } from 'react'
+ import { NavLink, Outlet, useLocation } from 'react-router-dom'
++import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
+ import { useLocale } from '@/i18n/LocaleContext'
+ import { cn } from '@/lib/utils'
+ 
+@@ -190,7 +191,11 @@ export function Shell({
+       ) : null}
+ 
+       <main className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 md:px-0 md:py-0">
+-        <Outlet />
++        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
++          <Outlet />
++        </div>
++        {/* In-flow update banner — user-controlled Reload; never forced. */}
++        <PwaUpdateBanner />
+       </main>
+ 
+       <style>{`
+diff --git a/client/src/i18n/messages.ts b/client/src/i18n/messages.ts
+index 7a920cf..f712926 100644
+--- a/client/src/i18n/messages.ts
++++ b/client/src/i18n/messages.ts
+@@ -80,6 +80,12 @@ const copy = {
+     failureReason: 'Failure reason',
+     openMenu: 'Menu',
+     closeMenu: 'Close menu',
++    updateAvailable: 'A new version of Hamster is available.',
++    reloadToUpdate: 'Reload',
++    dismissUpdate: 'Not now',
++    updateRetryNeeded:
++      'Update did not finish. Your current page was kept. You can try Reload again.',
++    updateRetryAction: 'Try Reload again',
+   },
+   zh: {
+     brand: 'Hamster',
+@@ -119,6 +125,11 @@ const copy = {
+     failureReason: '失败原因',
+     openMenu: '菜单',
+     closeMenu: '关闭菜单',
++    updateAvailable: 'Hamster 有新版本可用。',
++    reloadToUpdate: '重新加载',
++    dismissUpdate: '暂不',
++    updateRetryNeeded: '更新未完成。当前页面已保留，可以再次尝试重新加载。',
++    updateRetryAction: '再次重新加载',
+   },
+ } as const
+ 
+diff --git a/client/src/main.tsx b/client/src/main.tsx
+index 6f4ac9b..dfeb418 100644
+--- a/client/src/main.tsx
++++ b/client/src/main.tsx
+@@ -2,6 +2,12 @@ import { StrictMode } from 'react'
+ import { createRoot } from 'react-dom/client'
+ import App from './App.tsx'
+ import './index.css'
++import { registerHamsterServiceWorker } from './lib/pwaUpdate'
++
++// Register in PROD so install + offline shell + update detection work without a reload.
++if (import.meta.env.PROD) {
++  registerHamsterServiceWorker()
++}
+ 
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+diff --git a/client/vite.config.ts b/client/vite.config.ts
+index 5b2d530..7b6893d 100644
+--- a/client/vite.config.ts
++++ b/client/vite.config.ts
+@@ -2,12 +2,28 @@ import path from 'node:path'
+ import { fileURLToPath } from 'node:url'
+ import tailwindcss from '@tailwindcss/vite'
+ import react from '@vitejs/plugin-react'
+-import { defineConfig } from 'vite'
++import { defineConfig, type Plugin } from 'vite'
++import { stampDistServiceWorker } from './src/lib/pwaBuildStamp.mjs'
+ 
+ const rootDir = path.dirname(fileURLToPath(import.meta.url))
+ 
++/** Stamp sw.js with a deploy id derived from hashed assets so bundle-only deploys update SW. */
++function hamsterPwaBuildStampPlugin(): Plugin {
++  return {
++    name: 'hamster-pwa-build-stamp',
++    apply: 'build',
++    closeBundle() {
++      const distDir = path.resolve(rootDir, 'dist')
++      const buildId = stampDistServiceWorker(distDir)
++      if (buildId) {
++        console.log(`[hamster-pwa-build-stamp] ${buildId}`)
++      }
++    },
++  }
++}
++
+ export default defineConfig({
+-  plugins: [react(), tailwindcss()],
++  plugins: [react(), tailwindcss(), hamsterPwaBuildStampPlugin()],
+   resolve: {
+     alias: {
+       '@': path.resolve(rootDir, './src'),

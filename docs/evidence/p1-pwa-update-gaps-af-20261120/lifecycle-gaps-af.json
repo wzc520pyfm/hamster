@@ -1,0 +1,149 @@
+{
+  "at": "2026-11-20T15:17:43.718Z",
+  "origin": "http://127.0.0.1:33599",
+  "note": "VM isolated-origin only. Not box/phone. Not a pass claim for 1233857.",
+  "oldAssets": {
+    "names": [
+      "index-B2Y4gJPm.js",
+      "index-DLVVUNbP.css"
+    ],
+    "mainJs": "/assets/index-B2Y4gJPm.js",
+    "mainJsFile": "index-B2Y4gJPm.js",
+    "css": [
+      "/assets/index-DLVVUNbP.css"
+    ]
+  },
+  "newAssets": {
+    "names": [
+      "index-B2_i4K10.js",
+      "index-DhZ4vJki.css"
+    ],
+    "mainJs": "/assets/index-B2_i4K10.js",
+    "mainJsFile": "index-B2_i4K10.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "new2Assets": {
+    "names": [
+      "index-DHyggqPd.js",
+      "index-DhZ4vJki.css"
+    ],
+    "mainJs": "/assets/index-DHyggqPd.js",
+    "mainJsFile": "index-DHyggqPd.js",
+    "css": [
+      "/assets/index-DhZ4vJki.css"
+    ]
+  },
+  "deployIds": {
+    "id1": "53e11b6d581a",
+    "id2": "a642b0850179"
+  },
+  "steps": [
+    {
+      "step": "missing_old_asset_is_404_not_html",
+      "status": 404,
+      "oldAsset": "/assets/index-B2Y4gJPm.js",
+      "ok": true
+    },
+    {
+      "step": "old_140487b_installed",
+      "caches": [
+        "hamster-pwa-shell-v1"
+      ],
+      "hasOldJs": true,
+      "hasBanner": false,
+      "ok": true
+    },
+    {
+      "step": "retained_old_assets_safe_before_reload",
+      "hasOldJs": true,
+      "waiting": true,
+      "hasBanner": false,
+      "honest": "Before Reload consent, old shell cache must still hold old hashed JS; waiting SW must not wipe it. Retained 140487b page has no React banner.",
+      "ok": true
+    },
+    {
+      "step": "natural_reopen_new_artifact",
+      "bannerVisible": true,
+      "waiting": true,
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "beforeReloadCaches": {
+        "names": [
+          "hamster-pwa-shell-v1"
+        ],
+        "hasOldJs": true
+      },
+      "newMainJs": "/assets/index-B2_i4K10.js",
+      "ok": true
+    },
+    {
+      "step": "not_now_defers_activation_keeps_old_cache",
+      "stillWaiting": true,
+      "stillOld": true,
+      "ok": true
+    },
+    {
+      "step": "continuity_before_explicit_reload",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "old_assets_still_present_immediately_before_reload_click",
+      "stillOldBeforeReload": true,
+      "ok": true
+    },
+    {
+      "step": "explicit_reload_after_controllerchange",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "cachesAfter": [
+        "hamster-pwa-shell-53e11b6d581a"
+      ],
+      "ok": true
+    },
+    {
+      "step": "offline_launch",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "reconnect",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "ok": true
+    },
+    {
+      "step": "successive_deploy_real_built_assets",
+      "bannerText": "Hamster 有新版本可用。\n暂不\n重新加载",
+      "continuity": {
+        "hamster.locale": "zh",
+        "hamster.controlBase": "https://continuity.example",
+        "hamster.conversation.demo": "{\"id\":\"conv-demo\",\"n\":3}"
+      },
+      "new2MainJs": "/assets/index-DHyggqPd.js",
+      "new2JsStatus": 200,
+      "swId": "a642b0850179",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

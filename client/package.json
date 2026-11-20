@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs"
+    "smoke:locale": "node ../scripts/ui-smoke-locale.mjs",
+    "start:prod": "node server.mjs",
+    "test:pwa": "node --experimental-strip-types --test src/lib/pwaUpdate.test.mjs",
+    "test:pwa-lifecycle": "node scripts/pwa-update-lifecycle.mjs"
   },
   "dependencies": {
     "@openuidev/react-lang": "^1.1.1",

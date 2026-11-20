@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: register options bypass HTTP cache for sw.js updates
+ok 1 - register options bypass HTTP cache for sw.js updates
+  ---
+  duration_ms: 1.37882
+  type: 'test'
+  ...
+# Subtest: shell cache version left fixed v1 (regression guard is v2+)
+ok 2 - shell cache version left fixed v1 (regression guard is v2+)
+  ---
+  duration_ms: 0.162161
+  type: 'test'
+  ...
+# Subtest: activate deletes prior shell caches but keeps current
+ok 3 - activate deletes prior shell caches but keeps current
+  ---
+  duration_ms: 0.53803
+  type: 'test'
+  ...
+# Subtest: old→new fixture: old hashed assets drop; continuity keys survive; reload is user-driven
+ok 4 - old→new fixture: old hashed assets drop; continuity keys survive; reload is user-driven
+  ---
+  duration_ms: 0.354934
+  type: 'test'
+  ...
+# Subtest: integrated old→new upgrade fixture models meaningful lifecycle
+ok 5 - integrated old→new upgrade fixture models meaningful lifecycle
+  ---
+  duration_ms: 0.216162
+  type: 'test'
+  ...
+# Subtest: sw.js mirrors shell cache version and activate cleanup
+ok 6 - sw.js mirrors shell cache version and activate cleanup
+  ---
+  duration_ms: 0.260324
+  type: 'test'
+  ...
+# Subtest: server serves sw.js with no-cache (not max-age=3600)
+ok 7 - server serves sw.js with no-cache (not max-age=3600)
+  ---
+  duration_ms: 14.975714
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 64.480324

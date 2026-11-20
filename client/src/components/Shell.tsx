@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { PwaUpdateBanner } from '@/components/PwaUpdateBanner'
 import { useLocale } from '@/i18n/LocaleContext'
 import { cn } from '@/lib/utils'
 
@@ -190,7 +191,11 @@ export function Shell({
       ) : null}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 md:px-0 md:py-0">
-        <Outlet />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          <Outlet />
+        </div>
+        {/* In-flow update banner — user-controlled Reload; never forced. */}
+        <PwaUpdateBanner />
       </main>
 
       <style>{`

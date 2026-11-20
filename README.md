@@ -73,13 +73,26 @@ Shell language switch: **EN | 中文** (same layout; fixed status words from the
 
 ## Local verification without Compose
 
-Postgres + Node 24+ can run the same loop (also what the latest contract evidence used):
+Postgres + Node 24+ can run the same loop (also what the latest contract evidence used). Start the worker and the control plane, then run the contract script against the API (`API_BASE` defaults to `http://127.0.0.1:8080`; the script does not start the client):
 
 ```bash
 cd agent && npm install && npx eve build && PORT=8081 HAMSTER_API_URL=http://127.0.0.1:8080 npx eve start --host 127.0.0.1 --port 8081
 cd api && npm install && DATABASE_URL=postgres://hamster:changeme@127.0.0.1:5432/hamster EVE_API_URL=http://127.0.0.1:8081 node index.js
-cd client && npm install && VITE_API_BASE_URL=http://localhost:8080 npm run build && npm run preview -- --port 3000
 ./scripts/verify-p0.sh
+```
+
+The two client commands below are alternatives. Each serves `http://localhost:3000`. Run only one of them.
+
+**Cross-origin development preview** (`npm run preview` → `vite preview`, not `server.mjs`). The build bakes `VITE_API_BASE_URL=http://localhost:8080`, so the browser calls the API on that other origin. This path does not proxy same-origin `/api`. `client/vite.config.ts` sets preview `host` `0.0.0.0` and `port` `3000`; `--port 3000` matches that port.
+
+```bash
+cd client && npm install && VITE_API_BASE_URL=http://localhost:8080 npm run build && npm run preview -- --port 3000
+```
+
+**Production-style local verification** (`npm run start:prod` → `node server.mjs`). Build with an empty `VITE_API_BASE_URL` (same default as `client/Dockerfile` and `.env.example`) so the bundle calls same-origin `/api`. `server.mjs` proxies `/api` to `API_UPSTREAM` (default `http://127.0.0.1:8080`; Compose sets `http://api:8080`) and listens on `PORT` (default `3000`, bound to `0.0.0.0`).
+
+```bash
+cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=http://127.0.0.1:8080 PORT=3000 npm run start:prod
 ```
 
 ## Status

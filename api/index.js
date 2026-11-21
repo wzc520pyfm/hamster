@@ -12,6 +12,7 @@ const eve = require('./src/eve');
 const events = require('./src/events');
 const assets = require('./src/assets');
 const { createTaskLifecycle } = require('./src/taskLifecycle');
+const { selectProgressTarget } = require('./src/progressTarget');
 
 const taskLifecycle = createTaskLifecycle({
   query,
@@ -159,12 +160,24 @@ app.post('/api/conversations/:id/messages', asyncRoute(async (req, res) => {
 
   if (progressMatch || steerMatch || cancelMatch) {
     let task = null;
-    const explicitId = progressMatch ? null : (steerMatch?.[1] ?? cancelMatch?.[1]);
-    if (explicitId && explicitId.startsWith('task_')) {
-      const { rows } = await query('SELECT * FROM tasks WHERE id = $1', [explicitId]);
-      task = rows[0] ?? null;
+    if (progressMatch) {
+      // Progress target selection is shared production logic (api/src/progressTarget.js).
+      // Explicit task_ id must belong to this conversation; otherwise no silent fallback.
+      const selected = await selectProgressTarget({
+        conversationId,
+        text,
+        query,
+        findActiveTask,
+      });
+      task = selected.task;
     } else {
-      task = await findActiveTask(conversationId);
+      const explicitId = steerMatch?.[1] ?? cancelMatch?.[1];
+      if (explicitId && explicitId.startsWith('task_')) {
+        const { rows } = await query('SELECT * FROM tasks WHERE id = $1', [explicitId]);
+        task = rows[0] ?? null;
+      } else {
+        task = await findActiveTask(conversationId);
+      }
     }
     if (!task) {
       const reply = 'No task found in this conversation yet.';

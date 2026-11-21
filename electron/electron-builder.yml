@@ -1,0 +1,18 @@
+# Minimal private Linux x64 packaging config for the P1 Electron candidate port.
+# Trial-only: no signing, no publish targets, no auto-update wiring (out of scope).
+appId: com.hamster.p1.electron
+productName: Hamster
+artifactName: hamster-p1-electron-linux-x64
+linux:
+  target: AppImage
+  maintainer: hamster
+  category: Utility
+files:
+  - main.js
+  - preload.js
+  - gate.html
+  - hamsterOrigin.cjs
+  - sessionStore.cjs
+  - windowLoadGuard.cjs
+  - build/**
+  - package.json

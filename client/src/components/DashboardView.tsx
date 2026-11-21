@@ -4,11 +4,19 @@ import { Renderer, type OpenUIError } from '@openuidev/react-lang'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { freshnessLabel, getCopy, type Locale } from '@/i18n/messages'
-import { api, type AssetDetail, type Freshness } from '@/lib/api'
+import { api, isNetworkError, type AssetDetail, type Freshness } from '@/lib/api'
+import { controlBaseUrl } from '@/lib/hamsterEnv'
 import { formatTime } from '@/lib/utils'
 import { hamsterOpenUiLibrary, RefreshTokenContext } from '@/openui/library'
+import { resolveApiBase } from '@/lib/hamsterOrigin'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+function dashboardApiBase(): string {
+  return resolveApiBase({
+    pageOrigin: window.location.origin,
+    controlBase: controlBaseUrl(),
+    viteApiBase: (import.meta.env.VITE_API_BASE_URL as string | undefined) || '',
+  })
+}
 
 /**
  * Persistent dashboard surface (Line B).
@@ -20,9 +28,11 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.repl
 export function DashboardView({
   assetId,
   locale,
+  onNetworkError,
 }: {
   assetId: string
   locale: Locale
+  onNetworkError?: () => void
 }) {
   const t = getCopy(locale)
   const localeTag = locale === 'zh' ? 'zh-CN' : 'en-US'
@@ -54,7 +64,11 @@ export function DashboardView({
         await loadMeta()
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
+          if (isNetworkError(err)) {
+            onNetworkError?.()
+          } else {
+            setError(err instanceof Error ? err.message : String(err))
+          }
           setLoading(false)
         }
       }
@@ -70,7 +84,7 @@ export function DashboardView({
       metrics_weekly: async (args: Record<string, unknown>) => {
         void args
         const res = await fetch(
-          `${API_BASE}/api/assets/${encodeURIComponent(assetId)}/query/metrics_weekly`,
+          `${dashboardApiBase()}/api/assets/${encodeURIComponent(assetId)}/query/metrics_weekly`,
         )
         if (!res.ok) {
           const body = await res.text()
@@ -122,6 +136,11 @@ export function DashboardView({
         setError(result.error ?? 'refresh failed')
       }
     } catch (err) {
+      if (isNetworkError(err)) {
+        // Connection lost: keep last successful snapshot; shell owns the single Can't reach banner.
+        onNetworkError?.()
+        return
+      }
       setFreshness('refresh_failed')
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -146,7 +165,7 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 p-4 backdrop-blur">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div className="min-w-0">

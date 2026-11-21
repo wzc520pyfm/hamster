@@ -2,6 +2,25 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { planHamsterModel } from "./model.ts";
 
+test("offline preload: network-deny guard is installed in this test child without local harness import", () => {
+  // Intentionally does NOT import networkDeny.harness — proves npm --import preload
+  // installed the guard before this file's module graph (including model.ts) loaded.
+  const flag = (globalThis as Record<string, unknown>).__HAMSTER_NETWORK_DENY_INSTALLED__ as
+    | { installed?: boolean }
+    | undefined;
+  assert.equal(flag?.installed, true);
+  // Keys/proxies cleared by preload before launch (absence only; do not read values).
+  assert.equal(process.env.DEEPSEEK_API_KEY, undefined);
+  assert.equal(process.env.OPENAI_API_KEY, undefined);
+  assert.equal(process.env.ANTHROPIC_API_KEY, undefined);
+  assert.equal(process.env.HTTP_PROXY, undefined);
+  assert.equal(process.env.HTTPS_PROXY, undefined);
+  assert.equal(process.env.ALL_PROXY, undefined);
+  assert.equal(process.env.http_proxy, undefined);
+  assert.equal(process.env.https_proxy, undefined);
+  assert.equal(process.env.all_proxy, undefined);
+});
+
 test("empty HAMSTER_MODEL_ID resolves to the fixture plan", () => {
   const plan = planHamsterModel({ modelId: "", provider: "", anthropicApiKey: "", openaiApiKey: "" });
   assert.deepEqual(plan, { kind: "fixture" });

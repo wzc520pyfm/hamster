@@ -1,17 +1,8 @@
-import { test, before, after } from "node:test";
+import "./testSupport/networkDeny.harness.ts";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createDeepSeekModel, DEEPSEEK_OFFICIAL_BASE_URL, DEFAULT_DEEPSEEK_MODEL_ID } from "./deepseek.ts";
 
-/** Deny any accidental real provider network during offline unit tests. */
-const originalFetch = globalThis.fetch;
-before(() => {
-  globalThis.fetch = async () => {
-    throw new Error("NETWORK_DENIED: deepseek unit tests must not call providers");
-  };
-});
-after(() => {
-  globalThis.fetch = originalFetch;
-});
 
 function clearProviderEnv() {
   delete process.env.DEEPSEEK_API_KEY;

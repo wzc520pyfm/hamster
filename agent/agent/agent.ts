@@ -1,9 +1,7 @@
 import { defineAgent } from "eve";
 import { mockModel } from "eve/evals";
-import { anthropic } from "eve/models/anthropic";
-import { openai } from "eve/models/openai";
-import { createDeepSeekModel } from "../lib/deepseek.js";
-import { planHamsterModel, type HamsterLiveProvider } from "../lib/model.js";
+import { selectAgentModelFromPlan } from "../lib/liveSelection.js";
+import { planHamsterModel } from "../lib/model.js";
 
 // Hamster P0 agent.
 //
@@ -16,6 +14,8 @@ import { planHamsterModel, type HamsterLiveProvider } from "../lib/model.js";
 //   passes that model instance into defineAgent via the official direct helper for the chosen
 //   provider (`anthropic` from "eve/models/anthropic", `openai` from "eve/models/openai"),
 //   or the DeepSeek factory from "lib/deepseek.ts" for the DeepSeek vendor path.
+//   Live selection is production-shared in lib/liveSelection.ts (selectAgentModelFromPlan);
+//   the agent wires that same selector — do not fork a test-only copy.
 //   The instance goes provider-direct (no Vercel AI Gateway). HAMSTER_MODEL_ID is a NATIVE
 //   model id (e.g. "claude-sonnet-5", "deepseek-chat"); provider-qualified strings such as
 //   "anthropic/claude-…" are stripped to the native id, and documentation shows native ids only.
@@ -43,27 +43,13 @@ function fixtureSelection() {
   };
 }
 
-function liveSelection(provider: HamsterLiveProvider, modelId: string, deepseekApiKey: string | null) {
-  if (provider === "deepseek") {
-    // DeepSeek path: official OpenAI-compatible endpoint, DeepSeek key only, provider
-    // labeled "deepseek". Never routed through eve's `openai()` helper (that would mislabel
-    // the provider as openai / read OPENAI_API_KEY).
-    const model = createDeepSeekModel({ apiKey: deepseekApiKey, modelId });
-    return { model, reasoning: "low" as const };
-  }
-  const model = provider === "anthropic" ? anthropic(modelId) : openai(modelId);
-  return { model, reasoning: "low" as const };
-}
-
 function agentModelSelection() {
-  if (agentModelPlan.kind === "fixture") {
-    return fixtureSelection();
-  }
-  if (agentModelPlan.kind === "live") {
-    const deepseekApiKey = agentModelPlan.provider === "deepseek" ? process.env.DEEPSEEK_API_KEY ?? null : null;
-    return liveSelection(agentModelPlan.provider, agentModelPlan.modelId, deepseekApiKey);
-  }
-  throw new Error(agentModelPlan.message);
+  // Production wiring: same selectAgentModelFromPlan exercised by offline behavioral tests.
+  return selectAgentModelFromPlan(
+    agentModelPlan,
+    process.env.DEEPSEEK_API_KEY ?? null,
+    fixtureSelection,
+  );
 }
 
 interface ToolResultLike {

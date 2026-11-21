@@ -11,6 +11,16 @@ const policy = require('./src/policy');
 const eve = require('./src/eve');
 const events = require('./src/events');
 const assets = require('./src/assets');
+const { createTaskLifecycle } = require('./src/taskLifecycle');
+
+const taskLifecycle = createTaskLifecycle({
+  query,
+  eve,
+  audit: events.audit,
+  appendTaskEvent: events.appendTaskEvent,
+  attach: events.attach,
+});
+const { taskDetail, createTask } = taskLifecycle;
 
 const PORT = Number(process.env.PORT ?? 8080);
 const INTERNAL_SECRET = process.env.HAMSTER_INTERNAL_SECRET ?? 'dev-internal-secret';
@@ -49,40 +59,7 @@ async function defaultConversation() {
   return ins.rows[0];
 }
 
-function taskJson(t) {
-  return {
-    taskId: t.id,
-    conversationId: t.conversation_id,
-    runtimeSessionId: t.eve_session_id,
-    assetId: t.asset_id,
-    title: t.title,
-    status: t.status,
-    controlSeq: t.control_seq,
-    createdAt: t.created_at,
-    updatedAt: t.updated_at,
-    cancelRequestedAt: t.cancel_requested_at,
-  };
-}
-
-async function taskDetail(taskId) {
-  const { rows } = await query('SELECT * FROM tasks WHERE id = $1', [taskId]);
-  if (rows.length === 0) return null;
-  const t = rows[0];
-  const [evts, ctrls, apprs] = await Promise.all([
-    query('SELECT seq, kind, message, step, total, created_at FROM task_events WHERE task_id = $1 ORDER BY seq ASC', [taskId]),
-    query('SELECT control_seq, type, payload, status, created_at, applied_at FROM task_controls WHERE task_id = $1 ORDER BY control_seq ASC', [taskId]),
-    query('SELECT id, action, params, status, expires_at, decided_at, decision_note, consumed_at FROM approvals WHERE task_id = $1 ORDER BY requested_at ASC', [taskId]),
-  ]);
-  const failureEvent = [...evts.rows].reverse().find((e) => e.kind === 'failure') ?? null;
-  return {
-    ...taskJson(t),
-    events: evts.rows,
-    controls: ctrls.rows,
-    approvals: apprs.rows,
-    // Human-readable failure reason for the Task card (design-table status: Failed).
-    failureReason: failureEvent?.message ?? null,
-  };
-}
+// taskJson / taskDetail / createTask live in src/taskLifecycle.js (no listen/migrate).
 
 // ------------------------------------------------------------------ health
 
@@ -133,33 +110,6 @@ app.get('/api/conversations/:id/timeline', asyncRoute(async (req, res) => {
     })),
   });
 }));
-
-// Create a task and wake the worker in one step. Idempotency is not required by
-// the P0 UI (single click) but a client retry could double-create; acceptable
-// for P0, documented.
-async function createTask(conversationId, title, goal) {
-  const taskId = `task_${crypto.randomUUID()}`;
-  const ins = await query(
-    'INSERT INTO tasks (id, conversation_id, title, status) VALUES ($1, $2, $3, $4) RETURNING *',
-    [taskId, conversationId, title, 'queued']
-  );
-  try {
-    const { sessionId } = await eve.createSession(
-      `[hamster-worker taskId=${taskId} title=${title}] ${goal}`
-    );
-    await query('UPDATE tasks SET eve_session_id = $1, status = $2, updated_at = now() WHERE id = $3', [
-      sessionId,
-      'running',
-      taskId,
-    ]);
-    events.attach(`task:${taskId}`, sessionId);
-    return { task: await taskDetail(taskId) };
-  } catch (err) {
-    await query('UPDATE tasks SET status = $1, updated_at = now() WHERE id = $2', ['failed', taskId]);
-    await events.audit('task_spawn_failed', { taskId, error: String(err.message ?? err) });
-    return { task: await taskDetail(taskId), spawnError: String(err.message ?? err) };
-  }
-}
 
 async function findActiveTask(conversationId) {
   const { rows } = await query(

@@ -8,7 +8,7 @@
     "build": "eve build",
     "start": "eve start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import ./lib/testSupport/networkDeny.preload.ts --test lib/*.test.ts lib/testSupport/*.test.ts"
+    "test": "node --import ./lib/testSupport/networkDeny.preload.ts --import ./lib/testSupport/authoredTsResolve.preload.ts --test lib/*.test.ts lib/testSupport/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.117",

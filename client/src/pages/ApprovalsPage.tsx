@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ApprovalCard } from '@/components/ApprovalCard'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { api, type Approval } from '@/lib/api'
+import { api, isNetworkError, type Approval } from '@/lib/api'
 
 export function ApprovalsPage({
   locale,
   onApprovalsChanged,
+  onNetworkError,
+  connectionError = false,
 }: {
   locale: Locale
   onApprovalsChanged: () => void
+  onNetworkError?: () => void
+  /** Shell owns the single Can't reach banner; used here only to fail-close actions. */
+  connectionError?: boolean
 }) {
   const t = getCopy(locale)
+  const [searchParams] = useSearchParams()
+  const focusId = (searchParams.get('id') || searchParams.get('focus') || '').trim()
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [error, setError] = useState<string | null>(null)
+  const focusedRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async () => {
     const list = await api.listApprovals()
@@ -24,18 +33,35 @@ export function ApprovalsPage({
     ;(async () => {
       try {
         await refresh()
+        if (!cancelled) setError(null)
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) {
+          if (isNetworkError(err)) onNetworkError?.()
+          else setError(err instanceof Error ? err.message : String(err))
+        }
       }
     })()
     const timer = setInterval(() => {
-      void refresh().catch(() => undefined)
+      void refresh().catch((err) => {
+        // Keep last-loaded tickets visible; report disconnect to shell only.
+        if (isNetworkError(err)) onNetworkError?.()
+      })
     }, 3000)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [refresh])
+  }, [refresh, onNetworkError])
+
+  // Deep-link: scroll/focus the exact ticket — do not leave the operator hunting the list.
+  useEffect(() => {
+    if (!focusId || approvals.length === 0) return
+    const el = document.querySelector(`[data-approval-id="${CSS.escape(focusId)}"]`)
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      focusedRef.current = el as HTMLDivElement
+    }
+  }, [focusId, approvals])
 
   return (
     <div className="flex flex-col gap-3">
@@ -45,7 +71,9 @@ export function ApprovalsPage({
         </h1>
       </header>
 
-      {error ? <p className="text-sm text-[var(--color-destructive)]">{error}</p> : null}
+      {error && !connectionError ? (
+        <p className="text-sm text-[var(--color-destructive)]">{error}</p>
+      ) : null}
 
       {approvals.length === 0 ? (
         <p className="text-sm text-[var(--color-muted-foreground)]">{t.noApprovals}</p>
@@ -56,12 +84,17 @@ export function ApprovalsPage({
               key={a.id}
               approval={a}
               locale={locale}
+              focused={Boolean(focusId) && a.id === focusId}
+              actionsDisabled={connectionError}
               onApprove={async (id) => {
+                // Fail-closed: unavailable control channel must not execute or look granted.
+                if (connectionError) return
                 await api.approve(id)
                 await refresh()
                 onApprovalsChanged()
               }}
               onDeny={async (id) => {
+                if (connectionError) return
                 await api.deny(id)
                 await refresh()
                 onApprovalsChanged()

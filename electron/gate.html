@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hamster</title>
+    <style>
+      :root {
+        --color-border: #d5dde6;
+        --color-card: #ffffff;
+        --color-foreground: #1a2330;
+        --color-muted-foreground: #5c6b7a;
+        --color-primary: #2c4f73;
+        --color-primary-foreground: #ffffff;
+        --color-destructive: #a33b3b;
+        --color-accent: #dbe7f3;
+        --sidebar: #eef3f7;
+        --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+        --font-body: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--sidebar);
+        color: var(--color-foreground);
+        font-family: var(--font-body);
+      }
+      .shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+      .brand {
+        font-family: var(--font-display);
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .preview {
+        font-size: 11px;
+        color: var(--color-muted-foreground);
+      }
+      .locale {
+        display: flex;
+        gap: 4px;
+      }
+      .locale button {
+        height: 32px;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 500;
+        background: transparent;
+        color: var(--color-muted-foreground);
+        cursor: pointer;
+      }
+      .locale button[aria-pressed="true"] {
+        background: var(--color-accent);
+        color: var(--color-foreground);
+      }
+      .main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      form {
+        width: 100%;
+        max-width: 28rem;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid var(--color-border);
+        background: var(--color-card);
+      }
+      h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      label {
+        font-size: 14px;
+        color: var(--color-muted-foreground);
+      }
+      input {
+        height: 40px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        padding: 0 12px;
+        font-size: 14px;
+        outline: none;
+      }
+      input:focus {
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+      }
+      button.submit {
+        height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--color-primary);
+        color: var(--color-primary-foreground);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      button.submit:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .error {
+        margin: 0;
+        font-size: 14px;
+        color: var(--color-destructive);
+      }
+      .busy {
+        margin: 0;
+        font-size: 13px;
+        color: var(--color-muted-foreground);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="top">
+        <div>
+          <div class="brand">Hamster</div>
+          <div class="preview">Private preview</div>
+        </div>
+        <div class="locale" role="group" aria-label="Language">
+          <button type="button" data-testid="locale-en" id="locale-en">EN</button>
+          <button type="button" data-testid="locale-zh" id="locale-zh">中文</button>
+        </div>
+      </div>
+      <div class="main">
+        <form id="gate-form" data-testid="connect-gate">
+          <div>
+            <h1 id="title"></h1>
+            <label id="label" for="address"></label>
+          </div>
+          <input
+            id="address"
+            data-testid="connect-gate-address"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="http://192.168.1.10:3000"
+          />
+          <button class="submit" id="submit" type="submit" data-testid="connect-gate-submit"></button>
+          <p class="busy" id="busy" hidden></p>
+          <p class="error" id="error" data-testid="connect-gate-error" hidden></p>
+        </form>
+      </div>
+    </div>
+    <script>
+      const copy = {
+        en: {
+          title: 'Connect to Hamster',
+          label: 'Client origin',
+          connect: 'Connect',
+          retry: 'Retry',
+          error: "Can't reach this Hamster",
+          busy: 'Connecting…',
+        },
+        zh: {
+          title: '连接Hamster',
+          label: '客户端源地址',
+          connect: '连接',
+          retry: '重试',
+          error: '无法连接',
+          busy: '正在连接…',
+        },
+      }
+      const LOCALE_KEY = 'hamster.locale'
+      let locale = localStorage.getItem(LOCALE_KEY) === 'zh' ? 'zh' : 'en'
+      let failedOnce = false
+      let busy = false
+
+      const title = document.getElementById('title')
+      const label = document.getElementById('label')
+      const address = document.getElementById('address')
+      const submit = document.getElementById('submit')
+      const errorEl = document.getElementById('error')
+      const busyEl = document.getElementById('busy')
+      const enBtn = document.getElementById('locale-en')
+      const zhBtn = document.getElementById('locale-zh')
+
+      function render() {
+        const t = copy[locale]
+        document.documentElement.lang = locale
+        title.textContent = t.title
+        label.textContent = t.label
+        address.setAttribute('aria-label', t.label)
+        submit.textContent = failedOnce ? t.retry : t.connect
+        errorEl.textContent = t.error
+        busyEl.textContent = t.busy
+        enBtn.setAttribute('aria-pressed', locale === 'en' ? 'true' : 'false')
+        zhBtn.setAttribute('aria-pressed', locale === 'zh' ? 'true' : 'false')
+      }
+
+      function setLocale(next) {
+        locale = next
+        localStorage.setItem(LOCALE_KEY, next)
+        render()
+      }
+
+      enBtn.addEventListener('click', () => setLocale('en'))
+      zhBtn.addEventListener('click', () => setLocale('zh'))
+
+      // Restore draft / error from main (never secret-bearing).
+      try {
+        const gateState = window.hamster && window.hamster.gateState && window.hamster.gateState()
+        if (gateState && typeof gateState.draft === 'string' && gateState.draft) {
+          address.value = gateState.draft
+        }
+        if (gateState && gateState.showError) {
+          failedOnce = true
+          errorEl.hidden = false
+        }
+      } catch (_) {}
+
+      render()
+
+      document.getElementById('gate-form').addEventListener('submit', async (e) => {
+        e.preventDefault()
+        if (busy) return
+        errorEl.hidden = true
+        const value = address.value.trim()
+        if (!value || !window.hamster || typeof window.hamster.requestConnect !== 'function') {
+          failedOnce = true
+          errorEl.hidden = false
+          render()
+          return
+        }
+        busy = true
+        submit.disabled = true
+        address.readOnly = true
+        busyEl.hidden = false
+        render()
+        try {
+          const result = await window.hamster.requestConnect(value)
+          if (!result || !result.ok) {
+            failedOnce = true
+            errorEl.hidden = false
+            // Keep edited value for Retry (main never echoes secrets).
+          }
+          // On ok, main navigates away; if still here, treat as failure.
+          if (result && result.ok) {
+            // brief wait — navigation should unmount this document
+            await new Promise((r) => setTimeout(r, 400))
+            if (!document.hidden) {
+              failedOnce = true
+              errorEl.hidden = false
+            }
+          }
+        } catch (_) {
+          failedOnce = true
+          errorEl.hidden = false
+        } finally {
+          busy = false
+          submit.disabled = false
+          address.readOnly = false
+          busyEl.hidden = true
+          render()
+          address.focus()
+        }
+      })
+    </script>
+  </body>
+</html>

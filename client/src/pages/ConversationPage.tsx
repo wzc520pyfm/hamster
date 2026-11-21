@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ApprovalCard } from '@/components/ApprovalCard'
+import { PendingApprovalDock } from '@/components/PendingApprovalDock'
 import { TaskCard } from '@/components/TaskCard'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
-import { api, type Timeline, type TimelineMessage } from '@/lib/api'
+import { api, isNetworkError, type Timeline, type TimelineMessage } from '@/lib/api'
 
 export function ConversationPage({
   locale,
   conversationId,
   onApprovalsChanged,
+  onNetworkError,
+  connectionError = false,
 }: {
   locale: Locale
   conversationId: string | null
   onApprovalsChanged: () => void
+  onNetworkError?: () => void
+  connectionError?: boolean
 }) {
   const t = getCopy(locale)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [kbHeight, setKbHeight] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const stickToBottom = useRef(true)
 
@@ -34,23 +39,44 @@ export function ConversationPage({
       try {
         await refresh()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) {
+          if (isNetworkError(err)) onNetworkError?.()
+          else setError(err instanceof Error ? err.message : String(err))
+        }
       }
     })()
     const timer = setInterval(() => {
-      void refresh().catch(() => undefined)
+      void refresh().catch((err) => {
+        if (isNetworkError(err)) onNetworkError?.()
+      })
     }, 2500)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
-  }, [refresh])
+  }, [refresh, onNetworkError])
+
+  // Keyboard rise (mobile virtual keyboard): shrink the composer column to the live
+  // visual viewport so the composer and approval buttons stay usable.
+  useEffect(() => {
+    const vv = window.visualViewport ?? null
+    if (!vv) return
+    const update = () => {
+      const height = vv.height
+      setKbHeight(height > 0 && height < window.innerHeight - 1 ? Math.round(height) : null)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
+    // Only auto-stick within the message list. Pending approvals live outside this scroller
+    // (above the composer) so scrollIntoView must not drag Approve/Deny under the composer.
     if (stickToBottom.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [timeline?.messages.length, timeline?.tasks.length, timeline?.approvals.length])
+  }, [timeline?.messages.length, timeline?.tasks.length])
 
   const taskById = useMemo(() => {
     const map = new Map<string, Timeline['tasks'][number]>()
@@ -59,6 +85,8 @@ export function ConversationPage({
   }, [timeline])
 
   const pendingApprovals = (timeline?.approvals ?? []).filter((a) => a.status === 'pending')
+  // Closed approvals still appear in the timeline/history path via TaskCard state; active
+  // pending tickets are pinned above the composer so Deny / Approve stay reachable.
 
   async function send(raw: string) {
     if (!conversationId) return
@@ -72,7 +100,8 @@ export function ConversationPage({
       await refresh()
       onApprovalsChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      if (isNetworkError(err)) onNetworkError?.()
+      else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setSending(false)
     }
@@ -80,7 +109,13 @@ export function ConversationPage({
 
   return (
     // Narrow shell has a sticky top bar; keep the composer in the first viewport.
-    <div className="flex h-[calc(100dvh-5.75rem)] min-h-0 flex-col gap-3 md:h-[calc(100vh-2rem)]">
+    // Keyboard-open state (mobile visual viewport) shrinks this column so the composer
+    // and approval buttons stay usable instead of being pushed off-screen.
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-3"
+      style={kbHeight ? { height: `${kbHeight}px`, maxHeight: `${kbHeight}px` } : undefined}
+      data-testid="conversation-column"
+    >
       <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
         <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
           {t.mainConversation}
@@ -115,41 +150,32 @@ export function ConversationPage({
                 onApprovalsChanged()
               },
             })}
-
-            {pendingApprovals.length > 0 ? (
-              <div className="mt-2 flex flex-col gap-3">
-                {pendingApprovals.map((a) => (
-                  <ApprovalCard
-                    key={a.id}
-                    approval={a}
-                    locale={locale}
-                    onApprove={async (id) => {
-                      await api.approve(id)
-                      await refresh()
-                      onApprovalsChanged()
-                    }}
-                    onDeny={async (id) => {
-                      await api.deny(id)
-                      await refresh()
-                      onApprovalsChanged()
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {error ? (
+      {/* One summary only — SUMMARY → full ticket on /approvals?id=… → CONFIRM. No Approve here. */}
+      <PendingApprovalDock
+        pending={pendingApprovals}
+        locale={locale}
+        onDeny={async (id) => {
+          // Fail-closed when control channel unavailable — do not deny offline.
+          if (connectionError) return
+          await api.deny(id)
+          await refresh()
+          onApprovalsChanged()
+        }}
+      />
+
+      {error && !connectionError ? (
         <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
           {error}
         </div>
       ) : null}
 
       <form
-        className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
+        className="safe-area-bottom shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
         onSubmit={(e) => {
           e.preventDefault()
           void send(text)
@@ -158,8 +184,8 @@ export function ConversationPage({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
           <textarea
-            className="min-h-[4.5rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
-            rows={3}
+            className="min-h-[2.75rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
+            rows={pendingApprovals.length > 0 ? 2 : 3}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t.composerPlaceholder}

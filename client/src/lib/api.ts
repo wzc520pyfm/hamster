@@ -1,7 +1,20 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+import { controlBaseUrl } from '@/lib/hamsterEnv'
+import { resolveApiBase } from '@/lib/hamsterOrigin'
+
+/** Runtime API base: same-origin relative when on the validated Hamster client; never a stale bake-only host. */
+function apiBase(): string {
+  if (typeof window === 'undefined') {
+    return (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+  }
+  return resolveApiBase({
+    pageOrigin: window.location.origin,
+    controlBase: controlBaseUrl(),
+    viteApiBase: (import.meta.env.VITE_API_BASE_URL as string | undefined) || '',
+  })
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase()}${path}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
@@ -137,6 +150,22 @@ export interface AssetDetail extends AssetSummary {
       exceptions: number
     }>
   }
+}
+
+/**
+ * True when the control plane was unreachable (fetch failed, or same-origin proxy
+ * reported upstream down). Design-table wording: `Can't reach this Hamster` / `无法连接`.
+ * Ordinary HTTP 4xx/5xx application errors are not treated as disconnect.
+ */
+export function isNetworkError(err: unknown): boolean {
+  if (err instanceof TypeError) return true
+  if (err instanceof Error) {
+    const m = err.message || ''
+    if (/upstream unreachable/i.test(m)) return true
+    if (/Failed to fetch/i.test(m)) return true
+    if (/NetworkError|load failed|ECONNREFUSED|ENOTFOUND/i.test(m)) return true
+  }
+  return false
 }
 
 export const api = {

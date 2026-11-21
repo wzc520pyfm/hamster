@@ -3,13 +3,20 @@
 # PACKAGING-FIX after MF1/N1: include mainIpcAuth.cjs + notifyPendingApprovals.cjs
 # (required by main.js; omitted from pre-MF1 files list). Distinct artifact name
 # so PRE-FIX AppImage 67c039d… is never overwritten.
+#
+# SANDBOX mustfix: linux.executableArgs: [] overrides legacy fuse2 default
+# desktop Exec=AppRun --no-sandbox. afterPack installs fail-closed AppRun that
+# overwrites vendor generateAppRunScript (fail-open on unshare probe).
 appId: com.hamster.p1.electron
 productName: Hamster
-artifactName: hamster-p1-electron-handler-regressions-linux-x64
+artifactName: hamster-p1-electron-apprun-sandbox-fix-linux-x64
+afterPack: ./appimageAfterPack.cjs
 linux:
   target: AppImage
   maintainer: hamster
   category: Utility
+  # Empty array required: omitting executableArgs restores upstream default ["--no-sandbox"].
+  executableArgs: []
 files:
   - main.js
   - preload.js

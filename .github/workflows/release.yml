@@ -31,9 +31,11 @@ jobs:
               electron/dist/*.AppImage
               electron/dist/*.deb
               electron/dist/*.rpm
-          # Linux arm64 — AppImage + deb + rpm (native ARM runner)
+          # Linux arm64 — AppImage + deb + rpm
+          # Cross-package on x64: electron-builder's bundled fpm is x86-only and
+          # cannot Exec on ubuntu-*-arm runners (Exec format error).
           - platform: linux-arm64
-            os: ubuntu-22.04-arm
+            os: ubuntu-22.04
             dist_script: dist:linux
             electron_args: --arm64
             artifact_pattern: |

@@ -1,6 +1,6 @@
 {
   "name": "hamster-agent",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Hamster P0 eve worker/chat agent. Runs fully self-hosted next to the control plane. No Vercel project, no hosted eve service.",

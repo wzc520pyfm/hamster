@@ -92,4 +92,4 @@ Cloud computers, isolated desktops, BYO remotes, voice, channels, webhooks, team
 
 ## Next step
 
-Keep the repo private and the PR open for ProductBot review. Fixture Compose green + locale footer fix are progress toward a gate, not a launch.
+Repo stays private. Fixture Compose green + later P1 merges landed on `main`; exploratory **v0.1.0** tags the runnable stack without claiming an eve freeze or a ProductBot product pass. Release process: `docs/release.md`.

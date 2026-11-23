@@ -1,10 +1,7 @@
 # Multi-arch / multi-format Electron installers → one GitHub Release.
-# Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable),
-# without signing / updater / notarization yet.
-#
-# macOS is a separate non-gating job: private-repo macOS runners are scarce, and a
-# queued Intel/universal cell previously cancelled whole publishes. Linux+Windows
-# always publish; macOS arm64 uploads onto the same Release when a runner appears.
+# Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable,
+# macOS dmg/zip across arches), without signing / updater / notarization yet.
+# Repo is public; macOS is a required matrix cell (arm64 + Intel).
 name: Release
 
 on:
@@ -42,6 +39,14 @@ jobs:
             os: windows-11-arm
             dist_script: dist:win
             electron_args: --arm64
+          - platform: macos-arm64
+            os: macos-latest
+            dist_script: dist:mac
+            electron_args: --arm64
+          - platform: macos-x64
+            os: macos-13
+            dist_script: dist:mac
+            electron_args: --x64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -118,7 +123,7 @@ jobs:
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Download Linux/Windows artifacts
+      - name: Download all platform artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
@@ -130,9 +135,9 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           files=(release-assets/*)
-          # linux×2×3 + win×2×2 = 10
-          if [ "${#files[@]}" -lt 8 ]; then
-            echo "Expected Linux/Windows installer set (>=8), found ${#files[@]}" >&2
+          # linux×2×3 + win×2×2 + mac×2×2 = 14
+          if [ "${#files[@]}" -lt 12 ]; then
+            echo "Expected full multi-platform installer set (>=12), found ${#files[@]}" >&2
             find release-assets -type f -print || true
             exit 1
           fi
@@ -150,58 +155,11 @@ jobs:
           body: |
             Exploratory Hamster cut `${{ steps.meta.outputs.tag }}`.
 
-            **Install packages** (unsigned; ${{ steps.assets.outputs.count }} core assets):
+            **Install packages** (unsigned; ${{ steps.assets.outputs.count }} assets):
             - **Linux** x64 + arm64: AppImage, `.deb`, `.rpm`
             - **Windows** x64 + arm64: `-Setup.exe` (NSIS), `-Portable.exe`
-            - **macOS** arm64: attached by the follow-up `macos` job when a runner is available
+            - **macOS** arm64 + Intel: `.dmg`, `.zip` (Gatekeeper will warn)
 
             No code signing / updater signatures yet (unlike cc-switch `.sig` / `latest.json`).
 
             See `CHANGELOG.md` for human-written notes.
-
-  macos:
-    needs: release
-    # Do not gate the Release on scarce private-repo macOS runners.
-    continue-on-error: true
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: electron/package-lock.json
-
-      - name: Install Electron package deps
-        working-directory: electron
-        run: npm ci
-
-      - name: Build macOS arm64 packages
-        working-directory: electron
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run dist:mac -- --arm64
-
-      - name: Collect macOS assets
-        run: |
-          set -euo pipefail
-          mkdir -p release-assets
-          shopt -s nullglob
-          for f in electron/dist/*.dmg electron/dist/*.zip; do
-            base="$(basename "$f")"
-            dest="${base//-mac-/-macOS-}"
-            cp -f "$f" "release-assets/$dest"
-            echo "asset: $dest"
-          done
-          ls -lah release-assets
-          test "$(find release-assets -type f | wc -l | tr -d ' ')" -ge 1
-
-      - name: Attach macOS assets to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: release-assets/*
-          fail_on_unmatched_files: true

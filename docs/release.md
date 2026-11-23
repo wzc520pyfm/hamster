@@ -4,6 +4,8 @@ Early Hamster cuts are intentional `0.x` tags. Breaking changes are allowed. Do 
 
 Asset coverage is intentionally broad (similar to [cc-switch releases](https://github.com/farion1231/cc-switch/releases)): multiple OS/arch combinations and installer formats in one tag. Signing / updater metadata (`.sig`, `latest.json`) are not wired yet.
 
+The GitHub repository is **public**. macOS packages are **required** for a release (arm64 + Intel).
+
 ## What a release includes
 
 | Platform | Runner | Formats | Example asset names |
@@ -12,14 +14,14 @@ Asset coverage is intentionally broad (similar to [cc-switch releases](https://g
 | Linux arm64 | `ubuntu-22.04` (cross-package; fpm is x86-only) | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
 | Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
 | Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
-| macOS arm64 | `macos-latest` (non-gating follow-up job) | dmg, zip | `Hamster-vX.Y.Z-macOS-arm64.dmg/.zip` |
+| macOS arm64 | `macos-latest` | dmg, zip | `Hamster-vX.Y.Z-macOS-arm64.dmg/.zip` |
+| macOS Intel | `macos-13` | dmg, zip | `Hamster-vX.Y.Z-macOS-x64.dmg/.zip` |
 | Notes | — | `CHANGELOG.md` + generated PR list | GitHub Release body |
 | Compose / source | — | clone the tag | not a separate installer |
 
-**Critical path:** Linux + Windows build in parallel, then one job creates the GitHub Release.  
-**macOS:** runs after the Release exists and uploads onto it when a runner is available (`continue-on-error`). Scarce private-repo macOS queues must not block publishing (this previously cancelled whole tags).
+CI builds these **in parallel** (matrix). The Release job waits for **all** platforms — including macOS — then attaches every asset to one GitHub Release.
 
-No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected). Intel macOS not built yet.
+No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected).
 
 ## Cut a release
 
@@ -36,7 +38,7 @@ git tag -a vX.Y.Z -m "Hamster vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`) builds Linux/Windows, publishes the Release, then optionally attaches macOS.
+6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`) builds the full matrix and uploads all installers.
 
 ## Local packaging (optional smoke)
 
@@ -51,7 +53,7 @@ ls dist/
 
 - Preferred: `./scripts/verify-p0.sh` against Compose or the local Postgres + agent + api loop.
 - Acceptable for early tags: offline unit suites when Compose cannot run on the release host.
-- Packaging smoke: `electron` unit tests + successful Linux/Windows matrix jobs in CI.
+- Packaging smoke: `electron` unit tests + successful full matrix (Linux / Windows / macOS) in CI.
 - Live-model path remains optional; fixture NOTE is expected when no provider key is set.
 
 ## Later automation
@@ -59,4 +61,4 @@ ls dist/
 - unit tests on `main` / PRs
 - Compose contract on a Docker-capable runner
 - tag-from-version-bump (release-please)
-- Intel macOS + code signing / notarization / updater metadata when runners and keys exist
+- code signing / notarization / updater metadata when keys exist

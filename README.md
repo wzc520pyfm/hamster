@@ -1,6 +1,6 @@
 # Hamster (provisional name)
 
-This is a bounded P0 exploration, not a product release. "Hamster" is a provisional name. The trademark has not been searched, and this repository is not a public launch.
+This is a bounded P0 exploration, not a product launch. "Hamster" is a provisional name. The trademark has not been searched. The GitHub repository is public for easier CI packaging; that is not a product launch.
 
 P0 checks whether a self-hosted control plane, a React web client, independent task lifecycles, persistent OpenUI React Lang 1.0 pages, and fail-closed approvals can be built on a replaceable execution engine. Eve (`eve@1.0.2`) is evaluated first under a **fixture / mockModel path** when no live model key is set. This is not the first public version, and it is not authorization to publish or to promote the project. **Eve is not frozen.**
 
@@ -102,7 +102,7 @@ cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=htt
 
 ## Status
 
-**v0.1.6** is the current exploratory `0.x` cut (private; provisional name). Releases attach a cc-switch-style multi-arch/multi-format installer set — see `CHANGELOG.md` and `docs/release.md`.
+**v0.1.7** is the current exploratory `0.x` cut (public repo; provisional name). Releases require Linux / Windows / macOS installers — see `CHANGELOG.md` and `docs/release.md`.
 
 Contract checks and OpenUI Renderer wiring are documented in `docs/p0-report.md` with fixture limitations called out. Eve is still not frozen; this is not a public product launch.
 

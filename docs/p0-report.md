@@ -81,7 +81,7 @@ Per-card recaptures on the Compose client (2026-11-19). See `docs/evidence/ui-sm
 
 - Eve hard constraints are **not** a product pass. Eve is **not** frozen.
 - Prior `19/0` product-pass framing remains **withdrawn**.
-- No Hermes. No Vercel deploy. No npm publish. Repo stays **private**.
+- No Hermes. No Vercel deploy. No npm publish. Repo is **public** (not a product launch).
 - This is **not** a full product E2E / design-gate pass.
 
 ---
@@ -92,4 +92,4 @@ Cloud computers, isolated desktops, BYO remotes, voice, channels, webhooks, team
 
 ## Next step
 
-Repo stays private. Fixture Compose green + later P1 merges landed on `main`; exploratory **v0.1.0** tags the runnable stack without claiming an eve freeze or a ProductBot product pass. Release process: `docs/release.md`.
+Repo is public for packaging/CI. Fixture Compose green + later P1 merges landed on `main`; exploratory `0.x` tags the runnable stack without claiming an eve freeze or a ProductBot product pass. Release process: `docs/release.md`.

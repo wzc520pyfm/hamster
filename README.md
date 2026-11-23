@@ -102,7 +102,9 @@ cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=htt
 
 ## Status
 
-See `docs/p0-report.md`. Contract checks and OpenUI Renderer wiring are documented there with fixture limitations called out. This is still exploratory P0.
+**v0.1.0** is the first exploratory `0.x` cut (private; provisional name). See `CHANGELOG.md` and `docs/release.md`.
+
+Contract checks and OpenUI Renderer wiring are documented in `docs/p0-report.md` with fixture limitations called out. Eve is still not frozen; this is not a public product launch.
 
 ## License
 

@@ -1,0 +1,41 @@
+# Create a GitHub Release when a version tag is pushed.
+# Early 0.x tags are marked prerelease.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve prerelease flag
+        id: meta
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          case "${TAG}" in
+            v0.*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          body: |
+            Exploratory Hamster cut `${{ steps.meta.outputs.tag }}`.
+
+            See `CHANGELOG.md` for the human-written notes for this version.
+            Compose contract evidence (when available) lives under `docs/p0-report.md`.

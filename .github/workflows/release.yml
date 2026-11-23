@@ -1,5 +1,7 @@
-# Build Linux / Windows / macOS installers in parallel and publish one GitHub Release.
-# Early 0.x tags are marked prerelease. Packages are unsigned.
+# Multi-arch / multi-format Electron installers → one GitHub Release.
+# Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable,
+# macOS dmg+zip across arches), without signing / updater / notarization yet.
+# Early 0.x tags are marked prerelease.
 name: Release
 
 on:
@@ -10,24 +12,54 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: linux
-            os: ubuntu-latest
+          # Linux x64 — AppImage + deb + rpm (native)
+          - platform: linux-x64
+            os: ubuntu-22.04
             dist_script: dist:linux
-            artifact_pattern: electron/dist/*.AppImage
-          - platform: windows
-            os: windows-latest
+            electron_args: --x64
+            artifact_pattern: |
+              electron/dist/*.AppImage
+              electron/dist/*.deb
+              electron/dist/*.rpm
+          # Linux arm64 — AppImage + deb + rpm (native ARM runner)
+          - platform: linux-arm64
+            os: ubuntu-22.04-arm
+            dist_script: dist:linux
+            electron_args: --arm64
+            artifact_pattern: |
+              electron/dist/*.AppImage
+              electron/dist/*.deb
+              electron/dist/*.rpm
+          # Windows x64 — NSIS Setup + Portable
+          - platform: windows-x64
+            os: windows-2022
             dist_script: dist:win
+            electron_args: --x64
             artifact_pattern: electron/dist/*.exe
-          - platform: macos
-            os: macos-latest
+          # Windows arm64 — NSIS Setup + Portable
+          - platform: windows-arm64
+            os: windows-11-arm
+            dist_script: dist:win
+            electron_args: --arm64
+            artifact_pattern: electron/dist/*.exe
+          # macOS universal — dmg + zip (lipo of arm64 + x64)
+          - platform: macos-universal
+            os: macos-15
             dist_script: dist:mac
-            artifact_pattern: electron/dist/*.dmg
+            electron_args: --universal
+            artifact_pattern: |
+              electron/dist/*.dmg
+              electron/dist/*.zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -40,21 +72,67 @@ jobs:
           cache: npm
           cache-dependency-path: electron/package-lock.json
 
+      - name: Install Linux packaging deps (rpm)
+        if: runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm
+
       - name: Install Electron package deps
         working-directory: electron
         run: npm ci
 
-      - name: Build ${{ matrix.platform }} package
+      - name: Build ${{ matrix.platform }} packages
         working-directory: electron
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run ${{ matrix.dist_script }}
+        run: npm run ${{ matrix.dist_script }} -- ${{ matrix.electron_args }}
 
-      - name: Upload ${{ matrix.platform }} artifact
+      - name: Normalize asset names (cc-switch style)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          shopt -s nullglob
+          VERSION="${GITHUB_REF_NAME}"
+
+          rename_one() {
+            local src="$1"
+            local base dest
+            base="$(basename "$src")"
+            # Already using Hamster-v* from electron-builder — keep, but map os tokens.
+            dest="$base"
+            dest="${dest//-linux-/-Linux-}"
+            dest="${dest//-mac-/-macOS-}"
+            dest="${dest//-win-/-Windows-}"
+            # Prefer tag in the name when builder used package.json version only.
+            if [[ "$dest" != Hamster-"$VERSION"-* && "$dest" == Hamster-v* ]]; then
+              :
+            fi
+            cp -f "$src" "release-assets/$dest"
+            echo "asset: $dest"
+          }
+
+          for f in electron/dist/*.AppImage electron/dist/*.deb electron/dist/*.rpm \
+                   electron/dist/*.exe electron/dist/*.dmg electron/dist/*.zip; do
+            rename_one "$f"
+          done
+
+          count=$(find release-assets -type f | wc -l | tr -d ' ')
+          echo "Collected $count assets for ${{ matrix.platform }}"
+          ls -lah release-assets
+          if [ "$count" -lt 1 ]; then
+            echo "No release assets produced" >&2
+            ls -lah electron/dist || true
+            exit 1
+          fi
+
+      - name: Upload ${{ matrix.platform }} artifacts
         uses: actions/upload-artifact@v4
         with:
           name: hamster-${{ matrix.platform }}
-          path: ${{ matrix.artifact_pattern }}
+          path: release-assets/*
           if-no-files-found: error
           retention-days: 14
 
@@ -81,10 +159,12 @@ jobs:
       - name: List release assets
         id: assets
         run: |
+          set -euo pipefail
           shopt -s nullglob
           files=(release-assets/*)
-          if [ "${#files[@]}" -lt 3 ]; then
-            echo "Expected at least 3 installer assets, found ${#files[@]}" >&2
+          # Expect a cc-switch-like set: linux×2 arches×3 + win×2 arches×2 + mac×2 ≈ 12
+          if [ "${#files[@]}" -lt 8 ]; then
+            echo "Expected a broad installer set (>=8), found ${#files[@]}" >&2
             find release-assets -type f -print || true
             exit 1
           fi
@@ -102,10 +182,12 @@ jobs:
           body: |
             Exploratory Hamster cut `${{ steps.meta.outputs.tag }}`.
 
-            **Install packages** (unsigned early builds; ${{ steps.assets.outputs.count }} assets):
-            - Linux x64: `*.AppImage` — `chmod +x` then run
-            - Windows x64: `*.exe` (NSIS)
-            - macOS (Apple Silicon runner): `*.dmg` — Gatekeeper will warn on unsigned apps
+            **Install packages** (unsigned; ${{ steps.assets.outputs.count }} assets), cc-switch-style matrix:
+            - **Linux** x64 + arm64: AppImage, `.deb`, `.rpm`
+            - **Windows** x64 + arm64: `-Setup.exe` (NSIS), `-Portable.exe`
+            - **macOS** universal: `.dmg`, `.zip` (Gatekeeper will warn)
+
+            No code signing / updater signatures yet (unlike cc-switch `.sig` / `latest.json`).
 
             See `CHANGELOG.md` for human-written notes. Compose contract evidence
             (when available) lives under `docs/p0-report.md`.

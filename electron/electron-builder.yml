@@ -1,20 +1,22 @@
 # Private Electron packaging for early 0.x cuts.
-# Trial-only: no signing, no publish targets, no auto-update wiring (out of scope).
-# PACKAGING-FIX after MF1/N1: include mainIpcAuth.cjs + notifyPendingApprovals.cjs
-# (required by main.js; omitted from pre-MF1 files list).
+# Inspired by the cc-switch release asset matrix (multi-arch + multiple formats),
+# adapted to electron-builder. Unsigned / no updater / no notarization yet.
 #
-# SANDBOX mustfix (Linux AppImage): linux.executableArgs: [] overrides legacy
+# SANDBOX must pass (Linux AppImage): linux.executableArgs: [] overrides legacy
 # fuse2 default desktop Exec=AppRun --no-sandbox. afterPack installs fail-closed
 # AppRun that overwrites vendor generateAppRunScript (fail-open on unshare probe).
 appId: com.hamster.p1.electron
 productName: Hamster
-# Versioned release asset name (uploaded by .github/workflows/release.yml).
-artifactName: hamster-${version}-${os}-${arch}.${ext}
+# Default name; nsis/portable override below so Setup vs Portable do not collide.
+artifactName: Hamster-v${version}-${os}-${arch}.${ext}
 directories:
   output: dist
 afterPack: ./appimageAfterPack.cjs
 linux:
-  target: AppImage
+  target:
+    - AppImage
+    - deb
+    - rpm
   maintainer: hamster
   category: Utility
   # Empty array required: omitting executableArgs restores upstream default ["--no-sandbox"].
@@ -22,11 +24,13 @@ linux:
 win:
   target:
     - nsis
+    - portable
   # Unsigned early builds; do not require a code-signing certificate.
   signAndEditExecutable: false
 mac:
   target:
     - dmg
+    - zip
   # Unsigned early builds (Gatekeeper will warn). identity null disables signing.
   identity: null
   category: public.app-category.productivity
@@ -34,6 +38,9 @@ nsis:
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
+  artifactName: Hamster-v${version}-Windows-${arch}-Setup.${ext}
+portable:
+  artifactName: Hamster-v${version}-Windows-${arch}-Portable.${ext}
 files:
   - main.js
   - preload.js

@@ -2,19 +2,23 @@
 
 Early Hamster cuts are intentional `0.x` tags. Breaking changes are allowed. Do not wait on a ProductBot freeze or a live-model gate for exploratory tags.
 
+Asset coverage is intentionally broad (similar to [cc-switch releases](https://github.com/farion1231/cc-switch/releases)): multiple OS/arch combinations and installer formats in one tag. Signing / updater metadata (`.sig`, `latest.json`) are not wired yet.
+
 ## What a release includes
 
-| Artifact | Source | Attached to GitHub Release |
-| --- | --- | --- |
-| Linux x64 AppImage | `electron/` `npm run dist:linux` on `ubuntu-latest` | Yes (`hamster-<version>-linux-*.AppImage`) |
-| Windows x64 NSIS | `electron/` `npm run dist:win` on `windows-latest` | Yes (`hamster-<version>-win-*.exe`) |
-| macOS DMG | `electron/` `npm run dist:mac` on `macos-latest` | Yes (`hamster-<version>-mac-*.dmg`) |
-| Release notes | `CHANGELOG.md` + generated PR list | Yes |
-| Compose stack / source | repo at the tag | Clone the tag; not a separate installer |
+| Platform | Runner | Formats | Example asset names |
+| --- | --- | --- | --- |
+| Linux x64 | `ubuntu-22.04` | AppImage, deb, rpm | `Hamster-vX.Y.Z-Linux-*.AppImage/.deb/.rpm` |
+| Linux arm64 | `ubuntu-22.04-arm` | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
+| Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
+| Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
+| macOS universal | `macos-15` | dmg, zip | `Hamster-vX.Y.Z-macOS-universal.dmg/.zip` |
+| Notes | — | `CHANGELOG.md` + generated PR list | GitHub Release body |
+| Compose / source | — | clone the tag | not a separate installer |
 
-CI builds the three desktop packages **in parallel** (matrix), then one job attaches all assets to a single GitHub Release.
+CI builds these **in parallel** (matrix), then one job attaches every asset to a single GitHub Release.
 
-No auto-update. No code signing (macOS Gatekeeper will warn; Windows SmartScreen may warn).
+No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected).
 
 ## Cut a release
 
@@ -31,44 +35,37 @@ git tag -a vX.Y.Z -m "Hamster vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`):
-   - matrix-builds Linux / Windows / macOS installers
-   - creates a GitHub Release from the tag (prerelease while still on `0.x`)
-   - uploads all three installers as release assets
+6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`) builds the matrix and uploads all installers.
 
 ## Local packaging (optional smoke)
 
-Build only the current OS target (cross-OS packaging needs the matching runner / tooling):
+Build only formats for the current OS (cross-OS / cross-arch needs matching runners):
 
 ```bash
 cd electron
 npm ci
-CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:linux   # or dist:win / dist:mac
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:linux   # or dist:win / dist:mac [-- --universal]
 ls dist/
 ```
 
 ## Manual fallback
 
-If the workflow is unavailable, build each platform on its native host (or matching CI runner), then:
+Build each matrix cell on its native host, then:
 
 ```bash
-gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md --prerelease \
-  path/to/*.AppImage path/to/*.exe path/to/*.dmg
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md --prerelease path/to/Hamster-vX.Y.Z-*
 ```
 
 ## Verification policy for 0.x
 
 - Preferred: `./scripts/verify-p0.sh` against Compose or the local Postgres + agent + api loop.
-- Acceptable for early tags: offline unit suites (`agent` / `api` / `client` / `electron` test scripts) when Compose cannot run on the release host.
-- Packaging smoke: `electron` unit tests (includes AppImage fail-closed static checks) + successful matrix `dist:*` jobs in CI.
+- Acceptable for early tags: offline unit suites when Compose cannot run on the release host.
+- Packaging smoke: `electron` unit tests + successful matrix `dist:*` jobs in CI.
 - Live-model path remains optional; fixture NOTE is expected when no provider key is set.
-- Do not invent live-model evidence.
 
 ## Later automation
 
-Once this flow is stable, extend the workflow to:
-
-- run unit tests on `main` / PRs
-- optionally run Compose contract on a Docker-capable runner
-- create the tag from a version bump commit (release-please or a thin custom job)
-- optional Intel macOS (`macos-13`) and code signing when certificates exist
+- unit tests on `main` / PRs
+- Compose contract on a Docker-capable runner
+- tag-from-version-bump (release-please)
+- code signing, notarization, and updater metadata (cc-switch-style `.sig` / `latest.json`) when keys exist

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for early `0.x` cuts (breaking changes allowed without a major bump).
 
+## [0.1.3] - 2026-11-23
+
+### Added
+
+- cc-switch-style release matrix: Linux x64/arm64 AppImage+deb+rpm, Windows x64/arm64 Setup+Portable, macOS universal dmg+zip
+- Friendlier asset names (`Hamster-vX.Y.Z-…`)
+
+### Notes
+
+- Still unsigned (no `.sig` / `latest.json` updater channel yet)
+- ARM Linux/Windows use GitHub ARM runners (`ubuntu-22.04-arm`, `windows-11-arm`)
+
 ## [0.1.2] - 2026-11-23
 
 ### Added
@@ -50,6 +62,7 @@ First exploratory `0.x` cut of the private self-hosted stack. Provisional name; 
 - This cloud cut also re-ran offline unit suites (agent / api / client / electron) before tagging; Compose was not re-run in the release environment (no Docker on that host)
 - Repo stays private; no npm publish; no Vercel / hosted eve / OpenUI commercial Gateway required
 
+[0.1.3]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.3
 [0.1.2]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.2
 [0.1.1]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.1
 [0.1.0]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.0

@@ -1,16 +1,18 @@
 {
   "name": "hamster-electron",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Hamster Electron main client (private preview slice)",
+  "homepage": "https://github.com/wzc520pyfm/hamster",
+  "author": "Hamster contributors",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test ./sessionStore.test.cjs ./windowLoadGuard.test.cjs ./mainIpcAuth.test.cjs ./notifyPendingApprovals.test.cjs ./mainRegisteredHandlers.integration.test.cjs ./appimageSandboxLaunch.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs",
-    "dist:linux": "electron-builder --linux AppImage --config electron-builder.yml --publish never",
-    "dist:win": "electron-builder --win nsis --config electron-builder.yml --publish never",
-    "dist:mac": "electron-builder --mac dmg --config electron-builder.yml --publish never",
-    "dist": "electron-builder --linux AppImage --win nsis --mac dmg --config electron-builder.yml --publish never"
+    "dist:linux": "electron-builder --linux AppImage deb rpm --config electron-builder.yml --publish never",
+    "dist:win": "electron-builder --win nsis portable --config electron-builder.yml --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --config electron-builder.yml --publish never",
+    "dist": "electron-builder --linux AppImage deb rpm --win nsis portable --mac dmg zip --config electron-builder.yml --publish never"
   },
 
   "devDependencies": {

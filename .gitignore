@@ -10,5 +10,8 @@ dist/
 .DS_Store
 npm-debug.log*
 client/dist/
+electron/dist/
 api/node_modules/
 agent/node_modules/
+electron/node_modules/
+

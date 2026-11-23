@@ -1,15 +1,17 @@
 # Minimal private Linux x64 packaging config for the P1 Electron candidate port.
 # Trial-only: no signing, no publish targets, no auto-update wiring (out of scope).
 # PACKAGING-FIX after MF1/N1: include mainIpcAuth.cjs + notifyPendingApprovals.cjs
-# (required by main.js; omitted from pre-MF1 files list). Distinct artifact name
-# so PRE-FIX AppImage 67c039d… is never overwritten.
+# (required by main.js; omitted from pre-MF1 files list).
 #
 # SANDBOX mustfix: linux.executableArgs: [] overrides legacy fuse2 default
 # desktop Exec=AppRun --no-sandbox. afterPack installs fail-closed AppRun that
 # overwrites vendor generateAppRunScript (fail-open on unshare probe).
 appId: com.hamster.p1.electron
 productName: Hamster
-artifactName: hamster-p1-electron-apprun-sandbox-fix-linux-x64
+# Versioned release asset name (uploaded by .github/workflows/release.yml).
+artifactName: hamster-${version}-linux-${arch}.${ext}
+directories:
+  output: dist
 afterPack: ./appimageAfterPack.cjs
 linux:
   target: AppImage

@@ -1,4 +1,4 @@
-# Create a GitHub Release when a version tag is pushed.
+# Build the Linux AppImage and publish a GitHub Release when a version tag is pushed.
 # Early 0.x tags are marked prerelease.
 name: Release
 
@@ -27,6 +27,36 @@ jobs:
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install Electron package deps
+        working-directory: electron
+        run: npm ci
+
+      - name: Build Linux AppImage
+        working-directory: electron
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist:linux
+
+      - name: Locate AppImage artifact
+        id: artifact
+        run: |
+          shopt -s nullglob
+          files=(electron/dist/*.AppImage)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "Expected exactly one AppImage under electron/dist, found ${#files[@]}" >&2
+            ls -la electron/dist || true
+            exit 1
+          fi
+          echo "path=${files[0]}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${files[0]}")" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -34,8 +64,12 @@ jobs:
           name: ${{ steps.meta.outputs.tag }}
           generate_release_notes: true
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          files: ${{ steps.artifact.outputs.path }}
           body: |
             Exploratory Hamster cut `${{ steps.meta.outputs.tag }}`.
 
-            See `CHANGELOG.md` for the human-written notes for this version.
-            Compose contract evidence (when available) lives under `docs/p0-report.md`.
+            **Install package (Linux x64):** `${{ steps.artifact.outputs.name }}`
+            Download the AppImage from Assets below, `chmod +x` it, then run it.
+
+            See `CHANGELOG.md` for human-written notes. Compose contract evidence
+            (when available) lives under `docs/p0-report.md`.

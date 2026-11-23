@@ -12,7 +12,8 @@ Asset coverage is intentionally broad (similar to [cc-switch releases](https://g
 | Linux arm64 | `ubuntu-22.04` (cross-package; fpm is x86-only) | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
 | Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
 | Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
-| macOS universal | `macos-15` | dmg, zip | `Hamster-vX.Y.Z-macOS-universal.dmg/.zip` |
+| macOS arm64 | `macos-latest` | dmg, zip | `Hamster-vX.Y.Z-mac-arm64.dmg/.zip` |
+| macOS Intel | `macos-13` | dmg, zip | `Hamster-vX.Y.Z-mac-x64.dmg/.zip` |
 | Notes | — | `CHANGELOG.md` + generated PR list | GitHub Release body |
 | Compose / source | — | clone the tag | not a separate installer |
 

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for early `0.x` cuts (breaking changes allowed without a major bump).
 
+## [0.1.5] - 2026-11-23
+
+### Fixed
+
+- macOS release jobs: replace often-queued `macos-15` universal build with `macos-latest` (arm64) + `macos-13` (Intel) dmg/zip pairs. v0.1.4 CI cancelled before Release publish.
+
 ## [0.1.4] - 2026-11-23
 
 ### Fixed
@@ -72,6 +78,7 @@ First exploratory `0.x` cut of the private self-hosted stack. Provisional name; 
 - This cloud cut also re-ran offline unit suites (agent / api / client / electron) before tagging; Compose was not re-run in the release environment (no Docker on that host)
 - Repo stays private; no npm publish; no Vercel / hosted eve / OpenUI commercial Gateway required
 
+[0.1.5]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.5
 [0.1.4]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.4
 [0.1.3]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.3
 [0.1.2]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.2

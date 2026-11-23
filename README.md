@@ -102,7 +102,7 @@ cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=htt
 
 ## Status
 
-**v0.1.7** is the current exploratory `0.x` cut (public repo; provisional name). Releases require Linux / Windows / macOS installers — see `CHANGELOG.md` and `docs/release.md`.
+**v0.1.8** is the current exploratory `0.x` cut (public repo; provisional name). Releases require Linux / Windows / macOS installers — see `CHANGELOG.md` and `docs/release.md`.
 
 Contract checks and OpenUI Renderer wiring are documented in `docs/p0-report.md` with fixture limitations called out. Eve is still not frozen; this is not a public product launch.
 

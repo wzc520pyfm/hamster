@@ -14,12 +14,11 @@ The GitHub repository is **public**. macOS packages are **required** for a relea
 | Linux arm64 | `ubuntu-22.04` (cross-package; fpm is x86-only) | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
 | Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
 | Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
-| macOS arm64 | `macos-latest` | dmg, zip | `Hamster-vX.Y.Z-macOS-arm64.dmg/.zip` |
-| macOS Intel | `macos-13` | dmg, zip | `Hamster-vX.Y.Z-macOS-x64.dmg/.zip` |
+| macOS arm64 + Intel | `macos-latest` (both arches in one job) | dmg, zip | `Hamster-vX.Y.Z-macOS-arm64|x64.dmg/.zip` |
 | Notes | — | `CHANGELOG.md` + generated PR list | GitHub Release body |
 | Compose / source | — | clone the tag | not a separate installer |
 
-CI builds these **in parallel** (matrix). The Release job waits for **all** platforms — including macOS — then attaches every asset to one GitHub Release.
+CI builds these **in parallel** (matrix). The Release job waits for **all** platforms — **macOS is required** (arm64 + Intel) — then attaches every asset to one GitHub Release.
 
 No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected).
 

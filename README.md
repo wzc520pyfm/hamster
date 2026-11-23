@@ -102,7 +102,7 @@ cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=htt
 
 ## Status
 
-**v0.1.4** is the current exploratory `0.x` cut (private; provisional name). Releases attach a cc-switch-style multi-arch/multi-format installer set — see `CHANGELOG.md` and `docs/release.md`.
+**v0.1.5** is the current exploratory `0.x` cut (private; provisional name). Releases attach a cc-switch-style multi-arch/multi-format installer set — see `CHANGELOG.md` and `docs/release.md`.
 
 Contract checks and OpenUI Renderer wiring are documented in `docs/p0-report.md` with fixture limitations called out. Eve is still not frozen; this is not a public product launch.
 

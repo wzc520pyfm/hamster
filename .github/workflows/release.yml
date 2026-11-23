@@ -54,11 +54,19 @@ jobs:
             dist_script: dist:win
             electron_args: --arm64
             artifact_pattern: electron/dist/*.exe
-          # macOS universal — dmg + zip (lipo of arm64 + x64)
-          - platform: macos-universal
-            os: macos-15
+          # macOS arm64 — dmg + zip (macos-15 often queued/cancelled on private repos)
+          - platform: macos-arm64
+            os: macos-latest
             dist_script: dist:mac
-            electron_args: --universal
+            electron_args: --arm64
+            artifact_pattern: |
+              electron/dist/*.dmg
+              electron/dist/*.zip
+          # macOS Intel — dmg + zip
+          - platform: macos-x64
+            os: macos-13
+            dist_script: dist:mac
+            electron_args: --x64
             artifact_pattern: |
               electron/dist/*.dmg
               electron/dist/*.zip
@@ -187,7 +195,7 @@ jobs:
             **Install packages** (unsigned; ${{ steps.assets.outputs.count }} assets), cc-switch-style matrix:
             - **Linux** x64 + arm64: AppImage, `.deb`, `.rpm`
             - **Windows** x64 + arm64: `-Setup.exe` (NSIS), `-Portable.exe`
-            - **macOS** universal: `.dmg`, `.zip` (Gatekeeper will warn)
+            - **macOS** arm64 + Intel: `.dmg`, `.zip` (Gatekeeper will warn)
 
             No code signing / updater signatures yet (unlike cc-switch `.sig` / `latest.json`).
 

@@ -1,13 +1,16 @@
 {
   "name": "hamster-electron",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Hamster Electron main client (private preview slice)",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test ./sessionStore.test.cjs ./windowLoadGuard.test.cjs ./mainIpcAuth.test.cjs ./notifyPendingApprovals.test.cjs ./mainRegisteredHandlers.integration.test.cjs ./appimageSandboxLaunch.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs",
-    "dist:linux": "electron-builder --linux AppImage --config electron-builder.yml --publish never"
+    "dist:linux": "electron-builder --linux AppImage --config electron-builder.yml --publish never",
+    "dist:win": "electron-builder --win nsis --config electron-builder.yml --publish never",
+    "dist:mac": "electron-builder --mac dmg --config electron-builder.yml --publish never",
+    "dist": "electron-builder --linux AppImage --win nsis --mac dmg --config electron-builder.yml --publish never"
   },
 
   "devDependencies": {

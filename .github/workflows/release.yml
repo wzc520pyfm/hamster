@@ -1,7 +1,7 @@
 # Multi-arch / multi-format Electron installers → one GitHub Release.
 # Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable,
-# macOS dmg/zip across arches), without signing / updater / notarization yet.
-# Repo is public; macOS is a required matrix cell (arm64 + Intel).
+# macOS dmg/zip for arm64 + Intel), without signing / updater / notarization yet.
+# Repo is public; macOS is required (both arches built on macos-latest).
 name: Release
 
 on:
@@ -39,14 +39,11 @@ jobs:
             os: windows-11-arm
             dist_script: dist:win
             electron_args: --arm64
-          - platform: macos-arm64
+          # Both Apple Silicon + Intel on macos-latest (avoids scarce macos-13 queue).
+          - platform: macos
             os: macos-latest
             dist_script: dist:mac
-            electron_args: --arm64
-          - platform: macos-x64
-            os: macos-13
-            dist_script: dist:mac
-            electron_args: --x64
+            electron_args: --arm64 --x64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -100,6 +97,10 @@ jobs:
             ls -lah electron/dist || true
             exit 1
           fi
+          if [ "${{ matrix.platform }}" = "macos" ] && [ "$count" -lt 4 ]; then
+            echo "Expected arm64+x64 dmg+zip (>=4) for macOS, found $count" >&2
+            exit 1
+          fi
 
       - name: Upload ${{ matrix.platform }} artifacts
         uses: actions/upload-artifact@v4
@@ -139,6 +140,12 @@ jobs:
           if [ "${#files[@]}" -lt 12 ]; then
             echo "Expected full multi-platform installer set (>=12), found ${#files[@]}" >&2
             find release-assets -type f -print || true
+            exit 1
+          fi
+          # Require macOS presence
+          mac_count=$(find release-assets -type f \( -name '*.dmg' -o -name '*.zip' \) | wc -l | tr -d ' ')
+          if [ "$mac_count" -lt 4 ]; then
+            echo "macOS is required: expected >=4 dmg/zip, found $mac_count" >&2
             exit 1
           fi
           echo "count=${#files[@]}" >> "$GITHUB_OUTPUT"

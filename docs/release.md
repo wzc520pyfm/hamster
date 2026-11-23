@@ -9,7 +9,7 @@ Asset coverage is intentionally broad (similar to [cc-switch releases](https://g
 | Platform | Runner | Formats | Example asset names |
 | --- | --- | --- | --- |
 | Linux x64 | `ubuntu-22.04` | AppImage, deb, rpm | `Hamster-vX.Y.Z-Linux-*.AppImage/.deb/.rpm` |
-| Linux arm64 | `ubuntu-22.04-arm` | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
+| Linux arm64 | `ubuntu-22.04` (cross-package; fpm is x86-only) | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
 | Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
 | Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
 | macOS universal | `macos-15` | dmg, zip | `Hamster-vX.Y.Z-macOS-universal.dmg/.zip` |

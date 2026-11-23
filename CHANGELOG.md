@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for early `0.x` cuts (breaking changes allowed without a major bump).
 
+## [0.1.4] - 2026-11-23
+
+### Fixed
+
+- Linux arm64 deb/rpm packaging: build on x64 runners (electron-builder fpm is x86-only; native ARM runners hit Exec format error). v0.1.3 CI failed before creating a Release.
+
+### Notes
+
+- Same cc-switch-style asset matrix as 0.1.3 once green
+
 ## [0.1.3] - 2026-11-23
 
 ### Added
@@ -62,6 +72,7 @@ First exploratory `0.x` cut of the private self-hosted stack. Provisional name; 
 - This cloud cut also re-ran offline unit suites (agent / api / client / electron) before tagging; Compose was not re-run in the release environment (no Docker on that host)
 - Repo stays private; no npm publish; no Vercel / hosted eve / OpenUI commercial Gateway required
 
+[0.1.4]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.4
 [0.1.3]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.3
 [0.1.2]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.2
 [0.1.1]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.1

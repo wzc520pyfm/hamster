@@ -1,7 +1,10 @@
 # Multi-arch / multi-format Electron installers → one GitHub Release.
-# Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable,
-# macOS dmg+zip across arches), without signing / updater / notarization yet.
-# Early 0.x tags are marked prerelease.
+# Asset coverage mirrors cc-switch-style releases (AppImage/deb/rpm, Setup+Portable),
+# without signing / updater / notarization yet.
+#
+# macOS is a separate non-gating job: private-repo macOS runners are scarce, and a
+# queued Intel/universal cell previously cancelled whole publishes. Linux+Windows
+# always publish; macOS arm64 uploads onto the same Release when a runner appears.
 name: Release
 
 on:
@@ -22,48 +25,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux x64 — AppImage + deb + rpm (native)
           - platform: linux-x64
             os: ubuntu-22.04
             dist_script: dist:linux
             electron_args: --x64
-            artifact_pattern: |
-              electron/dist/*.AppImage
-              electron/dist/*.deb
-              electron/dist/*.rpm
-          # Linux arm64 — AppImage + deb + rpm
-          # Cross-package on x64: electron-builder's bundled fpm is x86-only and
-          # cannot Exec on ubuntu-*-arm runners (Exec format error).
           - platform: linux-arm64
+            # Cross-package on x64: electron-builder's bundled fpm is x86-only.
             os: ubuntu-22.04
             dist_script: dist:linux
             electron_args: --arm64
-            artifact_pattern: |
-              electron/dist/*.AppImage
-              electron/dist/*.deb
-              electron/dist/*.rpm
-          # Windows x64 — NSIS Setup + Portable
           - platform: windows-x64
             os: windows-2022
             dist_script: dist:win
             electron_args: --x64
-            artifact_pattern: electron/dist/*.exe
-          # Windows arm64 — NSIS Setup + Portable
           - platform: windows-arm64
             os: windows-11-arm
             dist_script: dist:win
             electron_args: --arm64
-            artifact_pattern: electron/dist/*.exe
-          # macOS arm64 — dmg + zip
-          # Note: macos-13/15 Intel/universal jobs often sit queued with no runner on
-          # this private repo and cancel the whole matrix; ship Apple Silicon first.
-          - platform: macos-arm64
-            os: macos-latest
-            dist_script: dist:mac
-            electron_args: --arm64
-            artifact_pattern: |
-              electron/dist/*.dmg
-              electron/dist/*.zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -93,36 +71,22 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run ${{ matrix.dist_script }} -- ${{ matrix.electron_args }}
 
-      - name: Normalize asset names (cc-switch style)
+      - name: Collect assets
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p release-assets
           shopt -s nullglob
-          VERSION="${GITHUB_REF_NAME}"
-
-          rename_one() {
-            local src="$1"
-            local base dest
-            base="$(basename "$src")"
-            # Already using Hamster-v* from electron-builder — keep, but map os tokens.
+          for f in electron/dist/*.AppImage electron/dist/*.deb electron/dist/*.rpm \
+                   electron/dist/*.exe electron/dist/*.dmg electron/dist/*.zip; do
+            base="$(basename "$f")"
             dest="$base"
             dest="${dest//-linux-/-Linux-}"
             dest="${dest//-mac-/-macOS-}"
             dest="${dest//-win-/-Windows-}"
-            # Prefer tag in the name when builder used package.json version only.
-            if [[ "$dest" != Hamster-"$VERSION"-* && "$dest" == Hamster-v* ]]; then
-              :
-            fi
-            cp -f "$src" "release-assets/$dest"
+            cp -f "$f" "release-assets/$dest"
             echo "asset: $dest"
-          }
-
-          for f in electron/dist/*.AppImage electron/dist/*.deb electron/dist/*.rpm \
-                   electron/dist/*.exe electron/dist/*.dmg electron/dist/*.zip; do
-            rename_one "$f"
           done
-
           count=$(find release-assets -type f | wc -l | tr -d ' ')
           echo "Collected $count assets for ${{ matrix.platform }}"
           ls -lah release-assets
@@ -154,7 +118,7 @@ jobs:
             *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Download all platform artifacts
+      - name: Download Linux/Windows artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
@@ -166,9 +130,9 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           files=(release-assets/*)
-          # Expect a cc-switch-like set: linux×2 arches×3 + win×2 arches×2 + mac×2 ≈ 12
+          # linux×2×3 + win×2×2 = 10
           if [ "${#files[@]}" -lt 8 ]; then
-            echo "Expected a broad installer set (>=8), found ${#files[@]}" >&2
+            echo "Expected Linux/Windows installer set (>=8), found ${#files[@]}" >&2
             find release-assets -type f -print || true
             exit 1
           fi
@@ -186,12 +150,58 @@ jobs:
           body: |
             Exploratory Hamster cut `${{ steps.meta.outputs.tag }}`.
 
-            **Install packages** (unsigned; ${{ steps.assets.outputs.count }} assets), cc-switch-style matrix:
+            **Install packages** (unsigned; ${{ steps.assets.outputs.count }} core assets):
             - **Linux** x64 + arm64: AppImage, `.deb`, `.rpm`
             - **Windows** x64 + arm64: `-Setup.exe` (NSIS), `-Portable.exe`
-            - **macOS** arm64 (Apple Silicon): `.dmg`, `.zip` (Gatekeeper will warn)
+            - **macOS** arm64: attached by the follow-up `macos` job when a runner is available
 
             No code signing / updater signatures yet (unlike cc-switch `.sig` / `latest.json`).
 
-            See `CHANGELOG.md` for human-written notes. Compose contract evidence
-            (when available) lives under `docs/p0-report.md`.
+            See `CHANGELOG.md` for human-written notes.
+
+  macos:
+    needs: release
+    # Do not gate the Release on scarce private-repo macOS runners.
+    continue-on-error: true
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install Electron package deps
+        working-directory: electron
+        run: npm ci
+
+      - name: Build macOS arm64 packages
+        working-directory: electron
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist:mac -- --arm64
+
+      - name: Collect macOS assets
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          shopt -s nullglob
+          for f in electron/dist/*.dmg electron/dist/*.zip; do
+            base="$(basename "$f")"
+            dest="${base//-mac-/-macOS-}"
+            cp -f "$f" "release-assets/$dest"
+            echo "asset: $dest"
+          done
+          ls -lah release-assets
+          test "$(find release-assets -type f | wc -l | tr -d ' ')" -ge 1
+
+      - name: Attach macOS assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release-assets/*
+          fail_on_unmatched_files: true

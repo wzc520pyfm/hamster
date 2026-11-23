@@ -8,9 +8,13 @@ for early `0.x` cuts (breaking changes allowed without a major bump).
 
 ## [0.1.6] - 2026-11-23
 
+### Added
+
+- Published cc-switch-style installer set (10 assets): Linux x64/arm64 AppImage+deb+rpm, Windows x64/arm64 Setup+Portable
+
 ### Fixed
 
-- Drop unreliable `macos-13` Intel matrix cell (queued with no runner, blocked Release). Ship macOS arm64 dmg/zip only for now; Linux x64/arm64 + Windows x64/arm64 unchanged.
+- Release publish no longer waits on scarce private-repo macOS runners (macOS becomes a non-gating follow-up attach). Earlier 0.1.3–0.1.5 tags failed/cancelled before Release creation because of ARM fpm / queued macOS cells.
 
 ## [0.1.5] - 2026-11-23
 

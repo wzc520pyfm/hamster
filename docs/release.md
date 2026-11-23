@@ -12,13 +12,14 @@ Asset coverage is intentionally broad (similar to [cc-switch releases](https://g
 | Linux arm64 | `ubuntu-22.04` (cross-package; fpm is x86-only) | AppImage, deb, rpm | same with arm64 / aarch64 arch token |
 | Windows x64 | `windows-2022` | NSIS Setup, Portable | `Hamster-vX.Y.Z-Windows-*-Setup.exe`, `…-Portable.exe` |
 | Windows arm64 | `windows-11-arm` | NSIS Setup, Portable | same with arm64 |
-| macOS arm64 | `macos-latest` | dmg, zip | `Hamster-vX.Y.Z-mac-arm64.dmg/.zip` |
+| macOS arm64 | `macos-latest` (non-gating follow-up job) | dmg, zip | `Hamster-vX.Y.Z-macOS-arm64.dmg/.zip` |
 | Notes | — | `CHANGELOG.md` + generated PR list | GitHub Release body |
 | Compose / source | — | clone the tag | not a separate installer |
 
-CI builds these **in parallel** (matrix), then one job attaches every asset to a single GitHub Release.
+**Critical path:** Linux + Windows build in parallel, then one job creates the GitHub Release.  
+**macOS:** runs after the Release exists and uploads onto it when a runner is available (`continue-on-error`). Scarce private-repo macOS queues must not block publishing (this previously cancelled whole tags).
 
-No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected).
+No auto-update. No code signing / notarization (SmartScreen / Gatekeeper warnings expected). Intel macOS not built yet.
 
 ## Cut a release
 
@@ -35,32 +36,22 @@ git tag -a vX.Y.Z -m "Hamster vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`) builds the matrix and uploads all installers.
+6. GitHub Actions workflow **Release** (`.github/workflows/release.yml`) builds Linux/Windows, publishes the Release, then optionally attaches macOS.
 
 ## Local packaging (optional smoke)
-
-Build only formats for the current OS (cross-OS / cross-arch needs matching runners):
 
 ```bash
 cd electron
 npm ci
-CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:linux   # or dist:win / dist:mac [-- --universal]
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:linux   # or dist:win / dist:mac
 ls dist/
-```
-
-## Manual fallback
-
-Build each matrix cell on its native host, then:
-
-```bash
-gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md --prerelease path/to/Hamster-vX.Y.Z-*
 ```
 
 ## Verification policy for 0.x
 
 - Preferred: `./scripts/verify-p0.sh` against Compose or the local Postgres + agent + api loop.
 - Acceptable for early tags: offline unit suites when Compose cannot run on the release host.
-- Packaging smoke: `electron` unit tests + successful matrix `dist:*` jobs in CI.
+- Packaging smoke: `electron` unit tests + successful Linux/Windows matrix jobs in CI.
 - Live-model path remains optional; fixture NOTE is expected when no provider key is set.
 
 ## Later automation
@@ -68,4 +59,4 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes-file CHANGELOG.md --prerelease
 - unit tests on `main` / PRs
 - Compose contract on a Docker-capable runner
 - tag-from-version-bump (release-please)
-- code signing, notarization, and updater metadata (cc-switch-style `.sig` / `latest.json`) when keys exist
+- Intel macOS + code signing / notarization / updater metadata when runners and keys exist

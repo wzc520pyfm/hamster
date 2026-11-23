@@ -1,15 +1,15 @@
-# Minimal private Linux x64 packaging config for the P1 Electron candidate port.
+# Private Electron packaging for early 0.x cuts.
 # Trial-only: no signing, no publish targets, no auto-update wiring (out of scope).
 # PACKAGING-FIX after MF1/N1: include mainIpcAuth.cjs + notifyPendingApprovals.cjs
 # (required by main.js; omitted from pre-MF1 files list).
 #
-# SANDBOX mustfix: linux.executableArgs: [] overrides legacy fuse2 default
-# desktop Exec=AppRun --no-sandbox. afterPack installs fail-closed AppRun that
-# overwrites vendor generateAppRunScript (fail-open on unshare probe).
+# SANDBOX mustfix (Linux AppImage): linux.executableArgs: [] overrides legacy
+# fuse2 default desktop Exec=AppRun --no-sandbox. afterPack installs fail-closed
+# AppRun that overwrites vendor generateAppRunScript (fail-open on unshare probe).
 appId: com.hamster.p1.electron
 productName: Hamster
 # Versioned release asset name (uploaded by .github/workflows/release.yml).
-artifactName: hamster-${version}-linux-${arch}.${ext}
+artifactName: hamster-${version}-${os}-${arch}.${ext}
 directories:
   output: dist
 afterPack: ./appimageAfterPack.cjs
@@ -19,6 +19,21 @@ linux:
   category: Utility
   # Empty array required: omitting executableArgs restores upstream default ["--no-sandbox"].
   executableArgs: []
+win:
+  target:
+    - nsis
+  # Unsigned early builds; do not require a code-signing certificate.
+  signAndEditExecutable: false
+mac:
+  target:
+    - dmg
+  # Unsigned early builds (Gatekeeper will warn). identity null disables signing.
+  identity: null
+  category: public.app-category.productivity
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
 files:
   - main.js
   - preload.js

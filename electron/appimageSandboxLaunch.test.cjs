@@ -61,7 +61,9 @@ test('electron-builder.yml sets executableArgs empty (no default --no-sandbox de
   const yml = fs.readFileSync(BUILDER_YML, 'utf8')
   assert.match(yml, /executableArgs:\s*\[\s*\]/)
   assert.match(yml, /afterPack:\s*\.\/appimageAfterPack\.cjs/)
-  assert.match(yml, /artifactName:\s*hamster-\$\{version\}-linux-\$\{arch\}\.\$\{ext\}/)
+  assert.match(yml, /artifactName:\s*hamster-\$\{version\}-\$\{os\}-\$\{arch\}\.\$\{ext\}/)
+  assert.match(yml, /^win:\s*$/m)
+  assert.match(yml, /^mac:\s*$/m)
   assert.ok(!/executableArgs:\s*\[[^\]]*--no-sandbox/.test(yml))
 })
 

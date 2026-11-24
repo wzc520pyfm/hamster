@@ -125,7 +125,7 @@ function ConnectGateInner() {
           className="h-10 rounded-md border border-[var(--color-border)] bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="http://192.168.1.10:3000"
+          placeholder="http://localhost:3000"
           aria-label={t.connectAddressLabel}
           data-testid="connect-gate-address"
           disabled={busy}

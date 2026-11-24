@@ -107,11 +107,14 @@ test('afterPack copies fail-closed AppRun into appOutDir (static hook contract)'
   }
 })
 
-test('afterPack no-ops on non-linux', async () => {
+test('afterPack no-ops AppRun on non-linux; darwin requires a real app layout', async () => {
   const hook = require(AFTER_PACK)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hamster-afterpack-darwin-'))
   try {
-    await hook.default({ electronPlatformName: 'darwin', appOutDir: tmp })
+    await assert.rejects(
+      () => hook.default({ electronPlatformName: 'darwin', appOutDir: tmp, arch: 3 }),
+      /main executable missing/,
+    )
     assert.ok(!fs.existsSync(path.join(tmp, 'AppRun')))
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })

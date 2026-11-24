@@ -51,6 +51,7 @@ files:
   - preload.js
   - gate.html
   - hamsterOrigin.cjs
+  - machoUuid.cjs
   - sessionStore.cjs
   - windowLoadGuard.cjs
   - mainIpcAuth.cjs

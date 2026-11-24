@@ -125,6 +125,12 @@
         font-size: 14px;
         color: var(--color-destructive);
       }
+      .hint {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--color-muted-foreground);
+      }
       .busy {
         margin: 0;
         font-size: 13px;
@@ -156,11 +162,12 @@
             type="url"
             spellcheck="false"
             autocomplete="off"
-            placeholder="http://192.168.1.10:3000"
+            placeholder="http://localhost:3000"
           />
           <button class="submit" id="submit" type="submit" data-testid="connect-gate-submit"></button>
           <p class="busy" id="busy" hidden></p>
           <p class="error" id="error" data-testid="connect-gate-error" hidden></p>
+          <p class="hint" id="hint" data-testid="connect-gate-hint" hidden></p>
         </form>
       </div>
     </div>
@@ -172,6 +179,8 @@
           connect: 'Connect',
           retry: 'Retry',
           error: "Can't reach this Hamster",
+          hintUnreachable:
+            'Start Compose (or server.mjs) first. Same Mac: http://localhost:3000. LAN needs Local Network allowed for Hamster in System Settings.',
           busy: 'Connecting…',
         },
         zh: {
@@ -180,6 +189,8 @@
           connect: '连接',
           retry: '重试',
           error: '无法连接',
+          hintUnreachable:
+            '请先启动 Compose（或 server.mjs）。本机请用 http://localhost:3000。局域网需在系统设置中允许 Hamster 的「本地网络」。',
           busy: '正在连接…',
         },
       }
@@ -187,12 +198,14 @@
       let locale = localStorage.getItem(LOCALE_KEY) === 'zh' ? 'zh' : 'en'
       let failedOnce = false
       let busy = false
+      let showHint = false
 
       const title = document.getElementById('title')
       const label = document.getElementById('label')
       const address = document.getElementById('address')
       const submit = document.getElementById('submit')
       const errorEl = document.getElementById('error')
+      const hintEl = document.getElementById('hint')
       const busyEl = document.getElementById('busy')
       const enBtn = document.getElementById('locale-en')
       const zhBtn = document.getElementById('locale-zh')
@@ -205,9 +218,18 @@
         address.setAttribute('aria-label', t.label)
         submit.textContent = failedOnce ? t.retry : t.connect
         errorEl.textContent = t.error
+        hintEl.textContent = t.hintUnreachable
+        hintEl.hidden = !showHint
         busyEl.textContent = t.busy
         enBtn.setAttribute('aria-pressed', locale === 'en' ? 'true' : 'false')
         zhBtn.setAttribute('aria-pressed', locale === 'zh' ? 'true' : 'false')
+      }
+
+      function markFailed(opts) {
+        failedOnce = true
+        errorEl.hidden = false
+        showHint = Boolean(opts && opts.hint)
+        hintEl.hidden = !showHint
       }
 
       function setLocale(next) {
@@ -226,8 +248,7 @@
           address.value = gateState.draft
         }
         if (gateState && gateState.showError) {
-          failedOnce = true
-          errorEl.hidden = false
+          markFailed({ hint: true })
         }
       } catch (_) {}
 
@@ -237,10 +258,11 @@
         e.preventDefault()
         if (busy) return
         errorEl.hidden = true
+        hintEl.hidden = true
+        showHint = false
         const value = address.value.trim()
         if (!value || !window.hamster || typeof window.hamster.requestConnect !== 'function') {
-          failedOnce = true
-          errorEl.hidden = false
+          markFailed({ hint: true })
           render()
           return
         }
@@ -252,8 +274,15 @@
         try {
           const result = await window.hamster.requestConnect(value)
           if (!result || !result.ok) {
-            failedOnce = true
-            errorEl.hidden = false
+            const reason = result && result.reason ? String(result.reason) : ''
+            markFailed({
+              hint:
+                !reason ||
+                reason === 'health_unreachable' ||
+                reason === 'manifest_unreachable' ||
+                reason === 'mount_timeout' ||
+                reason === 'load_failed',
+            })
             // Keep edited value for Retry (main never echoes secrets).
           }
           // On ok, main navigates away; if still here, treat as failure.
@@ -261,13 +290,11 @@
             // brief wait — navigation should unmount this document
             await new Promise((r) => setTimeout(r, 400))
             if (!document.hidden) {
-              failedOnce = true
-              errorEl.hidden = false
+              markFailed({ hint: true })
             }
           }
         } catch (_) {
-          failedOnce = true
-          errorEl.hidden = false
+          markFailed({ hint: true })
         } finally {
           busy = false
           submit.disabled = false

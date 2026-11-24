@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for early `0.x` cuts (breaking changes allowed without a major bump).
 
+## [0.1.10] - 2026-11-24
+
+### Fixed
+
+- macOS Electron: rewrite main + Helper Mach-O `LC_UUID` in afterPack so Local Network privacy attributes Hamster correctly (Electron stock UUID is shared across apps; v0.1.9’s plist key alone was not enough for LAN Connect)
+- Connect gate: prefer `http://localhost:3000` placeholder and show a short unreachable hint
+
 ## [0.1.9] - 2026-11-24
 
 ### Fixed
@@ -113,6 +120,7 @@ First exploratory `0.x` cut of the private self-hosted stack. Provisional name; 
 - This cloud cut also re-ran offline unit suites (agent / api / client / electron) before tagging; Compose was not re-run in the release environment (no Docker on that host)
 - Repo stays private; no npm publish; no Vercel / hosted eve / OpenUI commercial Gateway required
 
+[0.1.10]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.10
 [0.1.9]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.9
 [0.1.8]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.8
 [0.1.7]: https://github.com/wzc520pyfm/hamster/releases/tag/v0.1.7

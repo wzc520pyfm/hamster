@@ -1,6 +1,6 @@
 {
   "name": "hamster-electron",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Hamster Electron main client (private preview slice)",
   "homepage": "https://github.com/wzc520pyfm/hamster",
@@ -8,7 +8,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test ./sessionStore.test.cjs ./windowLoadGuard.test.cjs ./mainIpcAuth.test.cjs ./notifyPendingApprovals.test.cjs ./mainRegisteredHandlers.integration.test.cjs ./appimageSandboxLaunch.test.cjs ./hamsterOrigin.retry.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs",
+    "test": "node --test ./sessionStore.test.cjs ./windowLoadGuard.test.cjs ./mainIpcAuth.test.cjs ./notifyPendingApprovals.test.cjs ./mainRegisteredHandlers.integration.test.cjs ./appimageSandboxLaunch.test.cjs ./hamsterOrigin.retry.test.cjs ./machoUuid.test.cjs ../shared/hamsterOrigin.test.mjs ../shared/originHelpersConsistency.test.mjs ../client/server.safejoin.test.mjs",
     "dist:linux": "electron-builder --linux AppImage deb rpm --config electron-builder.yml --publish never",
     "dist:win": "electron-builder --win nsis portable --config electron-builder.yml --publish never",
     "dist:mac": "electron-builder --mac dmg zip --config electron-builder.yml --publish never",

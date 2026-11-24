@@ -87,6 +87,8 @@ test('macOS packaging declares NSLocalNetworkUsageDescription for LAN Connect', 
     macBlock,
     /extendInfo:\n[ \t]+NSLocalNetworkUsageDescription:\s*"Hamster connects to your self-hosted client on the local network\."/,
   )
+  // Ad-hoc identity required after LC_UUID rewrite on Apple Silicon.
+  assert.match(macBlock, /identity:\s*"-"\s*$/m)
   // Keep the usage string tied to the Connect gate's LAN origin story.
   assert.match(yml, /192\.168/)
 })

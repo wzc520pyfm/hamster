@@ -3,14 +3,20 @@
 /**
  * afterPack:
  * - linux: install fail-closed AppRun (overwrite vendor fail-open AppRun).
- * - darwin: rewrite main + Helper Mach-O LC_UUID for Local Network privacy
- *   (TN3179 / electron#55101). Must run before any signing step.
+ * - darwin: rewrite main executable Mach-O LC_UUID for Local Network privacy
+ *   (TN3179 / electron#55101), then ad-hoc re-sign the rewritten binary on
+ *   Apple Silicon. Editing LC_UUID invalidates Electron's linker signature;
+ *   with mac.identity null, nothing re-signs and arm64 kills the app at launch
+ *   ("Hamster quit unexpectedly"). Helpers keep stock UUIDs — macOS attributes
+ *   their traffic to the responsible app once the main UUID is unique.
  *
  * Desktop Exec is fixed separately via linux.executableArgs: [] in electron-builder.yml.
  */
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
-const { appUuid, patchExecutable } = require('./machoUuid.cjs')
+const { spawnSync } = require('node:child_process')
+const { appUuid, patchExecutable, readUuid } = require('./machoUuid.cjs')
 
 const FAIL_CLOSED = path.join(__dirname, 'appimage', 'AppRun.fail-closed.sh')
 const APP_ID = 'com.hamster.p1.electron'
@@ -23,61 +29,75 @@ function archLabel(arch) {
 }
 
 /**
- * Resolve MacOS + Frameworks dirs from electron-builder's darwin appOutDir.
- * electron-builder documents appOutDir as `…/AppName.app/Contents/MacOS`.
+ * Resolve main executable from electron-builder darwin appOutDir
+ * (`…/mac(-arm64)/Hamster.app/Contents/MacOS/Hamster` under `…/Hamster.app`).
  */
-function resolveDarwinLayout(appOutDir, productName) {
+function resolveDarwinMain(appOutDir, productName) {
   const directMain = path.join(appOutDir, productName)
   if (fs.existsSync(directMain) && path.basename(appOutDir) === 'MacOS') {
-    return {
-      main: directMain,
-      frameworks: path.join(path.dirname(appOutDir), 'Frameworks'),
-    }
+    return directMain
   }
-  // Fallback: appOutDir is the .app bundle root.
   const appRoot =
     path.basename(appOutDir) === `${productName}.app`
       ? appOutDir
       : path.join(appOutDir, `${productName}.app`)
-  const main = path.join(appRoot, 'Contents', 'MacOS', productName)
-  const frameworks = path.join(appRoot, 'Contents', 'Frameworks')
-  return { main, frameworks }
+  return path.join(appRoot, 'Contents', 'MacOS', productName)
+}
+
+/**
+ * Ad-hoc re-sign a single Mach-O as a standalone file (not the .app bundle).
+ * Signing Contents/MacOS/X in place makes codesign treat it as the whole bundle
+ * and fail on not-yet-signed siblings during afterPack.
+ */
+function adHocSignExecutable(filePath) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hamster-adhoc-'))
+  const tmp = path.join(dir, path.basename(filePath))
+  try {
+    fs.copyFileSync(filePath, tmp)
+    const result = spawnSync('codesign', ['--sign', '-', '--force', '--timestamp=none', tmp], {
+      encoding: 'utf8',
+    })
+    if (result.status !== 0) {
+      throw new Error(
+        `codesign --sign - failed for ${filePath}: ${result.stderr || result.stdout || result.error}`,
+      )
+    }
+    fs.copyFileSync(tmp, filePath)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 function patchDarwinLocalNetworkUuids(context) {
   const arch = archLabel(context.arch)
   const productName = context.packager?.appInfo?.productFilename || 'Hamster'
-  const { main, frameworks } = resolveDarwinLayout(context.appOutDir, productName)
+  const main = resolveDarwinMain(context.appOutDir, productName)
   if (!fs.existsSync(main)) {
     throw new Error(`macOS afterPack: main executable missing at ${main}`)
   }
 
-  const patched = []
-  const mainResult = patchExecutable(main, appUuid(APP_ID, arch, 'main'))
-  patched.push({ role: 'main', path: main, ...mainResult })
+  const before = readUuid(fs.readFileSync(main))
+  const expected = appUuid(APP_ID, arch, 'main')
+  const mainResult = patchExecutable(main, expected)
   if (mainResult.after === mainResult.before) {
     throw new Error('macOS afterPack: main LC_UUID unchanged after patch')
   }
+  if (mainResult.after !== expected) {
+    throw new Error(`macOS afterPack: expected UUID ${expected}, got ${mainResult.after}`)
+  }
 
-  const helpers = [
-    { role: 'helper', name: `${productName} Helper` },
-    { role: 'helper-renderer', name: `${productName} Helper (Renderer)` },
-    { role: 'helper-gpu', name: `${productName} Helper (GPU)` },
-    { role: 'helper-plugin', name: `${productName} Helper (Plugin)` },
-  ]
-  if (fs.existsSync(frameworks)) {
-    for (const h of helpers) {
-      const exe = path.join(frameworks, `${h.name}.app`, 'Contents', 'MacOS', h.name)
-      if (!fs.existsSync(exe)) continue
-      patched.push({
-        role: h.role,
-        path: exe,
-        ...patchExecutable(exe, appUuid(APP_ID, arch, h.role)),
-      })
+  // Apple Silicon rejects binaries whose linker ad-hoc signature was invalidated.
+  // Electron x64 builds often ship unsigned; codesign --sign - can fail there — skip.
+  if (arch === 'arm64') {
+    adHocSignExecutable(main)
+    // UUID must survive the re-sign.
+    const afterSign = readUuid(fs.readFileSync(main))
+    if (afterSign !== expected) {
+      throw new Error(`macOS afterPack: UUID lost after ad-hoc sign (${afterSign})`)
     }
   }
 
-  return patched
+  return [{ role: 'main', path: main, before, after: mainResult.after, arch }]
 }
 
 function installFailClosedAppRun(context) {
@@ -109,5 +129,6 @@ exports.default = async function afterPack(context) {
 }
 
 exports.patchDarwinLocalNetworkUuids = patchDarwinLocalNetworkUuids
-exports.resolveDarwinLayout = resolveDarwinLayout
+exports.resolveDarwinMain = resolveDarwinMain
+exports.adHocSignExecutable = adHocSignExecutable
 exports.archLabel = archLabel

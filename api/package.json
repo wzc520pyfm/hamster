@@ -1,6 +1,6 @@
 {
   "name": "hamster-api",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "commonjs",
   "description": "Hamster P0 self-hosted control plane: conversations, tasks (Mainline A), assets/dashboards, approvals (fail-closed).",

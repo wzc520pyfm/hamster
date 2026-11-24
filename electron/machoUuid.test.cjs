@@ -77,7 +77,7 @@ test('patchExecutable rewrites file and refuses non-Mach-O', () => {
   }
 })
 
-test('darwin afterPack rewrites main+helper UUIDs under appOutDir/*.app layout', () => {
+test('darwin afterPack rewrites main UUID only (helpers keep stock)', () => {
   const { patchDarwinLocalNetworkUuids } = require('./appimageAfterPack.cjs')
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hamster-darwin-pack-'))
   try {
@@ -85,22 +85,30 @@ test('darwin afterPack rewrites main+helper UUIDs under appOutDir/*.app layout',
     const main = path.join(app, 'Contents', 'MacOS', 'Hamster')
     fs.mkdirSync(path.dirname(main), { recursive: true })
     fs.writeFileSync(main, synthMachO())
-    const helpers = ['Helper', 'Helper (Renderer)', 'Helper (GPU)', 'Helper (Plugin)']
-    for (const suffix of helpers) {
-      const name = `Hamster ${suffix}`
-      const exe = path.join(app, 'Contents', 'Frameworks', `${name}.app`, 'Contents', 'MacOS', name)
-      fs.mkdirSync(path.dirname(exe), { recursive: true })
-      fs.writeFileSync(exe, synthMachO(`4c4c444${helpers.indexOf(suffix)}55553144a1b41777fb24dfb${helpers.indexOf(suffix)}`))
-    }
+    const helper = path.join(
+      app,
+      'Contents',
+      'Frameworks',
+      'Hamster Helper.app',
+      'Contents',
+      'MacOS',
+      'Hamster Helper',
+    )
+    fs.mkdirSync(path.dirname(helper), { recursive: true })
+    const helperStock = '4C4C4449-5555-3144-A1B4-1777FB24DFB7'
+    fs.writeFileSync(helper, synthMachO(helperStock.replace(/-/g, '').toLowerCase()))
+
+    // x64 skips codesign (Electron x64 often unsigned); exercise UUID rewrite path.
     const patched = patchDarwinLocalNetworkUuids({
       appOutDir: root,
-      arch: 3,
+      arch: 1,
       packager: { appInfo: { productFilename: 'Hamster' } },
     })
-    assert.equal(patched.length, 5)
-    assert.equal(patched[0].after, appUuid('com.hamster.p1.electron', 'arm64', 'main'))
+    assert.equal(patched.length, 1)
+    assert.equal(patched[0].after, appUuid('com.hamster.p1.electron', 'x64', 'main'))
     assert.notEqual(patched[0].before, patched[0].after)
     assert.equal(readUuid(fs.readFileSync(main)), patched[0].after)
+    assert.equal(readUuid(fs.readFileSync(helper)), helperStock)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

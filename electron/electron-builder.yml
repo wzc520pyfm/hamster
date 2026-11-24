@@ -31,8 +31,10 @@ mac:
   target:
     - dmg
     - zip
-  # Unsigned early builds (Gatekeeper will warn). identity null disables signing.
-  identity: null
+  # Ad-hoc sign ("-"): required after LC_UUID rewrite on Apple Silicon. identity
+  # null skips signing entirely and leaves an invalidated linker signature →
+  # "Hamster quit unexpectedly" on launch. Still unsigned / no notarization.
+  identity: "-"
   category: public.app-category.productivity
   # macOS 15+ Local Network privacy (TN3179): without this key, TCP to LAN
   # origins (e.g. http://192.168.x.x:3000) is denied silently — no prompt, and

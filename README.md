@@ -31,6 +31,18 @@ Then open `http://localhost:3000`. Recommended: leave `VITE_API_BASE_URL` empty 
 browser uses same-origin `/api` via `server.mjs` (`API_UPSTREAM=http://api:8080`).
 Set `VITE_API_BASE_URL` only for an explicit cross-origin bake override.
 
+### Electron private preview
+
+GitHub Releases ship unsigned Electron installers that **do not** embed the Compose stack.
+Start Compose (or production-style `server.mjs`) first, then open Hamster and enter the
+client origin on the Connect gate — same machine: `http://localhost:3000`; another device
+on the LAN: `http://<host-lan-ip>:3000` (placeholder example: `http://192.168.1.10:3000`).
+
+On **macOS 15+**, the first LAN connect may show a **Local Network** permission prompt
+(packaged builds declare `NSLocalNetworkUsageDescription`). Allow Hamster, then **Retry**
+if the gate still shows 无法连接 / Can't reach this Hamster. Loopback (`localhost` /
+`127.0.0.1`) is not gated by that prompt.
+
 Default placeholder env values (overridable; not real secrets):
 
 - `HAMSTER_DB_PASSWORD=changeme`

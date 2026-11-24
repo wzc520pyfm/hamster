@@ -113,6 +113,29 @@ async function validateHamsterClientApiOrigin(origin, opts = {}) {
   return { ok: true, origin: base }
 }
 
+/**
+ * macOS 15+ Local Network (TN3179): the TCP that raises the permission alert may
+ * be denied before the user answers. Retry only transient reachability failures.
+ */
+async function validateHamsterClientApiOriginWithRetry(origin, opts = {}) {
+  const attempts = Number(opts.attempts) > 0 ? Number(opts.attempts) : 3
+  const delayMs = Number(opts.delayMs) >= 0 ? Number(opts.delayMs) : 800
+  const sleep =
+    typeof opts.sleep === 'function'
+      ? opts.sleep
+      : (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  let last = await validateHamsterClientApiOrigin(origin, opts)
+  for (let i = 1; i < attempts && !last.ok; i += 1) {
+    if (last.reason !== 'health_unreachable' && last.reason !== 'manifest_unreachable') {
+      break
+    }
+    await sleep(delayMs)
+    last = await validateHamsterClientApiOrigin(origin, opts)
+  }
+  return last
+}
+
 function isRestorableClientPath(pathname) {
   const path = String(pathname || '')
   if (path === '/' || path === '') return true
@@ -148,6 +171,7 @@ module.exports = {
   normalizeHamsterOrigin,
   normalizeHamsterOriginInput: normalizeHamsterOrigin,
   validateHamsterClientApiOrigin,
+  validateHamsterClientApiOriginWithRetry,
   isRestorableClientPath,
   buildClientUrl,
   isUrlOnTrustedOrigin,

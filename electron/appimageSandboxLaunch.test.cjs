@@ -76,6 +76,19 @@ test('electron-builder.yml sets executableArgs empty (no default --no-sandbox de
   assert.ok(!/executableArgs:\s*\[[^\]]*--no-sandbox/.test(yml))
 })
 
+test('macOS packaging declares NSLocalNetworkUsageDescription for LAN Connect', () => {
+  const yml = fs.readFileSync(BUILDER_YML, 'utf8')
+  // electron-builder copies mac.extendInfo into Contents/Info.plist.
+  assert.match(yml, /^mac:\s*$/m)
+  assert.match(yml, /extendInfo:\s*$/m)
+  assert.match(
+    yml,
+    /NSLocalNetworkUsageDescription:\s*"Hamster connects to your self-hosted client on the local network\."/,
+  )
+  // Keep the usage string tied to the Connect gate's LAN origin story.
+  assert.match(yml, /192\.168/)
+})
+
 test('afterPack copies fail-closed AppRun into appOutDir (static hook contract)', async () => {
   const hook = require(AFTER_PACK)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hamster-afterpack-'))

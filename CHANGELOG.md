@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for early `0.x` cuts (breaking changes allowed without a major bump).
 
+## [Unreleased]
+
+### Fixed
+
+- macOS Electron: declare `NSLocalNetworkUsageDescription` so Connect to a LAN client origin (e.g. `http://192.168.x.x:3000`) can show the Local Network permission prompt on macOS 15+ instead of failing silently with 无法连接 / Can't reach this Hamster
+
 ## [0.1.8] - 2026-11-23
 
 ### Fixed

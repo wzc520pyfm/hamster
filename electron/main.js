@@ -16,7 +16,7 @@ const { pathToFileURL } = require('node:url')
 const {
   stripTrailingSlash,
   normalizeHamsterOrigin,
-  validateHamsterClientApiOrigin,
+  validateHamsterClientApiOriginWithRetry,
   isUrlOnTrustedOrigin,
   buildClientUrl,
 } = require('./hamsterOrigin.cjs')
@@ -447,7 +447,10 @@ app.whenReady().then(() => {
       return { ok: false, reason: normalized.reason }
     }
 
-    const validated = await validateHamsterClientApiOrigin(normalized.origin)
+    // macOS 15+ Local Network (TN3179): the first LAN TCP that raises the
+    // permission alert may be denied before the user answers. Retry briefly so
+    // Allow + Connect does not require an immediate second click when possible.
+    const validated = await validateHamsterClientApiOriginWithRetry(normalized.origin)
     if (!validated.ok) {
       session = {
         ...session,

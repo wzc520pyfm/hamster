@@ -38,10 +38,15 @@ Start Compose (or production-style `server.mjs`) first, then open Hamster and en
 client origin on the Connect gate — same machine: `http://localhost:3000`; another device
 on the LAN: `http://<host-lan-ip>:3000` (placeholder example: `http://192.168.1.10:3000`).
 
-On **macOS 15+**, the first LAN connect may show a **Local Network** permission prompt
-(packaged builds declare `NSLocalNetworkUsageDescription`). Allow Hamster, then **Retry**
-if the gate still shows 无法连接 / Can't reach this Hamster. Loopback (`localhost` /
-`127.0.0.1`) is not gated by that prompt.
+Default Compose publishes Postgres (`changeme`), the API (no browser auth on conversation
+routes), and the client on the host network. Prefer loopback for everyday use. For LAN
+access, bind only what you need (or use an authenticated tunnel) — Electron Connect does
+not restrict who else on the network can reach those ports.
+
+On **macOS 15+**, LAN Connect needs a build that declares `NSLocalNetworkUsageDescription`
+(**v0.1.9+** macOS installers). The first LAN connect may show a **Local Network**
+permission prompt. Allow Hamster, then **Retry** if the gate still shows 无法连接 /
+Can't reach this Hamster. Loopback (`localhost` / `127.0.0.1`) is not gated by that prompt.
 
 Default placeholder env values (overridable; not real secrets):
 
@@ -114,7 +119,7 @@ cd client && npm install && VITE_API_BASE_URL= npm run build && API_UPSTREAM=htt
 
 ## Status
 
-**v0.1.8** is the current exploratory `0.x` cut (public repo; provisional name). Releases require Linux / Windows / macOS installers — see `CHANGELOG.md` and `docs/release.md`.
+**v0.1.9** is the current exploratory `0.x` cut (public repo; provisional name). Releases require Linux / Windows / macOS installers — see `CHANGELOG.md` and `docs/release.md`.
 
 Contract checks and OpenUI Renderer wiring are documented in `docs/p0-report.md` with fixture limitations called out. Eve is still not frozen; this is not a public product launch.
 

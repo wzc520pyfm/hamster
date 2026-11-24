@@ -75,3 +75,56 @@ test('retry does not loop on non-transient validation failures', async () => {
   assert.equal(result.reason, 'health_not_hamster')
   assert.equal(healthCalls, 1)
 })
+
+test('retry exhaustion keeps health_unreachable after default attempts', async () => {
+  let healthCalls = 0
+  const sleeps = []
+  const fetchImpl = async (url) => {
+    const u = String(url)
+    if (u.includes('/api/health')) {
+      healthCalls += 1
+      throw new Error('EHOSTUNREACH')
+    }
+    return { ok: false, status: 404, json: async () => ({}) }
+  }
+
+  const result = await validateHamsterClientApiOriginWithRetry('http://192.168.1.10:3000', {
+    fetchImpl,
+    delayMs: 5,
+    sleep: async (ms) => {
+      sleeps.push(ms)
+    },
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.reason, 'health_unreachable')
+  assert.equal(healthCalls, 3)
+  assert.deepEqual(sleeps, [5, 5])
+})
+
+test('retry recovers after transient manifest_unreachable', async () => {
+  let healthCalls = 0
+  let manifestCalls = 0
+  const fetchImpl = async (url) => {
+    const u = String(url)
+    if (u.includes('/api/health')) {
+      healthCalls += 1
+      return okHealth()
+    }
+    if (u.includes('manifest.webmanifest')) {
+      manifestCalls += 1
+      if (manifestCalls < 2) throw new Error('EHOSTUNREACH')
+      return okManifest()
+    }
+    return { ok: false, status: 404, json: async () => ({}) }
+  }
+
+  const result = await validateHamsterClientApiOriginWithRetry('http://192.168.1.10:3000', {
+    fetchImpl,
+    attempts: 3,
+    delayMs: 5,
+    sleep: async () => {},
+  })
+  assert.deepEqual(result, { ok: true, origin: 'http://192.168.1.10:3000' })
+  assert.equal(healthCalls, 2)
+  assert.equal(manifestCalls, 2)
+})

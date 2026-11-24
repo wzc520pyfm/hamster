@@ -79,11 +79,13 @@ test('electron-builder.yml sets executableArgs empty (no default --no-sandbox de
 test('macOS packaging declares NSLocalNetworkUsageDescription for LAN Connect', () => {
   const yml = fs.readFileSync(BUILDER_YML, 'utf8')
   // electron-builder copies mac.extendInfo into Contents/Info.plist.
-  assert.match(yml, /^mac:\s*$/m)
-  assert.match(yml, /extendInfo:\s*$/m)
+  // Assert under the mac: block only (not a sibling linux/win key).
+  const macMatch = yml.match(/^mac:\n((?:[ \t].*\n)*)/m)
+  assert.ok(macMatch, 'mac: section required')
+  const macBlock = macMatch[1]
   assert.match(
-    yml,
-    /NSLocalNetworkUsageDescription:\s*"Hamster connects to your self-hosted client on the local network\."/,
+    macBlock,
+    /extendInfo:\n[ \t]+NSLocalNetworkUsageDescription:\s*"Hamster connects to your self-hosted client on the local network\."/,
   )
   // Keep the usage string tied to the Connect gate's LAN origin story.
   assert.match(yml, /192\.168/)

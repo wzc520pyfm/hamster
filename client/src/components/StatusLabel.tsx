@@ -26,7 +26,13 @@ function taskTone(status: TaskStatus) {
 
 export function TaskStatusLabel({ status, locale }: { status: TaskStatus; locale: Locale }) {
   return (
-    <Badge tone={taskTone(status)} aria-label={taskStatusLabel(status, locale)}>
+    <Badge
+      tone={taskTone(status)}
+      aria-label={taskStatusLabel(status, locale)}
+      className="max-w-full whitespace-normal text-left leading-snug"
+      data-testid="task-status-label"
+      data-status={status}
+    >
       {status === 'running' ? (
         <span className="inline-flex items-center gap-1.5">
           <span className="size-1.5 animate-pulse rounded-full bg-[#2c4f73]" aria-hidden />
@@ -46,7 +52,16 @@ export function ControlStatusLabel({
   status: ControlStatus
   locale: Locale
 }) {
-  return <Badge tone="info">{controlStatusLabel(status, locale)}</Badge>
+  return (
+    <Badge
+      tone="info"
+      className="max-w-full whitespace-normal"
+      data-testid="control-status-label"
+      data-status={status}
+    >
+      {controlStatusLabel(status, locale)}
+    </Badge>
+  )
 }
 
 export function ApprovalStatusLabel({
@@ -57,6 +72,21 @@ export function ApprovalStatusLabel({
   locale: Locale
 }) {
   const tone =
-    status === 'pending' ? 'warn' : status === 'approved' ? 'info' : status === 'denied' || status === 'expired' ? 'danger' : 'quiet'
-  return <Badge tone={tone}>{approvalStatusLabel(status, locale)}</Badge>
+    status === 'pending'
+      ? 'warn'
+      : status === 'approved'
+        ? 'info'
+        : status === 'denied' || status === 'expired'
+          ? 'danger'
+          : 'quiet'
+  return (
+    <Badge
+      tone={tone}
+      className="max-w-full whitespace-normal text-left leading-snug"
+      data-testid="approval-status-label"
+      data-status={status}
+    >
+      {approvalStatusLabel(status, locale)}
+    </Badge>
+  )
 }

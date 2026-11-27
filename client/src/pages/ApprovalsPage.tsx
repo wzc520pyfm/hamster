@@ -64,45 +64,51 @@ export function ApprovalsPage({
   }, [focusId, approvals])
 
   return (
-    <div className="flex flex-col gap-3">
-      <header className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
-        <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          {t.approvals}
-        </h1>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="shrink-0 border-b border-[var(--color-border)] px-3 py-2.5 md:px-4">
+        <div className="mx-auto w-full max-w-[var(--reading-column)]">
+          <h1 className="text-lg font-semibold tracking-tight text-[var(--color-foreground)]">
+            {t.approvals}
+          </h1>
+        </div>
       </header>
 
-      {error && !connectionError ? (
-        <p className="text-sm text-[var(--color-destructive)]">{error}</p>
-      ) : null}
+      <div className="mx-auto flex w-full max-w-[var(--reading-column)] flex-col gap-3 px-3 py-3 md:px-4">
+        {error && !connectionError ? (
+          <p className="text-sm text-[var(--color-destructive)] whitespace-normal">{error}</p>
+        ) : null}
 
-      {approvals.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted-foreground)]">{t.noApprovals}</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {approvals.map((a) => (
-            <ApprovalCard
-              key={a.id}
-              approval={a}
-              locale={locale}
-              focused={Boolean(focusId) && a.id === focusId}
-              actionsDisabled={connectionError}
-              onApprove={async (id) => {
-                // Fail-closed: unavailable control channel must not execute or look granted.
-                if (connectionError) return
-                await api.approve(id)
-                await refresh()
-                onApprovalsChanged()
-              }}
-              onDeny={async (id) => {
-                if (connectionError) return
-                await api.deny(id)
-                await refresh()
-                onApprovalsChanged()
-              }}
-            />
-          ))}
-        </div>
-      )}
+        {approvals.length === 0 ? (
+          <p className="text-sm text-[var(--color-muted-foreground)] whitespace-normal">
+            {t.noApprovals}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {approvals.map((a) => (
+              <ApprovalCard
+                key={a.id}
+                approval={a}
+                locale={locale}
+                focused={Boolean(focusId) && a.id === focusId}
+                actionsDisabled={connectionError}
+                onApprove={async (id) => {
+                  // Fail-closed: unavailable control channel must not execute or look granted.
+                  if (connectionError) return
+                  await api.approve(id)
+                  await refresh()
+                  onApprovalsChanged()
+                }}
+                onDeny={async (id) => {
+                  if (connectionError) return
+                  await api.deny(id)
+                  await refresh()
+                  onApprovalsChanged()
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

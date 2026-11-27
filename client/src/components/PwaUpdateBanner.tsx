@@ -48,14 +48,14 @@ export function PwaUpdateBanner() {
 
   return (
     <div
-      className="safe-area-bottom shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
+      className="safe-area-bottom shrink-0 border-t border-[var(--color-border)] bg-[var(--color-wash)] px-3 py-2"
       data-testid="pwa-update-banner"
       role="status"
       aria-live="polite"
       aria-label={retryNeeded ? t.updateRetryNeeded : t.updateAvailable}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1 text-sm leading-snug">
+        <div className="min-w-0 flex-1 text-sm leading-snug whitespace-normal">
           {retryNeeded ? t.updateRetryNeeded : t.updateAvailable}
         </div>
         <div className="flex shrink-0 gap-2">

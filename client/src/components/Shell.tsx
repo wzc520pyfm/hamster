@@ -41,14 +41,20 @@ export function Shell({
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'block rounded-md px-2.5 py-2 text-sm transition-colors',
+      'block rounded-md px-2.5 py-1.5 text-sm transition-colors',
       isActive
-        ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-        : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]',
+        ? 'bg-[var(--color-muted)] text-[var(--color-foreground)]'
+        : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70 hover:text-[var(--color-foreground)]',
     )
 
+  // Control-plane default title is the literal EN string; map it to locked locale copy.
+  const conversationSubtitle =
+    !conversationTitle.trim() || conversationTitle === 'Main conversation'
+      ? t.mainConversation
+      : conversationTitle
+
   const brandBlock = (
-    <div className="mb-6 px-1">
+    <div className="mb-5 px-1">
       <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
         {t.brand}
       </div>
@@ -57,10 +63,12 @@ export function Shell({
   )
 
   const links = (
-    <nav className="flex flex-col gap-1">
+    <nav className="flex flex-col gap-0.5">
       <NavLink to="/" end className={linkClass} onClick={() => setMenuOpen(false)}>
         <div className="font-medium">{t.conversation}</div>
-        <div className="truncate text-xs opacity-80">{conversationTitle || t.mainConversation}</div>
+        <div className="truncate text-xs opacity-80" data-testid="shell-conversation-subtitle">
+          {conversationSubtitle}
+        </div>
       </NavLink>
       <NavLink to="/assets" className={linkClass} onClick={() => setMenuOpen(false)}>
         {t.dashboards}
@@ -90,8 +98,8 @@ export function Shell({
         className={cn(
           'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
           locale === 'en'
-            ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+            ? 'bg-[var(--color-muted)] text-[var(--color-foreground)]'
+            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70',
         )}
         aria-pressed={locale === 'en'}
         onClick={() => setLocale('en')}
@@ -104,8 +112,8 @@ export function Shell({
         className={cn(
           'h-8 rounded-md px-2.5 text-xs font-medium transition-colors',
           locale === 'zh'
-            ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+            ? 'bg-[var(--color-muted)] text-[var(--color-foreground)]'
+            : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70',
         )}
         aria-pressed={locale === 'zh'}
         onClick={() => setLocale('zh')}
@@ -117,8 +125,9 @@ export function Shell({
 
   return (
     <div
-      className="mx-auto flex h-[100dvh] max-h-[100dvh] min-h-0 max-w-6xl flex-col gap-0 md:p-4"
+      className="flex h-[100dvh] max-h-[100dvh] min-h-0 w-full flex-col gap-0"
       data-shell-bounded="true"
+      data-shell-fullbleed="true"
     >
       {/* One connection-error layer only — shrink-0 inside 100dvh; remaining height for shell body. */}
       {connectionError ? (
@@ -127,16 +136,16 @@ export function Shell({
           data-testid="connection-banner"
           role="alert"
         >
-          <p className="text-sm text-[var(--color-destructive)]">{t.connect}</p>
+          <p className="text-sm text-[var(--color-destructive)] whitespace-normal">{t.connect}</p>
           <Button type="button" size="sm" variant="outline" onClick={() => onRetryConnection?.()}>
             {t.retry}
           </Button>
         </div>
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 md:flex-row md:gap-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 md:flex-row">
         {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
-        <header className="safe-area-top sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 backdrop-blur-md md:hidden">
+        <header className="safe-area-top sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-2.5 md:hidden">
           <div className="min-w-0">
             <div className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight">
               {t.brand}
@@ -151,8 +160,8 @@ export function Shell({
                 className={cn(
                   'h-8 rounded-md px-2 text-xs font-medium transition-colors',
                   locale === 'en'
-                    ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-                    : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+                    ? 'bg-[var(--color-muted)] text-[var(--color-foreground)]'
+                    : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70',
                 )}
                 aria-pressed={locale === 'en'}
                 onClick={() => setLocale('en')}
@@ -165,8 +174,8 @@ export function Shell({
                 className={cn(
                   'h-8 rounded-md px-2 text-xs font-medium transition-colors',
                   locale === 'zh'
-                    ? 'bg-[var(--color-accent)] text-[var(--color-foreground)]'
-                    : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+                    ? 'bg-[var(--color-muted)] text-[var(--color-foreground)]'
+                    : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70',
                 )}
                 aria-pressed={locale === 'zh'}
                 onClick={() => setLocale('zh')}
@@ -174,30 +183,34 @@ export function Shell({
                 中文
               </button>
             </div>
-            <button
-              type="button"
-              data-testid="shell-menu-toggle"
-              className="inline-flex h-9 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium"
-              aria-expanded={menuOpen}
-              aria-controls={panelId}
-              onClick={() => setMenuOpen((open) => !open)}
-            >
-              {menuOpen ? t.closeMenu : t.openMenu}
-              {pendingApprovals > 0 ? (
-                <span
-                  data-testid="shell-pending-badge"
-                  className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
-                >
-                  {pendingApprovals}
-                </span>
-              ) : null}
-            </button>
+            {/* Open control stays on the top bar; Close menu lives inside the drawer so
+                the official label is never clipped by the panel (EN "Close menu"). */}
+            {!menuOpen ? (
+              <button
+                type="button"
+                data-testid="shell-menu-toggle"
+                className="inline-flex h-9 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium"
+                aria-expanded={false}
+                aria-controls={panelId}
+                onClick={() => setMenuOpen(true)}
+              >
+                {t.openMenu}
+                {pendingApprovals > 0 ? (
+                  <span
+                    data-testid="shell-pending-badge"
+                    className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
+                  >
+                    {pendingApprovals}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
           </div>
         </header>
 
-        {/* Desktop sidebar — min-h-0 + flex-1 so locale stays reachable within remaining height. */}
+        {/* Desktop sidebar — edge-to-edge, hairline split; locale stays inside the window. */}
         <aside
-          className="hidden min-h-0 w-[13.5rem] shrink-0 flex-col rounded-xl border border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-4 backdrop-blur-md md:flex"
+          className="hidden min-h-0 w-[var(--shell-sidebar-width)] shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-3 md:flex"
           style={{ animation: 'shell-in 420ms ease-out' }}
           data-testid="shell-sidebar"
         >
@@ -206,7 +219,7 @@ export function Shell({
           {localeToggle}
         </aside>
 
-        {/* Narrow drawer overlay — nav only; locale stays on the top bar. */}
+        {/* Narrow drawer overlay — nav + Close menu inside the panel; locale stays on the top bar. */}
         {menuOpen ? (
           <div className="fixed inset-0 z-40 md:hidden" role="presentation">
             <button
@@ -217,18 +230,46 @@ export function Shell({
             />
             <aside
               id={panelId}
-              className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 shadow-[4px_0_24px_rgba(26,35,48,0.12)]"
+              className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-wash)] px-3 py-4 shadow-[4px_0_24px_rgba(26,35,48,0.12)]"
               style={{ animation: 'shell-in 280ms ease-out' }}
+              data-testid="shell-drawer"
             >
-              {brandBlock}
+              <div className="mb-5 flex items-start justify-between gap-2">
+                <div className="min-w-0 px-1">
+                  <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+                    {t.brand}
+                  </div>
+                  <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
+                    {t.preview}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="shell-menu-toggle"
+                  className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium whitespace-nowrap"
+                  aria-expanded={true}
+                  aria-controls={panelId}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {t.closeMenu}
+                  {pendingApprovals > 0 ? (
+                    <span
+                      data-testid="shell-pending-badge"
+                      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
+                    >
+                      {pendingApprovals}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
               {links}
             </aside>
           </div>
         ) : null}
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col px-3 py-4 md:px-0 md:py-0">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--color-chat-ground)]">
           {standalone && location.pathname !== '/' ? (
-            <div className="shrink-0 pb-2">
+            <div className="shrink-0 px-3 pt-2 md:px-4">
               <Button asChild variant="ghost" size="sm">
                 <Link to="/">{t.backToConversation}</Link>
               </Button>

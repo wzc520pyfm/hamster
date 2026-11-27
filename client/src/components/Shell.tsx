@@ -47,6 +47,12 @@ export function Shell({
         : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]/70 hover:text-[var(--color-foreground)]',
     )
 
+  // Control-plane default title is the literal EN string; map it to locked locale copy.
+  const conversationSubtitle =
+    !conversationTitle.trim() || conversationTitle === 'Main conversation'
+      ? t.mainConversation
+      : conversationTitle
+
   const brandBlock = (
     <div className="mb-5 px-1">
       <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
@@ -60,7 +66,9 @@ export function Shell({
     <nav className="flex flex-col gap-0.5">
       <NavLink to="/" end className={linkClass} onClick={() => setMenuOpen(false)}>
         <div className="font-medium">{t.conversation}</div>
-        <div className="truncate text-xs opacity-80">{conversationTitle || t.mainConversation}</div>
+        <div className="truncate text-xs opacity-80" data-testid="shell-conversation-subtitle">
+          {conversationSubtitle}
+        </div>
       </NavLink>
       <NavLink to="/assets" className={linkClass} onClick={() => setMenuOpen(false)}>
         {t.dashboards}
@@ -175,24 +183,28 @@ export function Shell({
                 中文
               </button>
             </div>
-            <button
-              type="button"
-              data-testid="shell-menu-toggle"
-              className="inline-flex h-9 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium"
-              aria-expanded={menuOpen}
-              aria-controls={panelId}
-              onClick={() => setMenuOpen((open) => !open)}
-            >
-              {menuOpen ? t.closeMenu : t.openMenu}
-              {pendingApprovals > 0 ? (
-                <span
-                  data-testid="shell-pending-badge"
-                  className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
-                >
-                  {pendingApprovals}
-                </span>
-              ) : null}
-            </button>
+            {/* Open control stays on the top bar; Close menu lives inside the drawer so
+                the official label is never clipped by the panel (EN "Close menu"). */}
+            {!menuOpen ? (
+              <button
+                type="button"
+                data-testid="shell-menu-toggle"
+                className="inline-flex h-9 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium"
+                aria-expanded={false}
+                aria-controls={panelId}
+                onClick={() => setMenuOpen(true)}
+              >
+                {t.openMenu}
+                {pendingApprovals > 0 ? (
+                  <span
+                    data-testid="shell-pending-badge"
+                    className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
+                  >
+                    {pendingApprovals}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -207,7 +219,7 @@ export function Shell({
           {localeToggle}
         </aside>
 
-        {/* Narrow drawer overlay — nav only; locale stays on the top bar. */}
+        {/* Narrow drawer overlay — nav + Close menu inside the panel; locale stays on the top bar. */}
         {menuOpen ? (
           <div className="fixed inset-0 z-40 md:hidden" role="presentation">
             <button
@@ -220,8 +232,36 @@ export function Shell({
               id={panelId}
               className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-wash)] px-3 py-4 shadow-[4px_0_24px_rgba(26,35,48,0.12)]"
               style={{ animation: 'shell-in 280ms ease-out' }}
+              data-testid="shell-drawer"
             >
-              {brandBlock}
+              <div className="mb-5 flex items-start justify-between gap-2">
+                <div className="min-w-0 px-1">
+                  <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+                    {t.brand}
+                  </div>
+                  <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
+                    {t.preview}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-testid="shell-menu-toggle"
+                  className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--color-border)] bg-white px-3 text-sm font-medium whitespace-nowrap"
+                  aria-expanded={true}
+                  aria-controls={panelId}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {t.closeMenu}
+                  {pendingApprovals > 0 ? (
+                    <span
+                      data-testid="shell-pending-badge"
+                      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-md bg-[var(--color-primary)] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-primary-foreground)]"
+                    >
+                      {pendingApprovals}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
               {links}
             </aside>
           </div>

@@ -136,6 +136,39 @@ test('shell is full-bleed: no max-w-6xl / md:p-4 centering card stage', () => {
   assert.match(shell, /border-r border-\[var\(--color-border\)\]/)
 })
 
+test('narrow drawer keeps official Close menu fully inside the panel', async () => {
+  const shell = read('components/Shell.tsx')
+  const { getCopy } = await import('./messages.ts')
+  assert.equal(getCopy('en').closeMenu, 'Close menu')
+  assert.equal(getCopy('zh').closeMenu, '关闭菜单')
+  assert.equal(getCopy('en').openMenu, 'Menu')
+  assert.equal(getCopy('zh').openMenu, '菜单')
+  // Close control is rendered inside the drawer panel, not on the obscured top bar.
+  assert.match(shell, /data-testid="shell-drawer"/)
+  const drawerIdx = shell.indexOf('data-testid="shell-drawer"')
+  const closeInDrawerIdx = shell.indexOf('{t.closeMenu}', drawerIdx)
+  assert.ok(drawerIdx > 0)
+  assert.ok(closeInDrawerIdx > drawerIdx, 'Close menu must render inside the drawer')
+  // Top-bar open control must not switch to Close menu (that was the clip).
+  const topBarToggleSlice = shell.slice(
+    shell.indexOf('Narrow top bar'),
+    shell.indexOf('Desktop sidebar'),
+  )
+  assert.equal(topBarToggleSlice.includes('{t.closeMenu}'), false)
+  assert.match(topBarToggleSlice, /\{t\.openMenu\}/)
+})
+
+test('default control-plane title maps to locked t.mainConversation for sidebar subtitle', async () => {
+  const shell = read('components/Shell.tsx')
+  const { getCopy } = await import('./messages.ts')
+  assert.equal(getCopy('en').mainConversation, 'Main conversation')
+  assert.equal(getCopy('zh').mainConversation, '主对话')
+  assert.match(shell, /conversationTitle === 'Main conversation'/)
+  assert.match(shell, /t\.mainConversation/)
+  assert.match(shell, /data-testid="shell-conversation-subtitle"/)
+  assert.match(shell, /conversationSubtitle/)
+})
+
 test('conversation messages are bubbles without visible USER/ASSISTANT labels', () => {
   const page = read('pages/ConversationPage.tsx')
   // Role may appear in data-role / aria-label wiring, but not as a visible text node.

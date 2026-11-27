@@ -53,12 +53,27 @@ export function Shell({
       ? t.mainConversation
       : conversationTitle
 
+  const brandMark = (
+    <img
+      src="/icons/hamster-mark.png"
+      alt=""
+      width={32}
+      height={32}
+      draggable={false}
+      className="size-8 shrink-0"
+      data-testid="shell-brand-mark"
+    />
+  )
+
   const brandBlock = (
-    <div className="mb-5 px-1">
-      <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
-        {t.brand}
+    <div className="mb-5 flex items-center gap-2 px-1">
+      {brandMark}
+      <div className="min-w-0">
+        <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+          {t.brand}
+        </div>
+        <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{t.preview}</div>
       </div>
-      <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{t.preview}</div>
     </div>
   )
 
@@ -146,11 +161,14 @@ export function Shell({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 md:flex-row">
         {/* Narrow top bar — brand + menu control; desktop keeps the sticky sidebar. */}
         <header className="safe-area-top sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--sidebar)] px-3 py-2.5 md:hidden">
-          <div className="min-w-0">
-            <div className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight">
-              {t.brand}
+          <div className="flex min-w-0 items-center gap-2">
+            {brandMark}
+            <div className="min-w-0">
+              <div className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight">
+                {t.brand}
+              </div>
+              <div className="text-[11px] text-[var(--color-muted-foreground)]">{t.preview}</div>
             </div>
-            <div className="text-[11px] text-[var(--color-muted-foreground)]">{t.preview}</div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <div className="flex items-center gap-0.5" role="group" aria-label="Language">
@@ -235,12 +253,15 @@ export function Shell({
               data-testid="shell-drawer"
             >
               <div className="mb-5 flex items-start justify-between gap-2">
-                <div className="min-w-0 px-1">
-                  <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
-                    {t.brand}
-                  </div>
-                  <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
-                    {t.preview}
+                <div className="flex min-w-0 items-center gap-2 px-1">
+                  {brandMark}
+                  <div className="min-w-0">
+                    <div className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--color-foreground)]">
+                      {t.brand}
+                    </div>
+                    <div className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
+                      {t.preview}
+                    </div>
                   </div>
                 </div>
                 <button

@@ -136,6 +136,18 @@ test('shell is full-bleed: no max-w-6xl / md:p-4 centering card stage', () => {
   assert.match(shell, /border-r border-\[var\(--color-border\)\]/)
 })
 
+test('sidebar/top-bar brand mark uses mascot icon beside plain-text Hamster', () => {
+  const shell = read('components/Shell.tsx')
+  assert.match(shell, /data-testid="shell-brand-mark"/)
+  assert.match(shell, /\/icons\/hamster-mark\.png/)
+  assert.match(shell, /\{t\.brand\}/)
+  assert.match(shell, /\{t\.preview\}/)
+  // Marketing sheet copy must not enter the shell chrome.
+  for (const banned of ['你的贴心 AI 助手', '有我在，更轻松！', '仓鼠']) {
+    assert.equal(shell.includes(banned), false, `banned marketing copy in Shell: ${banned}`)
+  }
+})
+
 test('narrow drawer keeps official Close menu fully inside the panel', async () => {
   const shell = read('components/Shell.tsx')
   const { getCopy } = await import('./messages.ts')

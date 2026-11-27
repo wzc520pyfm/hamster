@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ExpandableIdentifiers } from '@/components/ExpandableIdentifiers'
 import { ApprovalStatusLabel } from '@/components/StatusLabel'
 import { Button } from '@/components/ui/button'
 import { approvalActionLabel, approvalDecisionCopy, getCopy, type Locale } from '@/i18n/messages'
@@ -25,6 +26,7 @@ export function safeParams(params: Record<string, unknown> | null | undefined) {
 /**
  * Full confirmation card (Approvals page / focused ticket).
  * SUMMARY dock never uses Approve — only this card does, after View details.
+ * Before a decision the user must already see action, target, key params, and expiry.
  */
 export function ApprovalCard({
   approval,
@@ -51,6 +53,7 @@ export function ApprovalCard({
   const footer = decisionCopy ?? note
   const params = safeParams(approval.params)
   const title = approvalActionLabel(approval.action, approval.params, locale)
+  const closedUnapproved = approval.status === 'expired' || approval.status === 'denied'
 
   return (
     <article
@@ -58,25 +61,34 @@ export function ApprovalCard({
       data-testid="approval-card"
       data-approval-id={approval.id}
       data-focused={focused ? 'true' : 'false'}
-      className={`rounded-lg border bg-[var(--color-card)] p-4 ${
+      data-unapproved={closedUnapproved ? 'true' : 'false'}
+      className={`w-full max-w-[var(--reading-column)] rounded-lg border bg-white p-3.5 ${
         focused
           ? 'border-[var(--color-ring)] ring-2 ring-[var(--color-ring)]'
-          : 'border-[var(--color-border)]'
+          : closedUnapproved
+            ? 'border-[#e2c4c4]'
+            : 'border-[var(--color-border)]'
       }`}
     >
       <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="text-base font-semibold" data-testid="approval-full-action">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold leading-snug" data-testid="approval-full-action">
             {title}
           </h3>
-          <div className="mt-1 font-mono text-[11px] text-[var(--color-muted-foreground)]">
-            {t.taskId}: {approval.taskId}
-          </div>
           {approval.taskTitle ? (
-            <div className="text-sm text-[var(--color-muted-foreground)]" data-testid="approval-full-task-title">
+            <div
+              className="mt-1 text-sm text-[var(--color-muted-foreground)] whitespace-normal"
+              data-testid="approval-full-task-title"
+            >
+              <span className="font-medium text-[var(--color-foreground)]">{t.approvalTarget}: </span>
               {approval.taskTitle}
             </div>
           ) : null}
+          <ExpandableIdentifiers
+            locale={locale}
+            testId="approval-identifiers"
+            items={[{ label: t.taskId, value: approval.taskId }]}
+          />
         </div>
         <ApprovalStatusLabel status={approval.status} locale={locale} />
       </header>
@@ -86,12 +98,13 @@ export function ApprovalCard({
           <div>
             <dt className="text-xs text-[var(--color-muted-foreground)]">{t.params}</dt>
             <dd
-              className="mt-1 rounded-md bg-[var(--color-muted)]/60 px-2.5 py-2 font-mono text-xs whitespace-normal"
+              className="mt-1 rounded-md bg-[var(--color-muted)]/60 px-2.5 py-2 text-sm whitespace-normal"
               data-testid="approval-full-params"
             >
               {params.map((p) => (
-                <div key={p.key} data-param-key={p.key}>
-                  {p.key}: {p.value}
+                <div key={p.key} data-param-key={p.key} className="leading-snug">
+                  <span className="text-[var(--color-muted-foreground)]">{p.key}: </span>
+                  {p.value}
                 </div>
               ))}
             </dd>
@@ -100,12 +113,23 @@ export function ApprovalCard({
         {expiresAt ? (
           <div>
             <dt className="text-xs text-[var(--color-muted-foreground)]">{t.expires}</dt>
-            <dd data-testid="approval-full-expires">
+            <dd data-testid="approval-full-expires" className="whitespace-normal">
               {formatTime(expiresAt, locale === 'zh' ? 'zh-CN' : 'en-US')}
             </dd>
           </div>
         ) : null}
-        {footer ? <div className="text-[var(--color-muted-foreground)]">{footer}</div> : null}
+        {footer ? (
+          <div
+            className={`whitespace-normal ${
+              closedUnapproved
+                ? 'text-[var(--color-destructive)]'
+                : 'text-[var(--color-muted-foreground)]'
+            }`}
+            data-testid="approval-decision-copy"
+          >
+            {footer}
+          </div>
+        ) : null}
       </dl>
 
       {pending ? (
@@ -131,6 +155,7 @@ export function ApprovalCard({
           <Button
             type="button"
             size="sm"
+            className="bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
             disabled={busy || actionsDisabled}
             data-testid="approval-approve"
             onClick={async () => {

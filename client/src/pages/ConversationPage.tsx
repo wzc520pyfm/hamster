@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ExpandableIdentifiers } from '@/components/ExpandableIdentifiers'
 import { PendingApprovalDock } from '@/components/PendingApprovalDock'
 import { TaskCard } from '@/components/TaskCard'
 import { Button } from '@/components/ui/button'
 import { getCopy, type Locale } from '@/i18n/messages'
 import { api, isNetworkError, type Timeline, type TimelineMessage } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export function ConversationPage({
   locale,
@@ -112,33 +114,40 @@ export function ConversationPage({
     // Keyboard-open state (mobile visual viewport) shrinks this column so the composer
     // and approval buttons stay usable instead of being pushed off-screen.
     <div
-      className="flex min-h-0 flex-1 flex-col gap-3"
+      className="flex min-h-0 flex-1 flex-col"
       style={kbHeight ? { height: `${kbHeight}px`, maxHeight: `${kbHeight}px` } : undefined}
       data-testid="conversation-column"
+      data-conversation-id={conversationId ?? undefined}
     >
-      <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 px-4 py-3 backdrop-blur">
-        <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
-          {t.mainConversation}
-        </h1>
-        {conversationId ? (
-          <div className="mt-0.5 font-mono text-[11px] text-[var(--color-muted-foreground)]">
-            conversationId: {conversationId}
-          </div>
-        ) : null}
+      <header className="shrink-0 border-b border-[var(--color-border)] px-3 py-2.5 md:px-4">
+        <div className="mx-auto w-full max-w-[var(--reading-column)]">
+          <h1 className="text-lg font-semibold tracking-tight text-[var(--color-foreground)]">
+            {t.mainConversation}
+          </h1>
+          {conversationId ? (
+            <ExpandableIdentifiers
+              locale={locale}
+              testId="conversation-identifiers"
+              items={[{ label: 'conversationId', value: conversationId }]}
+            />
+          ) : null}
+        </div>
       </header>
 
       <div
-        className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/80 p-4"
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-4"
         onScroll={(e) => {
           const el = e.currentTarget
           stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
         }}
       >
-        {!timeline || (timeline.messages.length === 0 && timeline.tasks.length === 0) ? (
-          <p className="text-sm text-[var(--color-muted-foreground)]">{t.noMessages}</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {renderTimeline(timeline.messages, taskById, locale, {
+        <div className="mx-auto flex w-full max-w-[var(--reading-column)] flex-col gap-2.5">
+          {!timeline || (timeline.messages.length === 0 && timeline.tasks.length === 0) ? (
+            <p className="text-sm text-[var(--color-muted-foreground)] whitespace-normal">
+              {t.noMessages}
+            </p>
+          ) : (
+            renderTimeline(timeline.messages, taskById, locale, {
               onCheckProgress: (taskId) => void send(`progress ${taskId}`),
               onSteer: async (taskId, message) => {
                 await api.steerTask(taskId, message)
@@ -149,60 +158,71 @@ export function ConversationPage({
                 await refresh()
                 onApprovalsChanged()
               },
-            })}
-          </div>
-        )}
-        <div ref={bottomRef} />
+            })
+          )}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      {/* One summary only — SUMMARY → full ticket on /approvals?id=… → CONFIRM. No Approve here. */}
-      <PendingApprovalDock
-        pending={pendingApprovals}
-        locale={locale}
-        onDeny={async (id) => {
-          // Fail-closed when control channel unavailable — do not deny offline.
-          if (connectionError) return
-          await api.deny(id)
-          await refresh()
-          onApprovalsChanged()
-        }}
-      />
-
-      {error && !connectionError ? (
-        <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)]">
-          {error}
-        </div>
-      ) : null}
-
-      <form
-        className="safe-area-bottom shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-3"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void send(text)
-        }}
-      >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
-          <textarea
-            className="min-h-[2.75rem] min-w-0 flex-1 resize-none rounded-md border border-[var(--color-border)] bg-white px-3 py-2 text-sm leading-snug outline-none focus:ring-2 focus:ring-[var(--color-ring)] sm:min-h-10 sm:py-2.5"
-            rows={pendingApprovals.length > 0 ? 2 : 3}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={t.composerPlaceholder}
-            aria-label={t.composerPlaceholder}
-            disabled={!conversationId || sending}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                void send(text)
-              }
+      <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-chat-ground)] px-3 pt-2 md:px-4">
+        <div className="mx-auto flex w-full max-w-[var(--reading-column)] flex-col gap-2">
+          {/* One summary only — SUMMARY → full ticket on /approvals?id=… → CONFIRM. No Approve here. */}
+          <PendingApprovalDock
+            pending={pendingApprovals}
+            locale={locale}
+            onDeny={async (id) => {
+              // Fail-closed when control channel unavailable — do not deny offline.
+              if (connectionError) return
+              await api.deny(id)
+              await refresh()
+              onApprovalsChanged()
             }}
           />
-          <Button type="submit" disabled={!conversationId || sending || !text.trim()}>
-            {t.send}
-          </Button>
+
+          {error && !connectionError ? (
+            <div className="rounded-md border border-[#e2c4c4] bg-[#f8ecec] px-3 py-2 text-sm text-[var(--color-destructive)] whitespace-normal">
+              {error}
+            </div>
+          ) : null}
+
+          <form
+            className="safe-area-bottom shrink-0 pb-3"
+            data-testid="conversation-composer"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void send(text)
+            }}
+          >
+            <div className="flex items-end gap-2 rounded-[var(--radius-composer)] border border-[var(--color-border)] bg-white/90 px-3 py-2 shadow-[0_1px_0_rgba(26,35,48,0.03)]">
+              {/* Textarea so the full design-table placeholder can wrap on narrow widths. */}
+              <textarea
+                className="min-h-[2.75rem] min-w-0 flex-1 resize-none border-0 bg-transparent px-0.5 py-1.5 text-sm leading-snug outline-none focus:ring-0 sm:min-h-10"
+                rows={pendingApprovals.length > 0 ? 2 : 3}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={t.composerPlaceholder}
+                aria-label={t.composerPlaceholder}
+                disabled={!conversationId || sending}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    void send(text)
+                  }
+                }}
+              />
+              <Button
+                type="submit"
+                size="sm"
+                className="mb-0.5 shrink-0 rounded-full"
+                disabled={!conversationId || sending || !text.trim()}
+                aria-label={t.send}
+              >
+                {t.send}
+              </Button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   )
 }
@@ -217,6 +237,7 @@ function renderTimeline(
     onCancel: (taskId: string) => Promise<void>
   },
 ) {
+  const t = getCopy(locale)
   const seenTasks = new Set<string>()
   const nodes: ReactNode[] = []
 
@@ -239,18 +260,21 @@ function renderTimeline(
       continue
     }
 
+    const isUser = message.role === 'user'
     nodes.push(
       <div
         key={message.id}
-        className={
-          message.role === 'user'
-            ? 'ml-8 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm'
-            : 'mr-8 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm'
-        }
+        role="article"
+        data-testid="chat-bubble"
+        data-role={message.role}
+        aria-label={isUser ? t.messageRoleUser : t.messageRoleAssistant}
+        className={cn(
+          'max-w-[var(--bubble-max)] rounded-[var(--radius-bubble)] px-3.5 py-2 text-sm leading-relaxed',
+          isUser
+            ? 'ml-auto bg-[var(--color-bubble-user)] text-[var(--color-bubble-user-fg)]'
+            : 'mr-auto bg-[var(--color-bubble-assistant)] text-[var(--color-bubble-assistant-fg)]',
+        )}
       >
-        <div className="mb-1 text-[11px] uppercase tracking-wide text-[var(--color-muted-foreground)]">
-          {message.role}
-        </div>
         <div className="whitespace-pre-wrap break-words">
           {displayMessageContent(message, taskById)}
         </div>

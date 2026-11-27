@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Renderer, type OpenUIError } from '@openuidev/react-lang'
+import { ExpandableIdentifiers } from '@/components/ExpandableIdentifiers'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { freshnessLabel, getCopy, type Locale } from '@/i18n/messages'
@@ -165,71 +166,79 @@ export function DashboardView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <header className="shrink-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]/90 p-4 backdrop-blur">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="mb-2">
-              <Button asChild size="sm" variant="ghost">
-                <Link to="/">{t.backToConversation}</Link>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="shrink-0 border-b border-[var(--color-border)] px-3 py-2.5 md:px-4">
+        <div className="mx-auto flex w-full max-w-[var(--reading-column)] flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="mb-1">
+                <Button asChild size="sm" variant="ghost">
+                  <Link to="/">{t.backToConversation}</Link>
+                </Button>
+              </div>
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--color-foreground)]">
+                {asset.title}
+              </h1>
+              <div className="mt-1 text-xs text-[var(--color-muted-foreground)] whitespace-normal">
+                {t.source}: {asset.source}
+              </div>
+              <ExpandableIdentifiers
+                locale={locale}
+                testId="asset-identifiers"
+                items={[
+                  { label: t.assetId, value: asset.assetId },
+                  { label: 'layout', value: `v${asset.layoutVersion}` },
+                ]}
+              />
+            </div>
+            {/* Full-width on narrow so freshness copy + Retry stay in the first viewport. */}
+            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:max-w-[min(100%,22rem)] sm:items-end">
+              <Badge
+                tone={
+                  freshness === 'refresh_failed' ? 'danger' : freshness === 'stale' ? 'warn' : 'info'
+                }
+                className="max-w-full whitespace-normal text-left leading-snug sm:text-right"
+              >
+                {freshnessLabel(freshness, lastSuccessAt, locale, localeTag)}
+              </Badge>
+              <div className="text-xs text-[var(--color-muted-foreground)] whitespace-normal">
+                {formatTime(lastSuccessAt, localeTag)}
+              </div>
+              <Button
+                size="sm"
+                className="w-fit"
+                onClick={() => void refresh()}
+                disabled={refreshing}
+              >
+                {freshness === 'refresh_failed' ? t.retry : t.refresh}
               </Button>
             </div>
-            <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight">
-              {asset.title}
-            </h1>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-[var(--color-muted-foreground)]">
-              <span>
-                {t.assetId}: {asset.assetId}
-              </span>
-              <span>
-                {t.source}: {asset.source}
-              </span>
-              <span>layout v{asset.layoutVersion}</span>
-            </div>
           </div>
-          {/* Full-width on narrow so freshness copy + Retry stay in the first viewport. */}
-          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:max-w-[min(100%,22rem)] sm:items-end">
-            <Badge
-              tone={
-                freshness === 'refresh_failed' ? 'danger' : freshness === 'stale' ? 'warn' : 'info'
-              }
-              className="max-w-full whitespace-normal text-left leading-snug sm:text-right"
-            >
-              {freshnessLabel(freshness, lastSuccessAt, locale, localeTag)}
-            </Badge>
-            <div className="text-xs text-[var(--color-muted-foreground)] whitespace-normal">
-              {formatTime(lastSuccessAt, localeTag)}
-            </div>
-            <Button
-              size="sm"
-              className="w-fit"
-              onClick={() => void refresh()}
-              disabled={refreshing}
-            >
-              {freshness === 'refresh_failed' ? t.retry : t.refresh}
-            </Button>
-          </div>
+          <p className="text-xs text-[var(--color-muted-foreground)] whitespace-normal">
+            {t.layoutNote}
+          </p>
+          {error && freshness === 'refresh_failed' ? (
+            <p className="text-sm text-[var(--color-destructive)] whitespace-normal">{error}</p>
+          ) : null}
         </div>
-        <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">{t.layoutNote}</p>
-        {error && freshness === 'refresh_failed' ? (
-          <p className="mt-2 text-sm text-[var(--color-destructive)]">{error}</p>
-        ) : null}
       </header>
 
       {/* Stable OpenUI Renderer — never keyed by refreshToken (would remount layout). */}
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-        <RefreshTokenContext.Provider value={refreshToken}>
-          <Renderer
-            response={asset.openui}
-            library={hamsterOpenUiLibrary}
-            isStreaming={false}
-            toolProvider={toolProvider}
-            onError={onOpenUiError}
-            queryLoader={
-              <span className="text-xs text-[var(--color-muted-foreground)]">{t.loading}</span>
-            }
-          />
-        </RefreshTokenContext.Provider>
+      <div className="min-h-0 flex-1 overflow-auto px-3 py-3 md:px-4">
+        <div className="mx-auto w-full max-w-[var(--reading-column)] rounded-lg border border-[var(--color-border)] bg-white p-3.5">
+          <RefreshTokenContext.Provider value={refreshToken}>
+            <Renderer
+              response={asset.openui}
+              library={hamsterOpenUiLibrary}
+              isStreaming={false}
+              toolProvider={toolProvider}
+              onError={onOpenUiError}
+              queryLoader={
+                <span className="text-xs text-[var(--color-muted-foreground)]">{t.loading}</span>
+              }
+            />
+          </RefreshTokenContext.Provider>
+        </div>
       </div>
     </div>
   )

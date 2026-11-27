@@ -70,12 +70,14 @@ const copy = {
     runtimeSessionId: 'runtimeSessionId',
     controlReceipt: 'Control receipt',
     events: 'Persisted events',
+    updatesCount: (n: number) => `${n} updates`,
     expires: 'Expires',
     action: 'Action',
     params: 'Key params',
     backToConversation: 'Back to conversation',
     layoutNote: 'Layout stays mounted. Refresh re-fetches saved bindings only.',
     loading: 'Loading…',
+    connecting: 'Connecting…',
     error: 'Something went wrong',
     failureReason: 'Failure reason',
     openMenu: 'Menu',
@@ -98,6 +100,11 @@ const copy = {
     morePending: (n: number) => (n === 1 ? '1 more pending' : `${n} more pending`),
     openPendingApprovals: 'Open pending approvals',
     approvalTarget: 'Target',
+    showIdentifiers: 'Show identifiers',
+    hideIdentifiers: 'Hide identifiers',
+    copy: 'Copy',
+    messageRoleUser: 'User',
+    messageRoleAssistant: 'Assistant',
   },
   zh: {
     brand: 'Hamster',
@@ -127,12 +134,14 @@ const copy = {
     runtimeSessionId: 'runtimeSessionId',
     controlReceipt: '控制回执',
     events: '持久事件',
+    updatesCount: (n: number) => `${n} 条更新`,
     expires: '有效期至',
     action: '动作',
     params: '关键参数',
     backToConversation: '返回对话',
     layoutNote: '布局保持挂载。刷新只按已保存绑定取数。',
     loading: '加载中…',
+    connecting: '正在连接…',
     error: '出错了',
     failureReason: '失败原因',
     openMenu: '菜单',
@@ -154,6 +163,11 @@ const copy = {
     morePending: (n: number) => `还有 ${n} 项待审批`,
     openPendingApprovals: '打开待审批',
     approvalTarget: '目标',
+    showIdentifiers: '显示标识',
+    hideIdentifiers: '隐藏标识',
+    copy: '复制',
+    messageRoleUser: '用户',
+    messageRoleAssistant: '助手',
   },
 } as const
 
@@ -239,6 +253,11 @@ export function approvalActionLabel(
           : 'Publish this dashboard'
     case 'save_dashboard_page':
       return locale === 'zh' ? '保存 Dashboard 页面' : 'Save the dashboard page'
+    case 'create_or_start_isolated_desktop':
+    case 'start_isolated_desktop':
+      return locale === 'zh'
+        ? '创建或启动隔离桌面'
+        : 'Create or start the isolated desktop'
     case 'unknown_action':
     case '':
     case undefined:

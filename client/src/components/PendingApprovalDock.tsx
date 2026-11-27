@@ -32,11 +32,10 @@ export function PendingApprovalDock({
     typeof primary.params?.channel === 'string' && primary.params.channel.trim()
       ? primary.params.channel.trim()
       : null
-  const targetBits = [
-    primary.taskTitle?.trim() || null,
-    assetId ? `${t.assetId}: ${assetId}` : null,
-    channel ? channel : null,
-  ].filter(Boolean)
+  const humanTarget = primary.taskTitle?.trim() || null
+  const targetBits = [humanTarget, assetId ? `${t.assetId}: ${assetId}` : null, channel || null].filter(
+    Boolean,
+  )
 
   const detailTo = `/approvals?id=${encodeURIComponent(primary.id)}`
 
@@ -47,7 +46,7 @@ export function PendingApprovalDock({
       data-pending-count={pending.length}
     >
       <article
-        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2.5"
+        className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2.5"
         data-testid="approval-summary"
         data-approval-id={primary.id}
       >
@@ -56,9 +55,6 @@ export function PendingApprovalDock({
             <h3 className="text-sm font-semibold leading-snug" data-testid="approval-summary-action">
               {action}
             </h3>
-            <div className="mt-0.5 font-mono text-[10px] text-[var(--color-muted-foreground)]">
-              {t.taskId}: {primary.taskId}
-            </div>
             {targetBits.length > 0 ? (
               <div
                 className="mt-1 text-xs leading-snug text-[var(--color-muted-foreground)] whitespace-normal"

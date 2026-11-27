@@ -46,7 +46,7 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="safe-area-bottom shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
+      className="safe-area-bottom shrink-0 border-t border-[var(--color-border)] bg-[var(--color-wash)] px-3 py-2"
       data-testid="install-prompt"
       role="region"
       aria-label={t.installTitle}

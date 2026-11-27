@@ -11,6 +11,7 @@
     "smoke:locale": "node ../scripts/ui-smoke-locale.mjs",
     "start:prod": "node server.mjs",
     "test:pwa": "node --experimental-strip-types --test src/lib/pwaUpdate.test.mjs",
+    "test:shell-copy": "node --experimental-strip-types --test src/i18n/shellCopy.test.mjs",
     "test:pwa-lifecycle": "node scripts/pwa-update-lifecycle.mjs",
     "test:entrypoint-parity": "node scripts/entrypoint-parity-node.mjs",
     "test:server-safejoin": "node --test server.safejoin.test.mjs",

@@ -412,18 +412,22 @@ async function main() {
     await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
       timeout: 60000,
     })
-    // Fresh main ConversationPage has no conversation-column testid — wait for API-owned id text.
+    // Conversation id lives on data-conversation-id (collapsed in the shell hierarchy pass).
     await page.waitForFunction(
-      () => /conversationId:\s*conv_/i.test(document.body?.innerText || ''),
+      () => {
+        const el = document.querySelector('[data-conversation-id]')
+        const id = el?.getAttribute('data-conversation-id') || ''
+        return /^conv_[0-9a-f-]{36}$/i.test(id)
+      },
       null,
       { timeout: 30000 },
     )
     await page.waitForSelector('textarea', { timeout: 10000 })
 
     const convBefore = await page.evaluate(() => {
-      const t = document.body?.innerText || ''
-      const m = t.match(/conversationId:\s*(\S+)/)
-      return { conversationIdVisible: m?.[1] || null, sample: t.slice(0, 300) }
+      const el = document.querySelector('[data-conversation-id]')
+      const id = el?.getAttribute('data-conversation-id') || null
+      return { conversationIdVisible: id, sample: (document.body?.innerText || '').slice(0, 300) }
     })
     pushStep(evidence, {
       step: 'api_generated_conversation_visible',
@@ -609,7 +613,11 @@ async function main() {
     const navAfterRetry = mainNavs.length
 
     await page.waitForFunction(
-      () => /conversationId:\s*conv_/i.test(document.body?.innerText || ''),
+      () => {
+        const el = document.querySelector('[data-conversation-id]')
+        const id = el?.getAttribute('data-conversation-id') || ''
+        return /^conv_[0-9a-f-]{36}$/i.test(id)
+      },
       null,
       { timeout: 30000 },
     )
@@ -621,9 +629,9 @@ async function main() {
 
     const uiAfterRetry = await page.evaluate((text) => {
       const body = document.body?.innerText || ''
-      const m = body.match(/conversationId:\s*(\S+)/)
+      const el = document.querySelector('[data-conversation-id]')
       return {
-        conversationIdVisible: m?.[1] || null,
+        conversationIdVisible: el?.getAttribute('data-conversation-id') || null,
         hasUserText: body.includes(text),
         hasBundleBMarker: body.includes('bundle-B-persist-retry-20261121'),
         sample: body.slice(0, 500),

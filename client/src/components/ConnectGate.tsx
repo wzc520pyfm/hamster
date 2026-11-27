@@ -108,15 +108,18 @@ function ConnectGateInner() {
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
       <form
-        className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4"
+        className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-white p-4"
         onSubmit={onSubmit}
         data-testid="connect-gate"
       >
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-xl font-semibold">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--color-foreground)]">
             {t.connectGateTitle}
           </h1>
-          <label className="mt-1 block text-sm text-[var(--color-muted-foreground)]" htmlFor="connect-gate-address">
+          <label
+            className="mt-1 block text-sm text-[var(--color-muted-foreground)]"
+            htmlFor="connect-gate-address"
+          >
             {t.connectAddressLabel}
           </label>
         </div>
@@ -135,7 +138,9 @@ function ConnectGateInner() {
           {failedOnce ? t.retry : t.connectAction}
         </Button>
         {busy ? (
-          <p className="text-sm text-[var(--color-muted-foreground)]">{t.loading}</p>
+          <p className="text-sm text-[var(--color-muted-foreground)]" data-testid="connect-gate-connecting">
+            {t.connecting}
+          </p>
         ) : null}
         {error ? (
           <p className="text-sm text-[var(--color-destructive)]" data-testid="connect-gate-error">
